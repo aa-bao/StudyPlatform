@@ -1,0 +1,127 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
+
+const routes = [
+  // 登录页
+  {
+    path: '/',
+    redirect: '/login'
+  },
+  {
+    path: '/login',
+    component: () => import('@/views/Login.vue')
+  },
+
+  // 用户端
+  {
+    path: '/user',
+    component: () => import('@/views/layout/UserLayout.vue'),
+    children: [{
+        // 备考面板
+        path: 'dashboard',
+        component: () => import('@/views/Dashboard.vue')
+      },
+      {
+        // 错题本
+        path: 'correction-notebook',
+        component: () => import('@/views/CorrectionNotebook.vue')
+      },
+      {
+        // 个人资料
+        path: 'profile',
+        component: () => import('@/views/UserProfile.vue')
+      },
+      // 题库页面
+      {
+        path: 'subject',
+        component: () => import('@/views/SubjectList.vue')
+      },
+      // 刷题界面
+      {
+        path: 'practice/:subjectId',
+        component: () => import('@/views/GeneralPractice.vue'),
+        props: true
+      },
+    ]
+  },
+
+  // 管理端
+  {
+    path: '/admin',
+    component: () => import('@/views/layout/AdminLayout.vue'),
+    children: [{
+       // 后台首页
+        path: 'home',
+        component: () => import('@/views/admin/AdminHome.vue')
+      },
+      {
+        // 题目管理
+        path: 'questions-manage',
+        component: () => import('@/views/admin/QuestionManage.vue')
+      },
+    ]
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+/**
+ * 核心逻辑：路由守卫
+ */
+router.beforeEach((to, from, next) => {
+  const role = localStorage.getItem('role')
+  const userStr = localStorage.getItem('user') // 修正 key 为 'user'，与 store 保持一致
+  let userRole = null
+  let isLogin = false
+
+  if (role && userStr) {
+    try {
+      const userObj = JSON.parse(userStr)
+      if (userObj.role === role) {
+        userRole = role
+        isLogin = true
+      }
+    } catch (e) {
+      console.error('用户信息解析失败', e)
+    }
+  }
+
+  if (!isLogin && (role || userStr)) {
+    localStorage.removeItem('role')
+    localStorage.removeItem('user')
+  }
+
+  console.log('当前路由去向:', to.path)
+  console.log('登录状态:', isLogin, '角色:', userRole)
+
+  // 2. 路由逻辑判断
+  if (to.path === '/login') {
+    // 如果已登录，且访问登录页 -> 自动跳转到对应首页
+    if (isLogin) {
+      next(userRole === 'admin' ? '/admin/home' : '/user/dashboard')
+    } else {
+      // 未登录 -> 放行进入登录页
+      next()
+    }
+  } else if (to.path.startsWith('/admin')) {
+    if (!isLogin) {
+      next('/login')
+    } else if (userRole !== 'admin') {
+      ElMessage.error("权限不足，无法进入管理后台")
+      next('/user/dashboard')
+    } else {
+      next()
+    }
+  } else {
+    if (!isLogin) {
+      next('/login')
+    } else {
+      next()
+    }
+  }
+})
+
+export default router

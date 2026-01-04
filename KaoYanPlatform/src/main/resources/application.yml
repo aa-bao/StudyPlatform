@@ -1,0 +1,17 @@
+server:
+  port: 8081
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/kaoyan_platform?serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=utf-8
+    username: root
+    password: 123456
+
+# MyBatis-Plus
+mybatis-plus:
+  configuration:
+    map-underline-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
