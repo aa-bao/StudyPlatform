@@ -394,12 +394,8 @@ const route = useRoute()
 const router = useRouter()
 
 const goBack = () => {
-  // 返回到习题册选择页面 (SubjectList)
-  // 传入 subject 参数以保持原来的科目选中状态
-  router.push({
-    path: '/user/subject',
-    query: { subject: route.query.subject } // 使用 route.query.subject 而不是 name
-  })
+  // 直接返回到科目选择首页 (SubjectList)
+  router.push('/user/subject')
 }
 
 const mode = ref('daily')
@@ -412,7 +408,7 @@ const isCollected = ref(false)
 const collectionTags = ref([])
 const newTagInput = ref('')
 const showCollectionDialog = ref(false)
-const systemTags = ['难题', '好题', '二刷', '易错', '重点']
+const systemTags = ['难题', '好题', '易错', '重点']
 const userHistoryTags = ref([])
 
 const allDisplayTags = computed(() => {
@@ -1300,7 +1296,7 @@ const renderLatex = (content) => {
   font-weight: bold;
 }
 
-/* 状态栏 (Inline Status) */
+/* 状态栏 (内联状态) */
 .status-bar {
   display: flex;
   justify-content: space-between;

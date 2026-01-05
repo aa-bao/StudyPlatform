@@ -12,7 +12,8 @@ public class Question {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Integer subjectId;
+    // 移除外键字段：subjectId, bookId
+    // 现在通过映射表管理：map_question_subject, map_question_book
     private Integer type; // 1-单选, 2-多选
     private String content;
 
@@ -30,5 +31,16 @@ public class Question {
     @TableField(exist = false)
     private java.time.LocalDateTime createTime; // 用于前端展示错题时间
 
-    private Integer bookId; // 习题册ID
+    // 非数据库字段：用于查询时的关联信息
+    @TableField(exist = false)
+    private Integer subjectId; // 所属科目ID（通过map_question_subject查询）
+
+    @TableField(exist = false)
+    private Integer bookId; // 所属习题册ID（通过map_question_book查询）
+
+    @TableField(exist = false)
+    private String bookName; // 习题册名称（关联查询时使用）
+
+    @TableField(exist = false)
+    private String subjectName; // 科目名称（关联查询时使用）
 }

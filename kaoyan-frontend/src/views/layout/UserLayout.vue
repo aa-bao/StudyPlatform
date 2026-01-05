@@ -28,21 +28,7 @@
                         <el-icon>
                             <img :src="singlePracticeIcon" class="menu-icon-svg" />
                         </el-icon>
-                        <template #title>逐题精练</template>
-                    </el-menu-item>
-
-                    <el-menu-item index="/user/topic-drill">
-                        <el-icon>
-                            <img :src="topicDrillIcon" class="menu-icon-svg" />
-                        </el-icon>
-                        <template #title>专项突破</template>
-                    </el-menu-item>
-
-                    <el-menu-item index="/user/mock-exam">
-                        <el-icon>
-                            <img :src="mockExamIcon" class="menu-icon-svg" />
-                        </el-icon>
-                        <template #title>真题模考</template>
+                        <template #title>开始刷题</template>
                     </el-menu-item>
 
                     <el-menu-item index="/user/correction-notebook">

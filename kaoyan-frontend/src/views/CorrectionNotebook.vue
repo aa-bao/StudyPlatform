@@ -843,7 +843,7 @@ onMounted(() => {
     color: #303133;
 }
 
-/* Error Items */
+/* 错题列表项 */
 .error-items-wrapper {
     display: flex;
     flex-direction: column;

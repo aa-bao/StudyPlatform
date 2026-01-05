@@ -18,7 +18,7 @@ export function registerApi(data) {
     })
 }
 
-// 更新基本信息 (昵称、考研年份、科目等)
+// 更新基本信息
 export function updateUserApi(data) {
     return request({
         url: '/user/update',
@@ -45,5 +45,13 @@ export function uploadAvatarApi(formData) {
         headers: {
             'Content-Type': 'multipart/form-data'
         }
+    })
+}
+
+// 获取当前登录用户的详细信息
+export function getUserInfoApi() {
+    return request({
+        url: '/user/info',
+        method: 'get'
     })
 }

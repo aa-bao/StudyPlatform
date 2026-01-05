@@ -17,9 +17,9 @@ public class BookController {
     private BookService bookService;
 
     @GetMapping("/list-by-subject")
-    public Result getBooksBySubject(@RequestParam String subjectName) {
+    public Result getBooksBySubject(@RequestParam String subjectId) {
         LambdaQueryWrapper<Book> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(Book::getSubjectName, subjectName);
+        queryWrapper.eq(Book::getSubjectId, subjectId);
         List<Book> list = bookService.list(queryWrapper);
         return Result.success(list);
     }

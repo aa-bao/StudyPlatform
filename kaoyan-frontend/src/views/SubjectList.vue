@@ -8,11 +8,21 @@
             <!-- 导航面包屑 (仅在非首页显示) -->
             <div class="nav-header" v-if="currentLevel > 0">
                 <div class="breadcrumb-wrapper">
-                    <el-icon class="home-icon" @click="resetLevel">
+                    <el-icon class="home-icon" @click="jumpToLevel(0)">
                         <HomeFilled />
                     </el-icon>
+
                     <span class="separator">/</span>
-                    <span class="current-crumb">{{ selectedSubject?.name }}</span>
+
+                    <span class="current-crumb clickable" :class="{ 'active': currentLevel === 1 }"
+                        @click="jumpToLevel(1)">
+                        {{ selectedSubject?.name }}
+                    </span>
+
+                    <template v-if="currentLevel > 1">
+                        <span class="separator">/</span>
+                        <span class="current-crumb">{{ selectedModeName }}</span>
+                    </template>
                 </div>
             </div>
 
@@ -57,8 +67,27 @@
                     </div>
                 </div>
 
-                <!-- Level 1: 详细习题集选择 -->
-                <div v-else-if="currentLevel === 1" class="level-wrapper book-view">
+                <!-- Level 1: 模式选择 -->
+                <div v-else-if="currentLevel === 1" class="level-wrapper mode-view">
+                    <div class="sub-header">
+                        <h2 class="sub-title">{{ selectedSubject.name }}</h2>
+                        <p class="sub-subtitle">请选择练习模式</p>
+                    </div>
+
+                    <div class="mode-grid">
+                        <div v-for="(mode, index) in modes" :key="mode.id" class="mode-card" :class="`delay-${index}`"
+                            @click="handleModeSelect(mode)">
+                            <div class="mode-icon-box" :style="{ background: mode.color }">
+                                <img :src="mode.icon" class="mode-icon-img" />
+                            </div>
+                            <h3>{{ mode.name }}</h3>
+                            <p>{{ mode.desc }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Level 2: 详细习题集选择 (仅针对逐题精练) -->
+                <div v-else-if="currentLevel === 2" class="level-wrapper book-view">
                     <div class="sub-header">
                         <h2 class="sub-title">{{ selectedSubject.name }}习题库</h2>
                         <p class="sub-subtitle">共找到 {{ bookList.length }} 本相关习题集</p>
@@ -96,8 +125,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
 import {
     Notebook, Right, Flag, Reading, Histogram, Cpu,
@@ -109,31 +139,140 @@ import politicsIcon from '@/assets/icons/politics.svg?url'
 import englishIcon from '@/assets/icons/english.svg?url'
 import mathIcon from '@/assets/icons/math_1.svg?url'
 import csIcon from '@/assets/icons/408.svg?url'
+import singlePracticeIcon from '@/assets/icons/single-practice.svg?url'
+import topicDrillIcon from '@/assets/icons/topic-drill.svg?url'
+import mockExamIcon from '@/assets/icons/mock-exam.svg?url'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 
 // 状态管理
-const currentLevel = ref(0) // 0:科目选择, 1:习题集选择
-const selectedSubject = ref(null)
+const currentLevel = ref(0) // 0:科目, 1:模式, 2:书本
+const selectedSubject = ref(null) // 包含 {id, name}
+const selectedModeName = ref('')
 const bookList = ref([])
 
-// Level 0: 固定四大科目
-const mainSubjects = [
-    { name: '考研政治', icon: 'Flag', type: 'politics', customIcon: politicsIcon },
-    { name: '考研英语', icon: 'Reading', type: 'english', customIcon: englishIcon },
-    { name: '考研数学', icon: 'Histogram', type: 'math', customIcon: mathIcon },
-    { name: '408专业课', icon: 'Cpu', type: 'cs', customIcon: csIcon }
+
+
+// 所有科目的完整配置
+const allSubjectsConfig = {
+    politics: { name: '政治', icon: 'Flag', type: 'politics', customIcon: politicsIcon, id: 1 },
+    english1: { name: '英语一', icon: 'Reading', type: 'english', customIcon: englishIcon, id: 2 },
+    english2: { name: '英语二', icon: 'Reading', type: 'english', customIcon: englishIcon, id: 3 },
+    math1: { name: '数学一', icon: 'Histogram', type: 'math', customIcon: mathIcon, id: 4 },
+    math2: { name: '数学二', icon: 'Histogram', type: 'math', customIcon: mathIcon, id: 5 },
+    math3: { name: '数学三', icon: 'Histogram', type: 'math', customIcon: mathIcon, id: 6 },
+    cs408: { name: '408', icon: 'Cpu', type: 'cs', customIcon: csIcon, id: 7 }
+}
+
+// 科目大类配置（用于显示）
+const mainCategoryConfig = {
+    politics: { name: '政治', icon: 'Flag', type: 'politics', customIcon: politicsIcon, categoryId: 'politics' },
+    english: { name: '英语', icon: 'Reading', type: 'english', customIcon: englishIcon, categoryId: 'english' },
+    math: { name: '数学', icon: 'Histogram', type: 'math', customIcon: mathIcon, categoryId: 'math' },
+    cs408: { name: '408', icon: 'Cpu', type: 'cs', customIcon: csIcon, categoryId: 'cs' }
+}
+
+// 始终显示四个大类（政治、英语、数学、408）
+const mainSubjects = computed(() => {
+    return [
+        mainCategoryConfig.politics,
+        mainCategoryConfig.english,
+        mainCategoryConfig.math,
+        mainCategoryConfig.cs408
+    ]
+})
+
+// 根据科目大类获取用户的具体科目配置
+const getSpecificSubject = (category) => {
+    const rawSubjects = userStore.userInfo?.examSubjects || '';
+
+    if (category.categoryId === 'politics') {
+        return allSubjectsConfig.politics
+    } else if (category.categoryId === 'english') {
+        if (rawSubjects.includes('英语二')) {
+            return allSubjectsConfig.english2
+        } else if (rawSubjects.includes('英语一')) {
+            return allSubjectsConfig.english1
+        }
+        return allSubjectsConfig.english1
+    } else if (category.categoryId === 'math') {
+        if (rawSubjects.includes('数学三')) {
+            return allSubjectsConfig.math3
+        } else if (rawSubjects.includes('数学二')) {
+            return allSubjectsConfig.math2
+        } else if (rawSubjects.includes('数学一')) {
+            return allSubjectsConfig.math1
+        }
+        return allSubjectsConfig.math1
+    } else if (category.categoryId === 'cs') {
+        return allSubjectsConfig.cs408
+    }
+    return null
+}
+
+const modes = [
+    { id: 'single', name: '逐题精练', desc: '按习题册顺序刷题', icon: singlePracticeIcon, color: '#409EFF' },
+    { id: 'topic', name: '专项突破', desc: '按知识点分类刷题', icon: topicDrillIcon, color: '#67C23A' },
+    { id: 'mock', name: '真题模考', desc: '全真模拟考试环境', icon: mockExamIcon, color: '#E6A23C' }
 ]
 
-const handleSubjectSelect = async (subject) => {
-    selectedSubject.value = subject
-    const res = await request.get('/book/list-by-subject', {
-        params: { subjectName: subject.name }
-    })
-    if (res.code === 200) {
-        bookList.value = res.data
+const handleSubjectSelect = (category) => {
+    // 根据大类获取用户的具体科目配置
+    const specificSubject = getSpecificSubject(category)
+    console.log('=== handleSubjectSelect ===')
+    console.log('点击的大类:', category)
+    console.log('解析的具体科目:', specificSubject)
+    if (specificSubject) {
+        selectedSubject.value = specificSubject
+        console.log('已设置 selectedSubject:', selectedSubject.value)
         currentLevel.value = 1
+    }
+}
+
+const handleModeSelect = async (mode) => {
+    selectedModeName.value = mode.name
+
+    console.log('=== handleModeSelect ===')
+    console.log('选择模式:', mode)
+    console.log('当前选中的科目:', selectedSubject.value)
+    console.log('科目ID:', selectedSubject.value.id)
+    console.log('科目名称:', selectedSubject.value.name)
+
+    if (mode.id === 'single') {
+        try {
+            const res = await request.get('/book/list-by-subject', {
+                params: {
+                    subjectId: selectedSubject.value.id // 修改为 subjectId
+                }
+            })
+
+            if (res.code === 200) {
+                bookList.value = res.data
+                currentLevel.value = 2
+            } else {
+                ElMessage.error(res.msg || '获取练习册失败')
+            }
+        } catch (error) {
+            console.error('获取练习册异常:', error)
+            ElMessage.error('网络异常，请检查后端服务')
+        }
+    } else if (mode.id === 'topic') {
+        // 专项突破 -> 跳转 Topic-Drill 并带上 rootId
+        console.log('跳转到专项突破，rootId:', selectedSubject.value.id)
+        router.push({
+            path: '/user/topic-drill',
+            fromLevel: 1,
+            query: { rootId: selectedSubject.value.id }
+        })
+    } else if (mode.id === 'mock') {
+        // 真题模考 -> 跳转 MockExam
+        router.push({
+            path: '/user/mock-exam',
+            fromLevel: 1,
+            query: { rootId: selectedSubject.value.id }
+        })
     }
 }
 
@@ -141,18 +280,42 @@ const goToPractice = (book) => {
     router.push(`/user/single-practice/${book.id}?name=${book.name}&subject=${selectedSubject.value.name}`)
 }
 
-const resetLevel = () => {
-    currentLevel.value = 0
-    selectedSubject.value = null
+
+// 修改 resetLevel 为更灵活的跳转函数
+const jumpToLevel = (level) => {
+    if (level === 0) {
+        // 回到科目选择首页
+        currentLevel.value = 0
+        selectedSubject.value = null
+        selectedModeName.value = ''
+        bookList.value = []
+    } else if (level === 1) {
+        // 回到模式选择页
+        currentLevel.value = 1
+        selectedModeName.value = ''
+        bookList.value = []
+    }
 }
 
 onMounted(() => {
-    // 检查路由参数，如果有 subject，则自动进入该科目的 Level 1
-    const subjectName = route.query.subject
+    console.log('SubjectList mounted. userStore.userInfo:', userStore.userInfo)
+
+    const { backToLevel, subjectId, subjectName } = route.query // 确保解构了 subjectName
+
+    if (backToLevel === '1' && subjectId) {
+        const target = Object.values(allSubjectsConfig).find(s => s.id == subjectId)
+        if (target) {
+            selectedSubject.value = target
+            currentLevel.value = 1
+            // 注意：这里建议给 selectedModeName 一个默认值或保持为空
+        }
+    }
+
     if (subjectName) {
-        const subject = mainSubjects.find(s => s.name === subjectName)
-        if (subject) {
-            handleSubjectSelect(subject)
+        const target = Object.values(allSubjectsConfig).find(m => m.name === subjectName)
+        if (target) {
+            selectedSubject.value = target
+            currentLevel.value = 1
         }
     }
 })
@@ -202,7 +365,7 @@ onMounted(() => {
     position: relative;
     z-index: 1;
     max-width: 1600px;
-    /* Increased width to 1600px */
+    /* 宽度增加到 1600px */
     width: 100%;
     margin: 0 auto;
     padding: 20px 40px 40px;
@@ -238,6 +401,25 @@ onMounted(() => {
     font-size: 14px;
 }
 
+.breadcrumb-wrapper .clickable {
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.breadcrumb-wrapper .clickable:hover {
+    color: #409EFF;
+    /* Element Plus 主题蓝 */
+    text-decoration: underline;
+}
+
+.breadcrumb-wrapper .home-icon {
+    cursor: pointer;
+}
+
+.breadcrumb-wrapper .home-icon:hover {
+    color: #409EFF;
+}
+
 .home-icon {
     cursor: pointer;
     font-size: 18px;
@@ -266,7 +448,7 @@ onMounted(() => {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    /* Center children horizontally */
+    /* 子元素水平居中 */
     padding-bottom: 60px;
     min-height: 600px;
     width: 100%;
@@ -306,17 +488,25 @@ onMounted(() => {
     margin: 0;
 }
 
-/* Grid Layout */
+/* Grid Layout - 自适应列数 */
 .subject-grid-level0 {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 30px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+    justify-content: center;
+}
+
+/* 当只有1-2个卡片时，居中显示 */
+.subject-grid-level0 {
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 /* 响应式调整 */
 @media (max-width: 1024px) {
     .subject-grid-level0 {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 18px;
     }
 }
 
@@ -348,8 +538,8 @@ onMounted(() => {
 }
 
 .card-inner {
-    padding: 70px;
-    padding-bottom: 50px;
+    padding: 35px 25px;
+    padding-bottom: 45px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -445,7 +635,8 @@ onMounted(() => {
 }
 
 /* Level 1 Book View */
-.level-wrapper.book-view {
+.level-wrapper.book-view,
+.level-wrapper.mode-view {
     margin-top: 20px;
     width: 100%;
 }
@@ -469,6 +660,62 @@ onMounted(() => {
     font-weight: 300;
 }
 
+/* Mode Grid */
+.mode-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
+    max-width: 1000px;
+    margin: 40px auto;
+}
+
+.mode-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.mode-card:hover {
+    transform: translateY(-10px);
+    background: #fff;
+}
+
+.mode-icon-box {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.mode-icon-img {
+    width: 60%;
+    height: 60%;
+    filter: brightness(0) invert(1);
+}
+
+.mode-card h3 {
+    color: #303133;
+    font-size: 22px;
+    margin: 0 0 10px 0;
+}
+
+.mode-card p {
+    color: #909399;
+    font-size: 14px;
+    margin: 0;
+}
+
 .book-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -489,7 +736,7 @@ onMounted(() => {
     flex-direction: column;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
     height: 320px;
-    /* Increased height */
+    /* 增加高度 */
     border: 1px solid rgba(255, 255, 255, 0.5);
     position: relative;
 }
@@ -503,7 +750,7 @@ onMounted(() => {
 
 .book-cover-section {
     height: 180px;
-    /* Increased cover height */
+    /* 增加封面高度 */
     background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
     display: flex;
     align-items: center;
@@ -514,7 +761,7 @@ onMounted(() => {
     overflow: hidden;
 }
 
-/* Add a decorative circle behind the icon */
+/* 在图标后添加装饰性圆形 */
 .book-cover-section::before {
     content: '';
     position: absolute;
@@ -536,7 +783,7 @@ onMounted(() => {
 
 .book-cover-icon {
     font-size: 64px;
-    /* Larger icon */
+    /* 更大的图标 */
     position: relative;
     z-index: 1;
     transition: transform 0.4s;

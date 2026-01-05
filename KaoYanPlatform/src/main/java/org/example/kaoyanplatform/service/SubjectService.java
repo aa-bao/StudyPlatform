@@ -8,6 +8,6 @@ import org.example.kaoyanplatform.entity.dto.SubjectDTO;
 import java.util.List;
 
 public interface SubjectService extends IService<Subject> {
-    List<SubjectDTO> getTree(Long userId);
+    List<SubjectDTO> getTree(Long userId, Integer rootId);
     List<Integer> getDescendantIds(Integer subjectId);
 }

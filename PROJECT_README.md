@@ -2,6 +2,36 @@
 
 > **注意**: 本文档旨在辅助 AI 理解 **KaoYanPlatform** (考研刷题平台) 的全栈上下文。它涵盖了前端 (`kaoyan-frontend`) 和后端 (`KaoYanPlatform`)。
 
+## 重要更新记录
+
+### 2026-01-06: 数据库表命名规范统一
+**变更内容**: 统一数据库表命名规范，所有表使用 `tb_` 前缀
+
+**主要变更**:
+- ✅ 重命名 `sys_user` 表为 `tb_user`
+- ✅ 更新 Java 实体类 `User.java` 的 `@TableName` 注解
+- ✅ 更新项目文档中的表名说明
+
+**执行指南**: 详见 `sql/RENAME_USER_TABLE_GUIDE.md`
+
+### 2026-01-06: 数据库映射表重构
+**重构内容**: 将题目-书本-科目之间的直接外键关系改为使用映射表（`map_`前缀）管理
+
+**主要变更**:
+- ✅ 从 `tb_question` 表删除 `book_id` 和 `subject_id` 外键字段
+- ✅ 从 `tb_book` 表删除 `subject_id` 外键字段
+- ✅ 新增 `map_question_book` 映射表（题目-书本多对多关系）
+- ✅ 新增 `map_question_subject` 映射表（题目-科目多对多关系）
+- ✅ 新增 `map_subject_book` 映射表（书本-科目多对多关系）
+- ✅ 新增对应的 Java 实体类、Mapper、Service 层代码
+
+**重构收益**:
+- 支持多对多关系：一道题可以属于多本书、多个科目
+- 符合数据库范式设计原则，避免数据冗余
+- 提高数据灵活性和系统扩展性
+
+**相关文档**: 详见 `REFACTOR_GUIDE.md` 重构指南（包含迁移步骤、测试方法、问题排查）
+
 ## 1. 项目概览
 
 *   **项目名称**: KaoYanPlatform (考研刷题平台)
@@ -63,28 +93,53 @@ kaoyanplatform/
 ├── entity/                     # 数据库模型 (MyBatis Plus)
 │   ├── dto/                    # 数据传输对象
 │   │   └── SubjectDTO.java     # 科目树形结构传输对象
+│   ├── Book.java               # tb_book 表
 │   ├── ExamRecord.java         # tb_exam_record 表
+│   ├── MapQuestionBook.java    # map_question_book 表 (题目-书本映射)
+│   ├── MapQuestionSubject.java # map_question_subject 表 (题目-科目映射)
+│   ├── MapSubjectBook.java     # map_subject_book 表 (书本-科目映射)
 │   ├── Question.java           # tb_question 表
-│   ├── User.java               # sys_user 表
+│   ├── Subject.java            # tb_subject 表
+│   ├── User.java               # tb_user 表
 │   └── MistakeRecord.java      # tb_mistake_record 表
 ├── handler/
 │   ├── GlobalExceptionHandler.java # 全局异常处理
 │   └── MyMetaObjectHandler.java    # MP自动填充处理
 ├── mapper/                     # 数据访问层 (接口)
+│   ├── BookMapper.java
+│   ├── CollectionMapper.java
 │   ├── ExamRecordMapper.java
+│   ├── MapQuestionBookMapper.java    # 题目-书本映射Mapper
+│   ├── MapQuestionSubjectMapper.java # 题目-科目映射Mapper
+│   ├── MapSubjectBookMapper.java     # 书本-科目映射Mapper
 │   ├── QuestionMapper.java
 │   ├── SubjectMapper.java
 │   ├── UserMapper.java
+│   ├── UserProgressMapper.java
 │   └── MistakeRecordMapper.java
 └── service/                    # 业务逻辑层
-│   └── QuestionService.java
-│   └── RecordService.java
-│   └── UserService.java
+│   ├── BookService.java
+│   ├── CollectionService.java
+│   ├── MapQuestionBookService.java    # 题目-书本映射Service
+│   ├── MapQuestionSubjectService.java # 题目-科目映射Service
+│   ├── MapSubjectBookService.java     # 书本-科目映射Service
+│   ├── QuestionService.java
+│   ├── RecordService.java
+│   ├── SubjectService.java
+│   ├── UserService.java
+│   ├── UserProgressService.java
 │   └── MistakeRecordService.java
 │   └── impl/
+│       ├── BookServiceImpl.java
+│       ├── CollectionServiceImpl.java
+│       ├── MapQuestionBookServiceImpl.java
+│       ├── MapQuestionSubjectServiceImpl.java
+│       ├── MapSubjectBookServiceImpl.java
 │       ├── QuestionServiceImpl.java
 │       ├── RecordServiceImpl.java
+│       ├── SubjectServiceImpl.java
 │       ├── UserServiceImpl.java
+│       ├── UserProgressServiceImpl.java
 │       └── MistakeRecordServiceImpl.java
 └── KaoYanPlatformApplication
 ```
@@ -126,7 +181,7 @@ src/
 
 ### 数据库设计 (完整表结构)
 
-#### 用户表 (`sys_user`)
+#### 用户表 (`tb_user`)
 | 字段 | 类型 | 描述 |
 | :--- | :--- | :--- |
 | `id` | bigint | 主键, 自增 |
@@ -146,7 +201,6 @@ src/
 | 字段 | 类型 | 描述 |
 | :--- | :--- | :--- |
 | `id` | bigint | 主键, 自增 |
-| `subject_id` | int | 所属科目ID |
 | `type` | tinyint | 题目类型: 1-单选, 2-多选, 3-填空, 4-简答 |
 | `content` | text | 题干内容 |
 | `options` | json | 选项(JSON存储: ["A.xx", "B.xx"]) |
@@ -156,7 +210,7 @@ src/
 | `tags` | json | 题目标签 |
 | `create_time` | datetime | 创建时间 |
 | `source` | varchar(100) | 题目来源 |
-| `book_id` | int | 所属习题册ID |
+**注**: 题目与科目、书本的关系通过映射表管理，不再直接存储外键字段。通过 `map_question_subject` 关联科目，通过 `map_question_book` 关联习题册。
 
 #### 答题记录表 (`tb_exam_record`)
 | 字段 | 类型 | 描述 |
@@ -193,23 +247,31 @@ src/
 | `scope` | varchar(50) | 适用范围: "4,5,6" (对应数一、数二、数三) |
 注：id范围1-100为顶级科目，例如：1-政治，2-英语一，3-英语二；id范围100以上为二级科目，例如：401-高数，402-线代，403-概率，其中，前缀40为高数下的详细知识点，例如id4011为函数、极限、连续,4012为一元微分学；
 
+#### 习题册表 (`tb_book`)
+| 字段 | 类型 | 描述 |
+| :--- | :--- | :--- |
+| `id` | bigint | 主键, 自增 |
+| `name` | varchar(50) | 习题册名称 |
+| `description` | varchar(255) | 习题册描述 |
+| `create_time` | datetime | 创建时间 |
+**注**: 习题册与科目的关系通过 `map_subject_book` 映射表管理，支持一本书包含多个科目。
 
-#### 收藏夹 (`tb_collection`)
+#### 收藏夹表 (`tb_collection`)
 | 字段 | 类型 | 描述 |
 | :--- | :--- | :--- |
 | `id` | bigint | 主键, 自增 |
 | `user_id` | bigint | 用户ID |
 | `question_id` | bigint | 题目ID |
-| `create_time` | datetime | 创建时间 |
 | `tag` | json | 自定义标签 |
+| `create_time` | datetime | 创建时间 |
 
-#### 学习资料表 (`tb_resource`)
+#### 学习资源表 (`tb_resource`)
 | 字段 | 类型 | 描述 |
 | :--- | :--- | :--- |
 | `id` | bigint | 主键, 自增 |
 | `title` | varchar(100) | 资料标题 |
 | `url` | varchar(255) | 下载/预览地址 |
-| `file_type` | varchar(20) | 文件类型 (默认 pdf) |
+| `file_type` | varchar(20) | 文件类型 |
 | `subject_id` | int | 所属科目ID |
 | `create_time` | datetime | 创建时间 |
 
@@ -223,19 +285,65 @@ src/
 | `correct_count` | int | 该考点下做对题目数 |
 | `update_time` | datetime | 更新时间 |
 
-#### 书本与科目关联表 (`map_subject_book`)
-| 字段 | 类型 | 描述 |
-| :--- | :--- | :--- |
-| `id` | int | 主键, 自增 |
-| `book_id` | int | 大纲ID (数一:4; 数二:5; 数三:6) |
-| `subject_id` | int | 知识科目ID (高数:401; 线代:402; 概率:403) |
+#### 映射表设计（多对多关系）
 
-#### 题目与科目关联表 (`tb_question_subject`)
+**设计说明**: 使用映射表（`map_`前缀）管理题目、书本、科目之间的多对多关系，提高数据灵活性和扩展性。
+
+##### 题目-书本关联表 (`map_question_book`)
 | 字段 | 类型 | 描述 |
 | :--- | :--- | :--- |
 | `id` | bigint | 主键, 自增 |
 | `question_id` | bigint | 题目ID |
-| `subject_id` | int | 科目或考点ID |
+| `book_id` | int | 习题册ID |
+**索引**: `uk_question_book` (question_id, book_id) 唯一索引, `idx_question_id`, `idx_book_id`
+
+##### 题目-科目关联表 (`map_question_subject`)
+| 字段 | 类型 | 描述 |
+| :--- | :--- | :--- |
+| `id` | bigint | 主键, 自增 |
+| `question_id` | bigint | 题目ID |
+| `subject_id` | int | 科目ID或知识点ID |
+**索引**: `uk_question_subject` (question_id, subject_id) 唯一索引, `idx_question_id`, `idx_subject_id`
+
+##### 书本-科目关联表 (`map_subject_book`)
+| 字段 | 类型 | 描述 |
+| :--- | :--- | :--- |
+| `id` | int | 主键, 自增 |
+| `book_id` | int | 习题册ID (如: 数一:4; 数二:5; 数三:6) |
+| `subject_id` | int | 科目ID或知识点ID (如: 高数:401; 线代:402; 概率:403) |
+**索引**: `uk_book_subject` (book_id, subject_id) 唯一索引, `idx_book_id`, `idx_subject_id`
+
+**映射表关系链**:
+```
+题目 → map_question_book → 习题册
+题目 → map_question_subject → 科目/知识点
+习题册 → map_subject_book → 科目/知识点
+```
+
+**查询示例**:
+```sql
+-- 查询某本书的所有题目
+SELECT q.* FROM tb_question q
+INNER JOIN map_question_book mqb ON q.id = mqb.question_id
+WHERE mqb.book_id = 1;
+
+-- 查询某个科目的所有题目
+SELECT q.* FROM tb_question q
+INNER JOIN map_question_subject mqs ON q.id = mqs.question_id
+WHERE mqs.subject_id = 401;
+
+-- 查询题目所属的书本和科目
+SELECT q.id, q.content, b.name as book_name, s.name as subject_name
+FROM tb_question q
+LEFT JOIN map_question_book mqb ON q.id = mqb.question_id
+LEFT JOIN tb_book b ON mqb.book_id = b.id
+LEFT JOIN map_question_subject mqs ON q.id = mqs.question_id
+LEFT JOIN tb_subject s ON mqs.subject_id = s.id
+WHERE q.id = 1000;
+```
+
+
+
 
 ### API 规范
 *   **基础 URL**: `http://localhost:8081`

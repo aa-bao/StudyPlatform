@@ -18,8 +18,7 @@ public class SubjectController {
     }
 
     @GetMapping("/tree")
-    public Result getTree(@RequestParam(required = false) Long userId) {
-        // If userId is not passed, maybe get from SecurityContext, but for now allow param
-        return Result.success(subjectService.getTree(userId));
+    public Result getTree(@RequestParam(required = false) Long userId, @RequestParam(required = false) Integer rootId) {
+        return Result.success(subjectService.getTree(userId, rootId));
     }
 }

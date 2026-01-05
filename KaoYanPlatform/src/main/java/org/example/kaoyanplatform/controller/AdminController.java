@@ -29,7 +29,7 @@ public class AdminController {
     private MistakeRecordService wrongBookService;
 
     @GetMapping("/statistics")
-    public Result getStatistics(@RequestParam(required = false) Integer userId) {
+    public Result<Map<String, Object>> getStatistics(@RequestParam(required = false) Integer userId) {
         Map<String, Object> map = new HashMap<>();
 
         // 1. 处理卡片统计数据

@@ -1,10 +1,47 @@
 <template>
     <div class="knowledge-practice-container">
-        <el-container style="height: calc(100vh - 80px);">
-            <!-- Left Side: Knowledge Tree -->
-            <el-aside width="320px" class="tree-aside">
+        <!-- 选择模式 -->
+        <div v-if="mode === 'selection'" class="selection-container">
+            <div class="selection-header">
+                <h2>选择科目</h2>
+                <p>请选择你要练习的科目类别</p>
+            </div>
+            <div class="subject-grid" v-loading="loading">
+                <div v-for="subject in subjectList" :key="subject.id" class="subject-card-item"
+                    @click="selectRootSubject(subject)">
+                    <div class="subject-icon">
+                        <!-- 尝试动态加载图标，失败则使用默认图标 -->
+                        <el-icon :size="40" color="#409eff">
+                            <Notebook />
+                        </el-icon>
+                    </div>
+                    <h3>{{ subject.name }}</h3>
+                    <div class="subject-stats">
+                        <span>共 {{ subject.questionCount }} 题</span>
+                        <el-progress
+                            :percentage="subject.questionCount ? Math.round((subject.finishedCount / subject.questionCount) * 100) : 0"
+                            :show-text="false" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 练习模式 -->
+        <el-container v-else style="height: calc(100vh - 80px);">
+            <!-- 左侧：知识点树 -->
+            <el-aside class="tree-aside">
                 <div class="aside-header">
-                    <h3><el-icon><Files /></el-icon> 知识点目录</h3>
+                    <div class="header-top">
+                        <el-button link @click="goBack" class="back-btn">
+                            <el-icon>
+                                <ArrowLeft />
+                            </el-icon> 返回
+                        </el-button>
+                        <h3>{{ selectedRoot?.name }}</h3>
+                    </div>
+                    <div class="header-subtitle"><el-icon>
+                            <Files />
+                        </el-icon> 知识点目录</div>
                 </div>
                 <el-scrollbar>
                     <el-tree :data="treeData" :props="defaultProps" @node-click="handleNodeClick" node-key="id"
@@ -13,7 +50,8 @@
                             <div class="custom-tree-node">
                                 <span class="node-label" :title="node.label">{{ node.label }}</span>
                                 <span class="node-stat" v-if="data.questionCount > 0">
-                                    <el-tag size="small" :type="data.finishedCount > 0 ? 'success' : 'info'" effect="plain" round>
+                                    <el-tag size="small" :type="data.finishedCount > 0 ? 'success' : 'info'"
+                                        effect="plain" round>
                                         {{ data.finishedCount }}/{{ data.questionCount }}
                                     </el-tag>
                                 </span>
@@ -23,8 +61,8 @@
                 </el-scrollbar>
             </el-aside>
 
-            <!-- Right Side: Question List -->
-            <el-main class="questions-main" v-loading="loading">
+            <!-- 右侧：题目列表 -->
+            <el-main class="questions-main" v-loading="questionsLoading">
                 <div v-if="!currentSubject" class="empty-state">
                     <el-empty description="请在左侧选择一个知识点开始刷题" image-size="200">
                         <template #extra>
@@ -39,7 +77,8 @@
                             <el-tag effect="dark" type="primary" size="large">{{ questions.length }} 道题</el-tag>
                         </div>
                         <div class="header-right">
-                            <el-progress :percentage="calculateProgress()" :stroke-width="10" :width="150" type="line" />
+                            <el-progress :percentage="calculateProgress()" :stroke-width="10" :width="150"
+                                type="line" />
                             <span class="progress-text">本节进度</span>
                         </div>
                     </div>
@@ -54,51 +93,60 @@
                                 <div class="q-tag-group">
                                     <span class="q-index">#{{ index + 1 }}</span>
                                     <el-tag size="small" :type="getTypeColor(q.type)">{{ getTypeName(q.type) }}</el-tag>
-                                    <el-tag v-if="q.difficulty" size="small" type="warning" effect="plain">难度: {{ q.difficulty }}</el-tag>
+                                    <el-tag v-if="q.difficulty" size="small" type="warning" effect="plain">难度: {{
+                                        q.difficulty
+                                        }}</el-tag>
                                 </div>
                                 <div class="q-actions">
-                                     <!-- Placeholder for future actions like bookmark -->
+                                    <!-- 占位符：未来可添加收藏等操作 -->
                                 </div>
                             </div>
 
                             <div class="q-content" v-html="renderLatex(q.content)"></div>
 
                             <div class="q-options">
-                                <div v-for="(opt, oIndex) in parseOptions(q.options)" :key="oIndex"
-                                    class="option-item"
-                                    :class="getOptionClass(q, opt)"
-                                    @click="selectOption(q, opt)">
+                                <div v-for="(opt, oIndex) in parseOptions(q.options)" :key="oIndex" class="option-item"
+                                    :class="getOptionClass(q, opt)" @click="selectOption(q, opt)">
                                     <span class="opt-prefix">{{ getOptionLetter(opt) }}</span>
                                     <span class="opt-text" v-html="renderLatex(getOptionContent(opt))"></span>
-                                    
-                                    <el-icon v-if="q.isSubmitted && getOptionLetter(opt) === q.answer" class="status-icon correct"><Select /></el-icon>
-                                    <el-icon v-if="q.isSubmitted && getOptionLetter(opt) === q.userSelected && q.userSelected !== q.answer" class="status-icon wrong"><CloseBold /></el-icon>
+
+                                    <el-icon v-if="q.isSubmitted && getOptionLetter(opt) === q.answer"
+                                        class="status-icon correct"><Select /></el-icon>
+                                    <el-icon
+                                        v-if="q.isSubmitted && getOptionLetter(opt) === q.userSelected && q.userSelected !== q.answer"
+                                        class="status-icon wrong">
+                                        <CloseBold />
+                                    </el-icon>
                                 </div>
                             </div>
 
                             <div class="q-footer">
                                 <div class="footer-left">
-                                    <el-button type="primary" 
-                                        :disabled="q.isSubmitted || !q.userSelected"
+                                    <el-button type="primary" :disabled="q.isSubmitted || !q.userSelected"
                                         @click="submitAnswer(q)" round>
                                         提交答案
                                     </el-button>
-                                    <el-button v-if="q.isSubmitted" @click="q.showAnalysis = !q.showAnalysis" plain round>
+                                    <el-button v-if="q.isSubmitted" @click="q.showAnalysis = !q.showAnalysis" plain
+                                        round>
                                         {{ q.showAnalysis ? '收起解析' : '查看解析' }}
                                     </el-button>
                                 </div>
-                                
+
                                 <div v-if="q.isSubmitted" class="result-box" :class="q.isCorrect ? 'correct' : 'wrong'">
-                                    <el-icon><component :is="q.isCorrect ? 'Select' : 'CloseBold'" /></el-icon>
+                                    <el-icon>
+                                        <component :is="q.isCorrect ? 'Select' : 'CloseBold'" />
+                                    </el-icon>
                                     <span v-if="q.isCorrect"> 回答正确</span>
                                     <span v-else> 回答错误，正确答案: <strong>{{ q.answer }}</strong></span>
                                 </div>
                             </div>
-                            
+
                             <el-collapse-transition>
                                 <div v-if="q.isSubmitted && (q.showAnalysis || !q.isCorrect)" class="analysis-wrapper">
                                     <div class="analysis-box">
-                                        <div class="analysis-title"><el-icon><Reading /></el-icon> 解析：</div>
+                                        <div class="analysis-title"><el-icon>
+                                                <Reading />
+                                            </el-icon> 解析：</div>
                                         <div class="analysis-content" v-html="renderLatex(q.analysis || '暂无解析')"></div>
                                     </div>
                                 </div>
@@ -115,9 +163,17 @@
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
-import { Files, Select, CloseBold, Reading } from '@element-plus/icons-vue'
+import { Files, Select, CloseBold, Reading, Notebook, ArrowLeft } from '@element-plus/icons-vue'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import { useRoute, useRouter } from 'vue-router'
+
+const route = useRoute()
+const router = useRouter()
+
+const mode = ref('selection') // 'selection' | 'drill'
+const subjectList = ref([])
+const selectedRoot = ref(null)
 
 const treeData = ref([])
 const defaultProps = {
@@ -125,24 +181,71 @@ const defaultProps = {
     label: 'name'
 }
 const loading = ref(false)
+const questionsLoading = ref(false)
 const currentSubject = ref(null)
 const questions = ref([])
 const userInfo = JSON.parse(localStorage.getItem('user') || '{}')
 
-const loadTree = async () => {
+const loadSubjectList = async () => {
+    loading.value = true
     try {
         const res = await request.get('/subject/tree', {
             params: { userId: userInfo.id }
         })
+        subjectList.value = res.data
+    } catch (error) {
+        console.error(error)
+    } finally {
+        loading.value = false
+    }
+}
+
+const selectRootSubject = (subject) => {
+    selectedRoot.value = subject
+    mode.value = 'drill'
+    loadTree(subject.id)
+}
+
+const goBack = () => {
+    // 如果是从科目列表页面跳转过来的（有 rootId），直接返回到 SubjectList
+    if (route.query.rootId) {
+        router.push({
+            path: '/user/subject',
+            query: {
+                backToLevel: 1,
+                subjectId: route.query.rootId
+            }
+        })
+    } else if (mode.value === 'drill') {
+        // 否则返回到科目选择页面
+        mode.value = 'selection'
+        selectedRoot.value = null
+        currentSubject.value = null
+        questions.value = []
+        treeData.value = []
+    } else {
+        // 否则返回到上一页
+        router.back()
+    }
+}
+
+const loadTree = async (rootId) => {
+    loading.value = true
+    try {
+        const res = await request.get('/subject/tree', {
+            params: { userId: userInfo.id, rootId: rootId }
+        })
         treeData.value = res.data
     } catch (error) {
         console.error(error)
+    } finally {
+        loading.value = false
     }
 }
 
 const handleNodeClick = async (data) => {
     currentSubject.value = data
-    loading.value = true
+    questionsLoading.value = true
     try {
         const res = await request.get('/question/list-by-knowledge-point', {
             params: { subjectId: data.id }
@@ -157,7 +260,7 @@ const handleNodeClick = async (data) => {
     } catch (error) {
         console.error(error)
     } finally {
-        loading.value = false
+        questionsLoading.value = false
     }
 }
 
@@ -171,8 +274,6 @@ const parseOptions = (opts) => {
     if (!opts) return []
     try {
         const parsed = typeof opts === 'string' ? JSON.parse(opts) : opts
-        // Sometimes options might be ["A. xxx", "B. xxx"] or just ["xxx", "yyy"]
-        // We handle standard format here
         return parsed
     } catch (e) {
         return []
@@ -180,16 +281,13 @@ const parseOptions = (opts) => {
 }
 
 const getOptionLetter = (opt) => {
-    // Check if opt starts with A., B., etc.
     if (/^[A-Z][.、]/.test(opt)) {
         return opt.charAt(0)
     }
-    // Fallback logic if needed, but for now assume standard format or handle index in loop
-    return opt.charAt(0) // Simplistic fallback
+    return opt.charAt(0)
 }
 
 const getOptionContent = (opt) => {
-    // Remove "A. " prefix
     return opt.replace(/^[A-Z][.、\s]\s*/, '')
 }
 
@@ -199,7 +297,7 @@ const getTypeColor = (t) => ({ 1: '', 2: 'success', 3: 'warning', 4: 'info' }[t]
 const selectOption = (q, opt) => {
     if (q.isSubmitted) return
     const letter = getOptionLetter(opt)
-    
+
     if (q.type === 2) { // 多选
         let current = q.userSelected ? q.userSelected.split('') : []
         if (current.includes(letter)) {
@@ -216,10 +314,9 @@ const selectOption = (q, opt) => {
 const getOptionClass = (q, opt) => {
     const letter = getOptionLetter(opt)
     if (q.isSubmitted) {
-        // 对于多选，判断是否包含
         const isAnswer = q.answer.includes(letter)
         const isSelected = q.userSelected.includes(letter)
-        
+
         if (isAnswer) return 'correct-opt'
         if (isSelected && !isAnswer) return 'wrong-opt'
     } else {
@@ -230,33 +327,25 @@ const getOptionClass = (q, opt) => {
 
 const submitAnswer = async (q) => {
     if (!q.userSelected || (Array.isArray(q.userSelected) && q.userSelected.length === 0)) return
-    
-    // Format answer for backend
+
     let answerStr = q.userSelected
     if (Array.isArray(q.userSelected)) {
-        answerStr = q.userSelected.sort().join('') // "AB"
+        answerStr = q.userSelected.sort().join('')
     }
-    
-    // Optimistic update
-    // Note: Backend stores answer usually as "A" or "A,B". Need to check backend expectation.
-    // RecordController: String userAns = examRecord.getUserAnswer().replaceAll("[,\\s]", "").toUpperCase();
-    // So "AB" is fine.
-    
+
     const dbAns = q.answer.replaceAll(/[,\\s]/g, "").toUpperCase();
     const isRight = answerStr === dbAns
-    
+
     q.isCorrect = isRight
     q.isSubmitted = true
-    
+
     try {
         await request.post('/record/submit', {
             userId: userInfo.id,
             questionId: q.id,
             userAnswer: answerStr
         })
-        
-        // Refresh tree counts? 
-        // We can manually update local tree data finishedCount
+
         if (currentSubject.value) {
             currentSubject.value.finishedCount = (currentSubject.value.finishedCount || 0) + 1
         }
@@ -266,32 +355,50 @@ const submitAnswer = async (q) => {
     }
 }
 
-// Latex Render
 const renderLatex = (content) => {
-  if (!content) return ''
-  return content.replace(/\$([^$]+)\$/g, (match, tex) => {
-    try {
-      return katex.renderToString(tex, {
-        throwOnError: false,
-        displayMode: false
-      })
-    } catch (err) {
-      return match
-    }
-  }).replace(/\$\$([^$]+)\$\$/g, (match, tex) => {
-    try {
-      return katex.renderToString(tex, {
-        throwOnError: false,
-        displayMode: true
-      })
-    } catch (err) {
-      return match
-    }
-  })
+    if (!content) return ''
+    return content.replace(/\$([^$]+)\$/g, (match, tex) => {
+        try {
+            return katex.renderToString(tex, {
+                throwOnError: false,
+                displayMode: false
+            })
+        } catch (err) {
+            return match
+        }
+    }).replace(/\$\$([^$]+)\$\$/g, (match, tex) => {
+        try {
+            return katex.renderToString(tex, {
+                throwOnError: false,
+                displayMode: true
+            })
+        } catch (err) {
+            return match
+        }
+    })
 }
 
-onMounted(() => {
-    loadTree()
+onMounted(async () => {
+    // Check for rootId in query
+    const rootId = route.query.rootId
+    if (rootId) {
+        // 从科目列表页面跳转过来，需要先加载科目列表获取科目信息
+        await loadSubjectList()
+        // 找到对应的科目
+        const targetSubject = subjectList.value.find(s => s.id == rootId)
+        if (targetSubject) {
+            selectedRoot.value = targetSubject
+            mode.value = 'drill'
+            loadTree(rootId)
+        } else {
+            // 如果找不到，仍然进入 drill 模式，但使用 ID 作为名称
+            selectedRoot.value = { id: rootId, name: '科目' }
+            mode.value = 'drill'
+            loadTree(rootId)
+        }
+    } else {
+        loadSubjectList()
+    }
 })
 </script>
 
@@ -301,7 +408,81 @@ onMounted(() => {
     height: 100%;
 }
 
+/* Selection Mode Styles */
+.selection-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.selection-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.selection-header h2 {
+    font-size: 28px;
+    color: #303133;
+    margin-bottom: 10px;
+}
+
+.selection-header p {
+    color: #909399;
+    font-size: 16px;
+}
+
+.subject-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 30px;
+}
+
+.subject-card-item {
+    background: #fff;
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid transparent;
+}
+
+.subject-card-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    border-color: #409eff;
+}
+
+.subject-icon {
+    width: 80px;
+    height: 80px;
+    background: #f0f7ff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+}
+
+.subject-card-item h3 {
+    margin: 0 0 15px;
+    color: #303133;
+    font-size: 18px;
+}
+
+.subject-stats {
+    color: #909399;
+    font-size: 14px;
+}
+
+.subject-stats .el-progress {
+    margin-top: 10px;
+}
+
+/* Drill Mode Styles */
 .tree-aside {
+    width: 320px;
     background: white;
     border-right: 1px solid #e6e6e6;
     display: flex;
@@ -314,13 +495,30 @@ onMounted(() => {
     background: #fff;
 }
 
+.header-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.back-btn {
+    font-size: 14px;
+    padding: 0;
+}
+
 .aside-header h3 {
     margin: 0;
     font-size: 16px;
     color: #303133;
+}
+
+.header-subtitle {
+    font-size: 12px;
+    color: #909399;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
 }
 
 .custom-tree-node {
@@ -509,8 +707,13 @@ onMounted(() => {
     font-size: 14px;
 }
 
-.result-box.correct { color: #67c23a; }
-.result-box.wrong { color: #f56c6c; }
+.result-box.correct {
+    color: #67c23a;
+}
+
+.result-box.wrong {
+    color: #f56c6c;
+}
 
 .analysis-wrapper {
     margin-top: 20px;
@@ -552,6 +755,10 @@ onMounted(() => {
     color: #909399;
     font-size: 14px;
     margin-top: 10px;
+}
+
+.empty-questions {
+    margin-top: 40px;
 }
 
 :deep(.katex) {

@@ -3,14 +3,14 @@
     <el-empty description="真题模考功能开发中..." image-size="200">
       <template #extra>
         <p>即将上线：全真模拟考场环境，历年真题成套演练，智能评分报告。</p>
-        <el-button type="primary" @click="$router.push('/user/dashboard')">返回首页</el-button>
+        <el-button type="primary" @click="$router.push('/user/subject')">返回刷题选择</el-button>
       </template>
     </el-empty>
   </div>
 </template>
 
 <script setup>
-// Placeholder for Mock Exam Logic
+  
 </script>
 
 <style scoped>
