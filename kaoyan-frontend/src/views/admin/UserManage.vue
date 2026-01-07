@@ -1,169 +1,199 @@
 <template>
     <div class="user-manage-container">
-        <el-card shadow="never" class="table-card">
-            <template #header>
-                <div class="card-header">
-                    <span class="title-text">用户管理中心</span>
+        <div class="content-wrapper">
+            <el-card shadow="never" class="main-card">
+                <template #header>
+                    <div class="card-header">
+                        <span class="title-text">用户管理中心</span>
+                        <div class="header-desc">查看并管理平台学生及管理员的学习数据</div>
+                    </div>
+                </template>
+                <div class="search-section">
+                    <el-form :inline="true" :model="searchForm">
+                        <el-form-item label="身份角色">
+                            <el-select v-model="searchForm.role" placeholder="选择角色" clearable @change="loadData"
+                                style="width: 130px">
+                                <el-option label="全部" value="" />
+                                <el-option label="学生" value="student" />
+                                <el-option label="管理员" value="admin" />
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="关键词">
+                            <el-input v-model="searchForm.keyword" placeholder="用户名 / 昵称 / 院校" clearable
+                                style="width: 280px" @keyup.enter="loadData" prefix-icon="Search" />
+                        </el-form-item>
+                        <el-form-item>
+                            <el-button type="primary" @click="loadData">查询</el-button>
+                            <el-button @click="resetSearch" plain>重置</el-button>
+                        </el-form-item>
+                    </el-form>
                 </div>
-            </template>
-
-            <!-- 搜索表单 -->
-            <el-form :inline="true" :model="searchForm" class="search-form">
-                <el-form-item label="角色">
-                    <el-select v-model="searchForm.role" placeholder="请选择角色" clearable style="width: 150px"
-                        @change="loadData">
-                        <el-option label="全部" value="" />
-                        <el-option label="学生" value="student" />
-                        <el-option label="管理员" value="admin" />
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="关键词">
-                    <el-input v-model="searchForm.keyword" placeholder="搜索用户名/昵称/目标院校" clearable style="width: 250px"
-                        @keyup.enter="loadData" />
-                </el-form-item>
-                <el-form-item>
-                    <el-button type="primary" icon="Search" @click="loadData">查询</el-button>
-                    <el-button icon="Refresh" @click="resetSearch">重置</el-button>
-                </el-form-item>
-            </el-form>
-
-            <!-- 数据表格 -->
-            <el-table :data="tableData" border stripe v-loading="loading" class="custom-table">
-                <el-table-column prop="id" label="ID" width="70" align="center" />
-                <el-table-column prop="username" label="用户名" width="120" align="center" />
-                <el-table-column prop="nickname" label="昵称" width="150" show-overflow-tooltip />
-                <el-table-column label="头像" width="80" align="center">
-                    <template #default="scope">
-                        <el-avatar :src="scope.row.avatar" :size="40">
-                            {{ scope.row.nickname?.charAt(0) || 'U' }}
-                        </el-avatar>
-                    </template>
-                </el-table-column>
-                <el-table-column prop="targetSchool" label="目标院校" width="180" show-overflow-tooltip />
-                <el-table-column prop="examYear" label="考研年份" width="100" align="center" />
-                <el-table-column prop="role" label="角色" width="100" align="center">
-                    <template #default="scope">
-                        <el-tag :type="scope.row.role === 'admin' ? 'danger' : 'primary'" size="small">
-                            {{ scope.row.role === 'admin' ? '管理员' : '学生' }}
-                        </el-tag>
-                    </template>
-                </el-table-column>
-                <el-table-column prop="createTime" label="注册时间" width="180" align="center" />
-                <el-table-column label="操作" width="150" align="center" fixed="right">
-                    <template #default="scope">
-                        <el-button size="small" type="primary" link @click="handleViewStats(scope.row)">
-                            查看详情
-                        </el-button>
-                    </template>
-                </el-table-column>
-            </el-table>
-
-            <!-- 分页 -->
-            <div class="pagination-container">
-                <el-pagination :current-page="pageNum" :page-size="pageSize" :page-sizes="[10, 20, 50, 100]"
-                    layout="total, sizes, prev, pager, next, jumper" :total="total" @size-change="handleSizeChange"
-                    @current-change="handlePageChange" />
-            </div>
-        </el-card>
-
-        <!-- 学习进度抽屉 -->
-        <el-drawer v-model="drawerVisible" :title="`学习进度 - ${currentUser?.nickname || currentUser?.username}`"
-            size="50%" destroy-on-close>
-            <div v-loading="statsLoading" class="drawer-content">
-                <!-- 用户基本信息 -->
-                <el-card shadow="never" class="user-info-card">
-                    <template #header>
-                        <span class="card-title">基本信息</span>
-                    </template>
-                    <el-descriptions :column="2" border>
-                        <el-descriptions-item label="用户名">{{ currentUser?.username }}</el-descriptions-item>
-                        <el-descriptions-item label="昵称">{{ currentUser?.nickname }}</el-descriptions-item>
-                        <el-descriptions-item label="目标院校">
-                            <el-tag type="success" v-if="currentUser?.targetSchool">{{ currentUser.targetSchool
+                <el-table :data="tableData" v-loading="loading" class="modern-table" stripe>
+                    <el-table-column prop="id" label="ID" width="60" align="center" />
+                    <el-table-column label="用户信息" min-width="180">
+                        <template #default="scope">
+                            <div class="user-info-cell">
+                                <el-avatar :src="scope.row.avatar" :size="38">
+                                    {{ scope.row.nickname?.charAt(0) || 'U' }}
+                                </el-avatar>
+                                <div class="name-box">
+                                    <div class="nickname">{{ scope.row.nickname }}</div>
+                                    <div class="username">@{{ scope.row.username }}</div>
+                                </div>
+                            </div>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="phone" label="手机号" width="120" />
+                    <el-table-column prop="email" label="Email" min-width="180" show-overflow-tooltip />
+                    <el-table-column prop="targetSchool" label="目标院校" min-width="140">
+                        <template #default="scope">
+                            <el-tag v-if="scope.row.targetSchool" type="info" effect="plain">{{ scope.row.targetSchool
                                 }}</el-tag>
                             <span v-else class="text-muted">未设置</span>
-                        </el-descriptions-item>
-                        <el-descriptions-item label="考研年份">
-                            <el-tag type="warning" v-if="currentUser?.examYear">{{ currentUser.examYear }}</el-tag>
-                            <span v-else class="text-muted">未设置</span>
-                        </el-descriptions-item>
-                    </el-descriptions>
-                </el-card>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="targetTotalScore" label="目标总分" width="90" align="center">
+                        <template #default="scope">
+                            <span class="score-text">{{ scope.row.targetTotalScore || '-' }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="examSubjects" label="考试科目" min-width="200" show-overflow-tooltip>
+                        <template #default="scope">
+                            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                <template v-if="scope.row.examSubjects && scope.row.examSubjects.trim() !== ''">
+                                    <el-tag v-for="(sub, index) in scope.row.examSubjects.split(',')" :key="index"
+                                        :type="['primary', 'success', 'warning', 'danger', 'info'][index % 5]"
+                                        size="small" effect="light">
+                                        {{ sub }}
+                                    </el-tag>
+                                </template>
+                                <span v-else class="text-muted">-</span>
+                            </div>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="examYear" label="考试年份" width="90" align="center">
+                        <template #default="scope">
+                            <el-tag v-if="scope.row.examYear" size="small" effect="dark" color="#9b66f7"
+                                style="border:none">
+                                {{ scope.row.examYear }}
+                            </el-tag>
+                            <span v-else>-</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="角色" width="90" align="center">
+                        <template #default="scope">
+                            <el-tag :type="scope.row.role === 'admin' ? 'danger' : 'success'" effect="light"
+                                size="small">
+                                {{ scope.row.role === 'admin' ? '管理员' : '学生' }}
+                            </el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="注册日期" width="170" align="center">
+                        <template #default="scope">
+                            <div class="full-time">
+                                {{ formatDateTime(scope.row.createTime) }}
+                            </div>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="220" align="center" fixed="right">
+                        <template #default="scope">
+                            <el-button size="small" type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
+                            <el-button size="small" type="warning" link
+                                @click="handleResetPassword(scope.row)">重置密码</el-button>
+                            <el-button size="small" type="info" link @click="handleViewStats(scope.row)"                                 style="color: #009688;">用户面板</el-button>
+                        </template>
+                    </el-table-column>
+                    <el-dialog v-model="editDialogVisible" title="编辑用户信息" width="500px" append-to-body>
+                        <el-form :model="editForm" label-width="80px" style="padding: 0 20px">
+                            <el-form-item label="用户名">
+                                <el-input v-model="editForm.username" disabled />
+                            </el-form-item>
+                            <el-form-item label="昵称">
+                                <el-input v-model="editForm.nickname" placeholder="请输入昵称" />
+                            </el-form-item>
+                            <el-form-item label="手机号">
+                                <el-input v-model="editForm.phone" placeholder="请输入手机号" />
+                            </el-form-item>
+                            <el-form-item label="邮箱">
+                                <el-input v-model="editForm.email" placeholder="请输入邮箱" />
+                            </el-form-item>
+                            <el-form-item label="身份角色">
+                                <el-select v-model="editForm.role" style="width: 100%">
+                                    <el-option label="学生" value="student" />
+                                    <el-option label="管理员" value="admin" />
+                                </el-select>
+                            </el-form-item>
+                        </el-form>
+                        <template #footer>
+                            <el-button @click="editDialogVisible = false">取消</el-button>
+                            <el-button type="primary" @click="submitEdit" :loading="submitLoading">保存修改</el-button>
+                        </template>
+                    </el-dialog>
 
-                <!-- 学习雷达图 -->
-                <el-card shadow="never" class="chart-card">
-                    <template #header>
-                        <span class="card-title">学习雷达图</span>
-                    </template>
-                    <div ref="radarChartRef" class="chart-container"></div>
-                </el-card>
-
-                <!-- 详细统计数据 -->
-                <el-card shadow="never" class="stats-card">
-                    <template #header>
-                        <span class="card-title">详细统计</span>
-                    </template>
-                    <el-table :data="studyStats?.subjectStats || []" border stripe>
-                        <el-table-column prop="subjectName" label="科目" width="120" />
-                        <el-table-column prop="finishedCount" label="完成题数" width="100" align="center" />
-                        <el-table-column prop="correctCount" label="正确题数" width="100" align="center" />
-                        <el-table-column label="正确率" width="120" align="center">
-                            <template #default="scope">
-                                <el-tag :type="getAccuracyType(scope.row.accuracy)">
-                                    {{ scope.row.accuracy?.toFixed(2) || 0 }}%
-                                </el-tag>
-                            </template>
+                    <el-dialog v-model="pwdDialogVisible" title="重置用户密码" width="400px" append-to-body>
+                        <div style="margin-bottom: 20px; color: #606266;">
+                            正在为用户 <b style="color: #409EFF">{{ currentUser?.nickname }}</b> 重置密码
+                        </div>
+                        <el-form :model="pwdForm" label-width="70px">
+                            <el-form-item label="新密码">
+                                <el-input v-model="pwdForm.newPassword" placeholder="请输入新密码" show-password />
+                            </el-form-item>
+                        </el-form>
+                        <template #footer>
+                            <el-button @click="pwdDialogVisible = false">取消</el-button>
+                            <el-button type="danger" @click="submitResetPassword"
+                                :loading="submitLoading">确认重置</el-button>
+                        </template>
+                    </el-dialog>
+                </el-table>
+                <div class="pagination-container">
+                    <el-pagination background :current-page="pageNum" :page-size="pageSize" 
+                        layout="total, prev, pager, next, jumper" :total="total" @current-change="handlePageChange" />
+                </div>
+            </el-card>
+        </div>
+        <el-drawer v-model="drawerVisible" :title="`${currentUser?.nickname} 的学习画像`" size="550px" destroy-on-close
+            custom-class="stats-drawer">
+            <div v-loading="statsLoading" class="drawer-inner">
+                <div class="stats-grid">
+                    <div class="mini-card">
+                        <div class="label">完成题数</div>
+                        <div class="value primary">{{ studyStats?.overallStats?.totalFinished || 0 }}</div>
+                    </div>
+                    <div class="mini-card">
+                        <div class="label">正确率</div>
+                        <div class="value success">{{ studyStats?.overallStats?.overallAccuracy?.toFixed(1) || 0 }}%
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-header">
+                        <span class="dot"></span> 知识点覆盖维度
+                    </div>
+                    <div ref="radarChartRef" class="radar-chart"></div>
+                    <div v-if="!studyStats?.subjectStats?.length" class="empty-stats">暂无详细学科数据</div>
+                </div>
+                <div class="sub-list">
+                    <div class="section-title">分科概览</div>
+                    <el-table :data="studyStats?.subjectStats || []" size="small">
+                        <el-table-column prop="subjectName" label="科目" />
+                        <el-table-column label="正确率" align="right">
+                            <template #default="scope">{{ scope.row.accuracy?.toFixed(1) }}%</template>
                         </el-table-column>
-                        <el-table-column label="覆盖度" width="120" align="center">
-                            <template #default="scope">
-                                <el-tag :type="getCoverageType(scope.row.coverage)">
-                                    {{ scope.row.coverage?.toFixed(2) || 0 }}%
-                                </el-tag>
-                            </template>
-                        </el-table-column>
-                        <el-table-column prop="totalCount" label="总题数" width="100" align="center" />
                     </el-table>
-                </el-card>
-
-                <!-- 总体统计 -->
-                <el-card shadow="never" class="overall-stats-card">
-                    <template #header>
-                        <span class="card-title">总体统计</span>
-                    </template>
-                    <el-row :gutter="20">
-                        <el-col :span="8">
-                            <div class="stat-item">
-                                <div class="stat-value">{{ studyStats?.overallStats?.totalFinished || 0 }}</div>
-                                <div class="stat-label">总完成题数</div>
-                            </div>
-                        </el-col>
-                        <el-col :span="8">
-                            <div class="stat-item">
-                                <div class="stat-value">{{ studyStats?.overallStats?.totalCorrect || 0 }}</div>
-                                <div class="stat-label">总正确题数</div>
-                            </div>
-                        </el-col>
-                        <el-col :span="8">
-                            <div class="stat-item">
-                                <div class="stat-value">{{ studyStats?.overallStats?.overallAccuracy?.toFixed(2) || 0
-                                    }}%</div>
-                                <div class="stat-label">总体正确率</div>
-                            </div>
-                        </el-col>
-                    </el-row>
-                </el-card>
+                </div>
             </div>
         </el-drawer>
     </div>
 </template>
 
-<script setup>
-import { ref, onMounted, nextTick } from 'vue'
-import request from '@/utils/request'
-import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
 
-// 数据定义
+<script setup>
+import { ref, onMounted, nextTick, onUnmounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus' 
+import * as echarts from 'echarts'
+import request from '@/utils/request'
+
 const loading = ref(false)
 const statsLoading = ref(false)
 const tableData = ref([])
@@ -175,61 +205,106 @@ const radarChartRef = ref(null)
 const currentUser = ref(null)
 const studyStats = ref(null)
 let radarChart = null
+let resizeObserver = null
 
-const searchForm = ref({
-    role: '',
-    keyword: ''
-})
+const searchForm = ref({ role: '', keyword: '' })
 
-// 加载用户数据
+// 状态控制
+const editDialogVisible = ref(false)
+const pwdDialogVisible = ref(false)
+const submitLoading = ref(false)
+
+// 表单数据
+const editForm = ref({})
+const pwdForm = ref({ newPassword: '' })
+
+// 数据加载
 const loadData = async () => {
     loading.value = true
     try {
-        const params = {
-            pageNum: pageNum.value,
-            pageSize: pageSize.value
-        }
-        if (searchForm.value.role) {
-            params.role = searchForm.value.role
-        }
-        if (searchForm.value.keyword) {
-            params.keyword = searchForm.value.keyword
-        }
-
-        console.log('请求参数:', params)
+        const params = { pageNum: pageNum.value, pageSize: pageSize.value, ...searchForm.value }
         const res = await request.get('/user/page', { params })
         const data = res.data || res
-        tableData.value = data.records || []
+        console.log(data)
+        // ID从小到大排序
+        tableData.value = (data.records || [])
         total.value = data.total || 0
-        console.log('用户数据:', tableData.value)
     } catch (e) {
         ElMessage.error('获取数据失败')
-        console.error('错误详情:', e)
     } finally {
         loading.value = false
     }
 }
 
-// 重置搜索
+// 打开编辑
+const handleEdit = (row) => {
+    editForm.value = { ...row } // 浅拷贝，防止直接修改表格显示
+    editDialogVisible.value = true
+}
+
+// 提交编辑
+const submitEdit = async () => {
+    submitLoading.value = true
+    try {
+        // 假设后端接口为 /user/update
+        await request.post('/user/update', editForm.value)
+        ElMessage.success('更新成功')
+        editDialogVisible.value = false
+        loadData() // 刷新列表
+    } catch (e) {
+        ElMessage.error('更新失败')
+    } finally {
+        submitLoading.value = false
+    }
+}
+
+// 打开重置密码
+const handleResetPassword = (row) => {
+    currentUser.value = row
+    pwdForm.value.newPassword = ''
+    pwdDialogVisible.value = true
+}
+
+// 提交重置密码
+const submitResetPassword = async () => {
+    if (!pwdForm.value.newPassword) return ElMessage.warning('请输入新密码')
+
+    submitLoading.value = true
+    try {
+        // 假设后端接口为 /user/resetPwd
+        await request.post('/user/resetPwd', {
+            id: currentUser.value.id,
+            password: pwdForm.value.newPassword
+        })
+        ElMessage.success('密码重置成功')
+        pwdDialogVisible.value = false
+    } catch (e) {
+        ElMessage.error('操作失败')
+    } finally {
+        submitLoading.value = false
+    }
+}
+
+
 const resetSearch = () => {
     searchForm.value = { role: '', keyword: '' }
     pageNum.value = 1
     loadData()
 }
 
-// 分页
 const handlePageChange = (page) => {
     pageNum.value = page
     loadData()
 }
 
-const handleSizeChange = (size) => {
-    pageSize.value = size
-    pageNum.value = 1
-    loadData()
+// 时间格式化函数
+const formatDateTime = (timeStr) => {
+    if (!timeStr) return '-';
+    // 处理 ISO 格式 (2026-01-01T01:18:43) -> 2026-01-01 01:18:43
+    return timeStr.replace('T', ' ').split('.')[0];
 }
 
-// 查看学习统计
+// 核心修复：雷达图渲染
 const handleViewStats = async (user) => {
     currentUser.value = user
     drawerVisible.value = true
@@ -238,210 +313,342 @@ const handleViewStats = async (user) => {
     try {
         const res = await request.get(`/user/study-stats/${user.id}`)
         studyStats.value = res.data || res
-        console.log('学习统计:', studyStats.value)
 
-        // 等待 DOM 更新后渲染图表
+        // 等待抽屉打开及DOM渲染
         await nextTick()
-        initRadarChart()
+        setTimeout(() => {
+            initRadarChart()
+        }, 350)
     } catch (e) {
-        ElMessage.error('获取学习统计失败')
-        console.error(e)
+        ElMessage.error('获取详情失败')
     } finally {
         statsLoading.value = false
     }
 }
 
-// 初始化雷达图
 const initRadarChart = () => {
     if (!radarChartRef.value) return
+    if (radarChart) radarChart.dispose()
 
-    // 销毁旧图表
-    if (radarChart) {
-        radarChart.dispose()
-    }
-
-    // 创建新图表
     radarChart = echarts.init(radarChartRef.value)
-
-    const stats = studyStats.value
-    const subjectStats = stats?.subjectStats || []
-
-    // 准备雷达图数据
-    const indicators = subjectStats.map(s => ({
-        name: s.subjectName,
-        max: 100
-    }))
-
-    const accuracyData = subjectStats.map(s => s.accuracy || 0)
-    const coverageData = subjectStats.map(s => s.coverage || 0)
-    const activityData = subjectStats.map(s => {
-        // 活跃度基于完成题数，归一化到 0-100
-        const maxFinished = Math.max(...subjectStats.map(item => item.finishedCount || 0))
-        return maxFinished > 0 ? ((s.finishedCount || 0) / maxFinished * 100) : 0
-    })
+    const subjectStats = studyStats.value?.subjectStats || []
 
     const option = {
-        tooltip: {
-            trigger: 'axis'
-        },
-        legend: {
-            data: ['正确率', '覆盖度', '活跃度']
-        },
+        color: ['#409EFF', '#67C23A'],
+        tooltip: { trigger: 'item' },
         radar: {
-            indicator: indicators
+            indicator: subjectStats.length ? subjectStats.map(s => ({ name: s.subjectName, max: 100 })) : [{ name: '暂无', max: 100 }],
+            splitArea: { show: false },
+            axisLine: { lineStyle: { color: '#E2E8F0' } },
+            splitLine: { lineStyle: { color: '#E2E8F0' } }
         },
-        series: [
-            {
-                name: '学习数据',
-                type: 'radar',
-                data: [
-                    {
-                        value: accuracyData,
-                        name: '正确率',
-                        itemStyle: { color: '#67C23A' },
-                        areaStyle: { opacity: 0.3 }
-                    },
-                    {
-                        value: coverageData,
-                        name: '覆盖度',
-                        itemStyle: { color: '#409EFF' },
-                        areaStyle: { opacity: 0.3 }
-                    },
-                    {
-                        value: activityData,
-                        name: '活跃度',
-                        itemStyle: { color: '#E6A23C' },
-                        areaStyle: { opacity: 0.3 }
-                    }
-                ]
-            }
-        ]
+        series: [{
+            type: 'radar',
+            data: [
+                { value: subjectStats.map(s => s.accuracy || 0), name: '正确率', areaStyle: { color: 'rgba(64, 158, 255, 0.2)' } },
+                { value: subjectStats.map(s => s.coverage || 0), name: '覆盖度', areaStyle: { color: 'rgba(103, 194, 58, 0.2)' } }
+            ]
+        }]
     }
-
     radarChart.setOption(option)
 
-    // 响应式
-    window.addEventListener('resize', () => {
+    // 监听容器大小变化，防止雷达图缩成一团
+    resizeObserver = new ResizeObserver(() => {
         radarChart?.resize()
     })
+    resizeObserver.observe(radarChartRef.value)
 }
 
-// 获取正确率标签类型
-const getAccuracyType = (accuracy) => {
-    if (accuracy >= 80) return 'success'
-    if (accuracy >= 60) return ''
-    if (accuracy >= 40) return 'warning'
-    return 'danger'
-}
-
-// 获取覆盖度标签类型
-const getCoverageType = (coverage) => {
-    if (coverage >= 80) return 'success'
-    if (coverage >= 60) return ''
-    if (coverage >= 40) return 'warning'
-    return 'info'
-}
-
-onMounted(() => {
-    console.log('用户管理页面已挂载')
-    loadData()
-})
+onMounted(() => { loadData() })
+onUnmounted(() => { resizeObserver?.disconnect() })
 </script>
 
 <style scoped>
-.user-manage-container {
-    padding: 16px;
-    background-color: #f5f7f9;
-    min-height: calc(100vh - 120px);
+.content-wrapper {
+    width: 100%;
+    max-width: 1400px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.table-card {
+/* 卡片与头部：扁平化设计 */
+.main-card {
+    border: 1px solid #ebeef5;
     border-radius: 8px;
-    border: none;
+    background: #ffffff;
+}
+
+/* 移除 el-card 头部底部的分割线 */
+:deep(.el-card__header) {
+    padding-bottom: 15px;
+}
+
+.title-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2f3d;
+    position: relative;
+    padding-left: 12px;
+}
+
+.title-text::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 18px;
+    background: #409eff;
+    border-radius: 2px;
 }
 
 .card-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .title-text {
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 600;
     color: #303133;
 }
 
-.search-form {
-    background: #fff;
-    padding: 12px 0;
-    margin-bottom: 8px;
-}
-
-.custom-table {
-    width: 100% !important;
-    margin-top: 10px;
-}
-
-.pagination-container {
-    margin-top: 20px;
-    display: flex;
-    justify-content: flex-end;
-}
-
-.text-muted {
+.header-desc {
+    font-size: 13px;
     color: #909399;
 }
 
-/* 抽屉样式 */
-.drawer-content {
-    padding: 0 16px;
-}
-
-.user-info-card,
-.chart-card,
-.stats-card,
-.overall-stats-card {
+/* 搜索区域 */
+.search-section {
+    background: #fcfcfd;
+    padding: 18px 20px 0;
+    border-radius: 8px;
     margin-bottom: 20px;
+    border: 1px solid #ebeef5;
 }
 
-.card-title {
+:deep(.el-form--inline .el-form-item) {
+    margin-right: 24px;
+}
+
+/* 表格 */
+.modern-table {
+    font-size: 14px;
+}
+
+/* 用户信息单元格 */
+.user-info-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nickname {
     font-weight: 600;
     color: #303133;
+    line-height: 1.2;
 }
 
-.chart-container {
-    width: 100%;
-    height: 400px;
+.username {
+    font-size: 12px;
+    color: #909399;
+    margin-top: 2px;
 }
 
-.stat-item {
-    text-align: center;
-    padding: 20px 0;
+/* 时间文本样式 */
+.time-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-.stat-value {
-    font-size: 32px;
-    font-weight: 600;
-    color: #409EFF;
-    margin-bottom: 8px;
-}
-
-.stat-label {
-    font-size: 14px;
+.time-date {
     color: #606266;
+    font-weight: 500;
 }
 
-:deep(.el-form-item) {
-    margin-bottom: 18px;
+.time-hm {
+    font-size: 11px;
+    color: #a8abb2;
 }
 
-:deep(.el-table) {
+/* 翻页栏容器 */
+.pagination-container {
+    margin-top: 25px;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: center;
+    background: #fdfdfd;
+    border-radius: 0 0 8px 8px;
+}
+
+/* Element Plus 分页样式 */
+:deep(.el-pagination.is-background .el-pager li) {
+    background-color: #fff;
+    border: 1px solid #dcdfe6;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+/* 激活状态的页码样式 */
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled).is-active) {
+    background-color: #409eff;
+    color: #fff;
+    border-color: #409eff;
+    box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
+}
+
+/* 悬停效果 */
+:deep(.el-pagination.is-background .el-pager li:hover) {
+    color: #409eff;
+    border-color: #409eff;
+}
+
+/* 总条数和跳页文字颜色 */
+:deep(.el-pagination__total),
+:deep(.el-pagination__jump) {
+    color: #606266;
     font-size: 13px;
 }
 
-:deep(.el-table th) {
-    background-color: #f5f7fa;
+/* 输入框圆角优化 */
+:deep(.el-input__wrapper) {
+    border-radius: 6px !important;
+}
+
+/* 抽屉内部样式 */
+.drawer-inner {
+    padding: 10px 20px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.mini-card {
+    background: #f8f9fa;
+    border: 1px solid #f0f2f5;
+    padding: 18px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.mini-card .label {
+    font-size: 13px;
+    color: #909399;
+    margin-bottom: 6px;
+}
+
+.mini-card .value {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.mini-card .value.primary {
+    color: #409EFF;
+}
+
+.mini-card .value.success {
+    color: #67C23A;
+}
+
+.chart-box {
+    border: 1px solid #f0f2f5;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.radar-chart {
+    width: 100%;
+    height: 350px;
+}
+
+/* 隐藏空状态提示 */
+.empty-stats {
+    text-align: center;
+    color: #c0c4cc;
+    padding: 20px;
+}
+
+/* 用户信息单元格美化 */
+.user-info-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nickname {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 14px;
+}
+
+.username {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+/* 考试科目小标签 */
+.subjects-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.mini-sub-tag {
+    background-color: #f1f5f9;
+    color: #64748b;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+/* 注册日期文字 */
+.full-time {
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    color: #475569;
+}
+
+/* 总分文字加粗 */
+.score-text {
+    font-weight: bold;
+    color: #e67e22;
+}
+
+/* 暂无数据的文字颜色 */
+.text-muted {
+    color: #cbd5e1;
+    font-style: italic;
+    font-size: 13px;
+}
+
+/* 现代表格细节微调 */
+:deep(.el-table__header th) {
+    background-color: #f8fafc !important;
+    color: #475569;
     font-weight: 600;
 }
+
+.modern-table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* 操作列按钮间距优化 */
+:deep(.el-table__fixed-right) {
+    height: 100% !important;
+}
+
+.el-button+.el-button {
+    margin-left: 12px;
+}
 </style>
+

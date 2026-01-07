@@ -89,6 +89,8 @@ public class UserController {
 
         if (user.getNickname() != null) dbUser.setNickname(user.getNickname());
         if (user.getAvatar() != null) dbUser.setAvatar(user.getAvatar());
+        if (user.getPhone() != null) dbUser.setPhone(user.getPhone());
+        if (user.getEmail() != null) dbUser.setEmail(user.getEmail());
         if (user.getExamYear() != null) dbUser.setExamYear(user.getExamYear());
         if (user.getExamSubjects() != null) dbUser.setExamSubjects(user.getExamSubjects());
         if (user.getTargetSchool() != null) dbUser.setTargetSchool(user.getTargetSchool());
@@ -150,6 +152,28 @@ public class UserController {
 
         user.setPassword(passwordEncoder.encode(newPassword));
         return userService.updateById(user) ? Result.success("密码修改成功") : Result.error("更新失败");
+    }
+
+    @PostMapping("/resetPwd")
+    @Operation(summary = "管理员重置用户密码", description = "管理员直接设置用户新密码，无需验证旧密码。")
+    public Result resetPwd(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "重置密码参数",
+                    content = @Content(examples = @ExampleObject(value = "{\"id\": 1, \"password\": \"123456\"}"))
+            )
+            @RequestBody Map<String, String> params) {
+        String id = params.get("id");
+        String password = params.get("password");
+
+        if (StrUtil.hasBlank(id, password)) {
+            return Result.error("参数缺失");
+        }
+
+        User user = userService.getById(id);
+        if (user == null) return Result.error("用户不存在");
+
+        user.setPassword(passwordEncoder.encode(password));
+        return userService.updateById(user) ? Result.success("密码重置成功") : Result.error("更新失败");
     }
 
     @GetMapping("/page")
