@@ -2,39 +2,69 @@
     <div class="user-manage-container">
         <div class="content-wrapper">
             <el-card shadow="never" class="main-card">
-                <div class="header-section">
-                    <div class="title-info">
-                        <div class="title-text">习题册管理中心</div>
-                        <div class="header-desc">统一配置考研各科目所需的参考书目与习题资源（共 {{ total }} 本）</div>
+                <template #header>
+                    <div class="header-section">
+                        <div class="card-header">
+                            <span class="title-text">习题册管理中心</span>
+                            <div class="header-desc">统一配置考研各科目所需的参考书目与习题资源（共 {{ total }} 本）
+                            </div>
+                        </div>
+                        <el-button type="primary" icon="Plus" @click="handleAdd">新增习题册</el-button>
                     </div>
-                    <el-button type="primary" icon="Plus" @click="handleAdd">新增习题册</el-button>
-                </div>
-                <div class="search-section">
-                    <el-form :inline="true" :model="searchForm">
-                        <el-form-item label="所属科目">
-                            <el-cascader v-model="searchForm.subjectId" :options="subjectTree" :props="{
-                                value: 'id',
-                                label: 'name',
-                                children: 'children',
-                                checkStrictly: true,
-                                emitPath: false
-                            }" placeholder="选择科目分类" clearable style="width: 240px" @change="loadData" />
-                        </el-form-item>
-                        <el-form-item>
-                            <el-button type="primary" @click="loadData">查询</el-button>
-                            <el-button @click="resetSearch" plain>重置</el-button>
-                        </el-form-item>
-                    </el-form>
-                </div>
+                </template>
 
-                <el-table :data="tableData" v-loading="loading" class="modern-table">
-                    <!-- ID 列已移除 -->
+                <!-- 搜索表单 -->
+                <el-form :inline="true" :model="searchForm" class="search-form">
+                    <el-form-item label="所属科目">
+                        <el-tree-select v-model="form.subjectIds" :data="subjects" 
+                        :props="{ label: 'name', value: 'id', children: 'children' }" 
+                        multiple collapse-tags
+                        collapse-tags-tooltip clearable 
+                        placeholder="请选择科目" popper-class="subject-tree-popper"
+                        check-strictly style="width: 260px">
+                            <template #default="{ node, data }">
+                                <div class="custom-tree-node">
+                                    <div class="node-label-wrapper">
+                                        <el-icon v-if="data.children && data.children.length > 0" class="folder-icon">
+                                            <Collection />
+                                        </el-icon>
+                                        <el-icon v-else class="leaf-icon">
+                                            <Document />
+                                        </el-icon>
+                                        <span class="node-text">{{ node.label }}</span>
+                                    </div>
 
+                                    <div v-if="data.children && data.children.length > 0" class="node-action">
+                                        <el-checkbox :model-value="isNodeFullySelected(data)"
+                                            :indeterminate="isNodePartiallySelected(data)"
+                                            @change="handleSelectAll(data)" @click.stop>
+                                            <span class="all-text">全选</span>
+                                        </el-checkbox>
+                                    </div>
+                                </div>
+                            </template>
+                        </el-tree-select>
+                    </el-form-item>
+
+                    <!-- 查询按钮 -->
+                    <el-form-item>
+                        <el-button type="primary" icon="Search" @click="loadData">查询</el-button>
+                        <el-button icon="Refresh" @click="resetSearch">重置</el-button>
+                    </el-form-item>
+                </el-form>
+
+                <!-- 数据表格 -->
+                <el-table :data="tableData" v-loading="loading" class="modern-table" stripe>
+                    <!-- ID 列 -->
+                    <el-table-column prop="id" label="ID" width="60" align="center" />
+                    <!-- 习题册信息列 -->
                     <el-table-column label="习题册信息" min-width="250">
                         <template #default="scope">
                             <div class="book-info-cell">
                                 <div class="nickname">
-                                    <el-icon class="book-icon"><Notebook /></el-icon>
+                                    <el-icon class="book-icon">
+                                        <Notebook />
+                                    </el-icon>
                                     <span>{{ scope.row.name }}</span>
                                 </div>
                                 <div class="book-description">{{ scope.row.description || '暂无描述' }}</div>
@@ -56,8 +86,9 @@
 
                     <el-table-column label="录入时间" width="160" align="center">
                         <template #default="scope">
-                            <span class="time-text">{{ scope.row.createTime ? scope.row.createTime.split('T')[0] : '-'
-                                }}</span>
+                            <div class="full-time">
+                                {{ formatDateTime(scope.row.createTime) }}
+                            </div>
                         </template>
                     </el-table-column>
 
@@ -73,6 +104,7 @@
                     </el-table-column>
                 </el-table>
 
+                <!-- 分页 -->
                 <div class="pagination-container">
                     <el-pagination background :current-page="pageNum" :page-size="pageSize"
                         layout="total, prev, pager, next" :total="total" @current-change="handlePageChange" />
@@ -80,6 +112,7 @@
             </el-card>
         </div>
 
+        <!-- 编辑对话框 -->
         <el-dialog v-model="dialogVisible" :title="form.id ? '编辑习题册' : '新增习题册'" width="550px" destroy-on-close
             class="stats-drawer">
             <el-form :model="form" :rules="rules" ref="formRef" label-position="top">
@@ -121,160 +154,106 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 const loading = ref(false)
 const saving = ref(false)
 const tableData = ref([])
+
 const total = ref(0)
 const pageNum = ref(1)
 const pageSize = ref(10)
+
 const dialogVisible = ref(false)
 const formRef = ref(null)
 
-const searchForm = ref({ subjectId: null })
-const subjectTree = ref([])
+const searchForm = ref({ subjectIds: [] })
+const subjects = ref([])
 
 const form = ref({
     id: null,
+    subjectIds: [],
     name: '',
-    description: '',
-    subjectIds: []
+    description: ''
 })
 
 const rules = {
     name: [{ required: true, message: '请输入习题册名称', trigger: 'blur' }]
 }
 
-// 获取科目树
-const loadSubjectTree = async () => {
-    try {
-        const res = await request.get('/subject/manage-tree')
-        const fullTree = res.data || res || []
-
-        // 过滤科目树：基于 scope 字段实现多对多关系
-        subjectTree.value = filterSubjectTreeForCascader(fullTree)
-    } catch (e) {
-        ElMessage.error('获取科目树失败')
-        console.error(e)
-    }
+// 时间格式化函数
+const formatDateTime = (timeStr) => {
+    if (!timeStr) return '-';
+    // 处理 ISO 格式 (2026-01-01T01:18:43) -> 2026-01-01 01:18:43
+    return timeStr.replace('T', ' ').split('.')[0];
 }
 
 
-// 基于 scope 字段实现多对多关系映射
-const filterSubjectTreeForCascader = (tree) => {
-    // 扁平化所有节点到一个 map 中
-    const nodeMap = new Map()
+// 获取科目树
+const loadSubjects = async () => {
+    try {
+        const res = await request.get('/subject/manage-tree')
+        subjects.value = res.data || res || []
+        console.log('科目树:', subjects.value)
+    } catch (e) {
 
-    const collectNodes = (node) => {
-        nodeMap.set(node.id, { ...node, children: [] })
-        if (node.children && node.children.length > 0) {
-            node.children.forEach(child => collectNodes(child))
+        ElMessage.error('获取科目列表失败')
+        console.error(e)
+    }
+}
+// 全选/取消全选处理
+const handleSelectAll = (node) => {
+    // 递归收集所有子节点 ID
+    const collectIds = (n) => {
+        const ids = [n.id]
+        if (n.children && n.children.length > 0) {
+            n.children.forEach(child => {
+                ids.push(...collectIds(child))
+            })
         }
+        return ids
     }
 
-    tree.forEach(node => collectNodes(node))
+    const allIds = collectIds(node)
+    const selectedSet = new Set(form.value.subjectIds)
 
-    // 定义考试规格根节点ID列表
-    const rootIds = [1, 2, 3, 4, 5, 6, 7] // 政治(1)、英语一(2)、英语二(3)、数学一(4)、数学二(5)、数学三(6)、408(7)
-
-    // 递归构建子节点（基于 parent_id 的传统关系）
-    const buildChildren = (parentId) => {
-        const children = []
-        nodeMap.forEach(node => {
-            if (node.parentId === parentId) {
-                const childNode = {
-                    id: node.id,
-                    name: node.name,
-                    level: node.level
-                }
-
-                const subChildren = buildChildren(node.id)
-                if (subChildren.length > 0) {
-                    childNode.children = subChildren
-                }
-
-                children.push(childNode)
-            }
-        })
-        return children.sort((a, b) => {
-            const nodeA = nodeMap.get(a.id)
-            const nodeB = nodeMap.get(b.id)
-            return (nodeA.sort || 9999) - (nodeB.sort || 9999)
-        })
+    if (selectedSet.has(node.id)) {
+        // 取消全选：移除该节点及其所有子节点
+        allIds.forEach(id => selectedSet.delete(id))
+    } else {
+        // 全选：添加该节点及其所有子节点
+        allIds.forEach(id => selectedSet.add(id))
     }
 
-    // 构建树：基于 scope 字段动态分配子节点
-    const buildTree = (examSpecId) => {
-        const children = []
+    form.value.subjectIds = Array.from(selectedSet)
+}
 
-        nodeMap.forEach(node => {
-            // 情况1：基于 scope 的多对多关系（Level 2/3 学科）
-            if ((node.level === '2' || node.level === '3') && node.parentId === 0) {
-                // 检查 scope 字段是否包含当前考试规格ID
-                const belongsToSpec = !node.scope || node.scope.split(',').map(s => s.trim()).includes(examSpecId.toString())
-
-                if (belongsToSpec) {
-                    const childNode = {
-                        id: node.id,
-                        name: node.name,
-                        level: node.level
-                    }
-
-                    // 递归构建子节点（基于 parent_id）
-                    const subChildren = buildChildren(node.id)
-                    if (subChildren.length > 0) {
-                        childNode.children = subChildren
-                    }
-
-                    children.push(childNode)
-                }
-            }
-            // 情况2：传统的 parent_id 关系（如政治下的马原、408下的四门课）
-            else if (node.parentId === examSpecId) {
-                const childNode = {
-                    id: node.id,
-                    name: node.name,
-                    level: node.level
-                }
-
-                const subChildren = buildChildren(node.id)
-                if (subChildren.length > 0) {
-                    childNode.children = subChildren
-                }
-
-                children.push(childNode)
-            }
-        })
-
-        return children.sort((a, b) => {
-            const nodeA = nodeMap.get(a.id)
-            const nodeB = nodeMap.get(b.id)
-            return (nodeA.sort || 9999) - (nodeB.sort || 9999)
-        })
+// 检测是否全选
+const isNodeFullySelected = (node) => {
+    const collectIds = (n) => {
+        const ids = [n.id]
+        if (n.children && n.children.length > 0) {
+            n.children.forEach(child => {
+                ids.push(...collectIds(child))
+            })
+        }
+        return ids
     }
+    const allIds = collectIds(node)
+    const selectedSet = new Set(form.value.subjectIds)
+    return allIds.every(id => selectedSet.has(id))
+}
 
-    // 构建最终树
-    const result = []
-    rootIds.forEach(rootId => {
-        const rootNode = nodeMap.get(rootId)
-        if (!rootNode) return
-
-        const newNode = {
-            id: rootNode.id,
-            name: rootNode.name,
-            level: rootNode.level
+// 检测是否部分选中
+const isNodePartiallySelected = (node) => {
+    const collectIds = (n) => {
+        const ids = [n.id]
+        if (n.children && n.children.length > 0) {
+            n.children.forEach(child => {
+                ids.push(...collectIds(child))
+            })
         }
-
-        const children = buildTree(rootId)
-        if (children.length > 0) {
-            newNode.children = children
-        }
-
-        result.push(newNode)
-    })
-
-    // 按 sort 排序根节点
-    return result.sort((a, b) => {
-        const nodeA = nodeMap.get(a.id)
-        const nodeB = nodeMap.get(b.id)
-        return (nodeA.sort || 9999) - (nodeB.sort || 9999)
-    })
+        return ids
+    }
+    const allIds = collectIds(node)
+    const selectedSet = new Set(form.value.subjectIds)
+    const selectedCount = allIds.filter(id => selectedSet.has(id)).length
+    return selectedCount > 0 && selectedCount < allIds.length
 }
 
 // 加载习题册数据
@@ -404,18 +383,13 @@ const handleDelete = (id) => {
 
 onMounted(() => {
     console.log('页面已挂载')
-    loadSubjectTree()
+    loadSubjects()
     loadData()
 })
 </script>
 
 
 <style scoped>
-.user-manage-container {
-    background-color: #f5f7f9;
-    min-height: calc(100vh - 100px);
-}
-
 .main-card {
     border: none;
     border-radius: 8px;
@@ -426,14 +400,18 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
-    padding: 10px 5px;
-    border-bottom: 1px solid #f0f2f5;
+    /* margin-bottom: 24px;
+    padding: 10px 5px; */
 }
 
 :deep(.el-card__header) {
     padding-bottom: 15px;
-    border-bottom: 1px solid #f0f2f5 !important;
+}
+
+.card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .title-text {
@@ -462,15 +440,69 @@ onMounted(() => {
 }
 
 /* 搜索区域 */
-.search-section {
-    background-color: #f8faff;
-    padding: 18px 20px;
-    border-radius: 4px;
+.search-form {
+    background: #fcfcfd;
+    padding: 18px 20px 0;
+    border-radius: 8px;
     margin-bottom: 20px;
+    border: 1px solid #ebeef5;
 }
 
-.search-section :deep(.el-form-item) {
-    margin-bottom: 0;
+:deep(.el-form--inline .el-form-item) {
+    margin-right: 24px;
+}
+
+/* 树节点布局 */
+.custom-tree-node {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 4px;
+    font-size: 14px;
+}
+
+.node-label-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    /* 图标和文字的间距 */
+}
+
+.node-text{
+    font-weight: 500;
+}
+/* 图标颜色区分 */
+.folder-icon {
+    color: #e6a23c;
+    /* 文件夹用暖色 */
+    font-size: 14px;
+}
+
+.leaf-icon {
+    color: #909399;
+    /* 叶子节点用中性色 */
+    font-size: 13px;
+}
+
+.node-text {
+    color: #303133;
+}
+
+/* 全选复选框美化 */
+.node-action :deep(.el-checkbox) {
+    height: auto;
+    margin-right: 0;
+}
+
+.node-action :deep(.el-checkbox__label) {
+    font-size: 12px;
+    color: #409eff;
+    padding-left: 4px;
+}
+
+.all-text {
+    font-weight: 500;
 }
 
 /* 表格内部样式 */
@@ -521,9 +553,11 @@ onMounted(() => {
     border-radius: 4px;
 }
 
-.time-text {
+/* 注册日期文字 */
+.full-time {
+    font-family: 'Monaco', 'Courier New', monospace;
     font-size: 13px;
-    color: #606266;
+    color: #475569;
 }
 
 .text-muted {

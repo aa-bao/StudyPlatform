@@ -33,7 +33,9 @@
                 
                 <!-- 数据表格 -->
                 <el-table :data="tableData" v-loading="loading" class="modern-table" stripe>
+                    <!-- ID 列 -->
                     <el-table-column prop="id" label="ID" width="60" align="center" />
+                    <!-- 用户信息列 -->
                     <el-table-column label="用户信息" min-width="180">
                         <template #default="scope">
                             <div class="user-info-cell">
@@ -47,8 +49,11 @@
                             </div>
                         </template>
                     </el-table-column>
+                    <!-- 手机列 -->
                     <el-table-column prop="phone" label="手机号" width="120" />
+                    <!-- 邮箱列 -->
                     <el-table-column prop="email" label="Email" min-width="180" show-overflow-tooltip />
+                    <!-- 目标院校列 -->
                     <el-table-column prop="targetSchool" label="目标院校" min-width="140">
                         <template #default="scope">
                             <el-tag v-if="scope.row.targetSchool" type="info" effect="plain">{{ scope.row.targetSchool
@@ -56,11 +61,13 @@
                             <span v-else class="text-muted">未设置</span>
                         </template>
                     </el-table-column>
+                    <!-- 目标总分列 -->
                     <el-table-column prop="targetTotalScore" label="目标总分" width="90" align="center">
                         <template #default="scope">
                             <span class="score-text">{{ scope.row.targetTotalScore || '-' }}</span>
                         </template>
                     </el-table-column>
+                    <!-- 考试科目列 -->
                     <el-table-column prop="examSubjects" label="考试科目" min-width="200" show-overflow-tooltip>
                         <template #default="scope">
                             <div style="display: flex; flex-wrap: wrap; gap: 4px;">
@@ -75,6 +82,7 @@
                             </div>
                         </template>
                     </el-table-column>
+                    <!-- 考试年份列 -->
                     <el-table-column prop="examYear" label="考试年份" width="90" align="center">
                         <template #default="scope">
                             <el-tag v-if="scope.row.examYear" size="small" effect="dark" color="#9b66f7"
@@ -84,6 +92,7 @@
                             <span v-else>-</span>
                         </template>
                     </el-table-column>
+                    <!-- 角色列 -->
                     <el-table-column label="角色" width="90" align="center">
                         <template #default="scope">
                             <el-tag :type="scope.row.role === 'admin' ? 'danger' : 'success'" effect="light"
@@ -92,6 +101,7 @@
                             </el-tag>
                         </template>
                     </el-table-column>
+                    <!-- 注册日期列 -->
                     <el-table-column label="注册日期" width="170" align="center">
                         <template #default="scope">
                             <div class="full-time">
@@ -99,6 +109,7 @@
                             </div>
                         </template>
                     </el-table-column>
+                    <!-- 操作面板列 -->
                     <el-table-column label="操作" width="220" align="center" fixed="right">
                         <template #default="scope">
                             <el-button size="small" type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
@@ -107,6 +118,8 @@
                             <el-button size="small" type="info" link @click="handleViewStats(scope.row)"                                 style="color: #009688;">用户面板</el-button>
                         </template>
                     </el-table-column>
+
+                    <!-- 编辑对话框 -->
                     <el-dialog v-model="editDialogVisible" title="编辑用户信息" width="500px" append-to-body>
                         <el-form :model="editForm" label-width="80px" style="padding: 0 20px">
                             <el-form-item label="用户名">
@@ -134,6 +147,7 @@
                         </template>
                     </el-dialog>
 
+                    <!-- 重置密码对话框 -->
                     <el-dialog v-model="pwdDialogVisible" title="重置用户密码" width="400px" append-to-body>
                         <div style="margin-bottom: 20px; color: #606266;">
                             正在为用户 <b style="color: #409EFF">{{ currentUser?.nickname }}</b> 重置密码
@@ -150,6 +164,8 @@
                         </template>
                     </el-dialog>
                 </el-table>
+
+                <!-- 分页 -->
                 <div class="pagination-container">
                     <el-pagination background :current-page="pageNum" :page-size="pageSize" 
                         layout="total, prev, pager, next, jumper" :total="total" @current-change="handlePageChange" />

@@ -3,7 +3,11 @@
         <el-card shadow="never" class="table-card">
             <template #header>
                 <div class="card-header">
-                    <span class="title-text">题目管理中心</span>
+                    <div class="text-header">
+                        <span class="title-text">题目管理中心</span>
+                        <div class="header-desc">查看并管理题目数据
+                        </div>
+                    </div>
                     <div class="header-btns">
                         <el-button type="success" icon="Download" @click="exportToExcel">导出 CSV</el-button>
                         <el-button type="primary" icon="Plus" @click="handleAdd">新增题目</el-button>
@@ -15,25 +19,41 @@
             <el-form :inline="true" :model="searchForm" class="search-form">
                 <el-form-item label="所属科目">
                     <el-tree-select v-model="form.subjectIds" :data="subjects"
-                        :props="{ label: 'name', value: 'id', children: 'children' }" multiple collapse-tags
-                        style="width: 100%">
+                        :props="{ label: 'name', value: 'id', children: 'children' }" multiple collapse-tags collapse-tags-tooltip clearable placeholder="请选择科目"
+                        popper-class="subject-tree-popper" check-strictly
+                        style="width: 260px">
                         <template #default="{ node, data }">
                             <div class="custom-tree-node">
-                                <span class="node-text">{{ node.label }}</span>
-                                <el-checkbox v-if="data.children && data.children.length > 0"
-                                    :model-value="isNodeFullySelected(data)"
-                                    :indeterminate="isNodePartiallySelected(data)" @change="handleSelectAll(data)"
-                                    @click.stop class="node-checkbox">全选</el-checkbox>
+                                <div class="node-label-wrapper">
+                                    <el-icon v-if="data.children && data.children.length > 0" class="folder-icon">
+                                        <Collection />
+                                    </el-icon>
+                                    <el-icon v-else class="leaf-icon">
+                                        <Document />
+                                    </el-icon>
+                                    <span class="node-text">{{ node.label }}</span>
+                                </div>
+
+                                <div v-if="data.children && data.children.length > 0" class="node-action">
+                                    <el-checkbox :model-value="isNodeFullySelected(data)"
+                                        :indeterminate="isNodePartiallySelected(data)" @change="handleSelectAll(data)"
+                                        @click.stop>
+                                        <span class="all-text">全选</span>
+                                    </el-checkbox>
+                                </div>
                             </div>
                         </template>
                     </el-tree-select>
                 </el-form-item>
+
                 <el-form-item label="习题册">
                     <el-select v-model="searchForm.bookId" placeholder="请选择习题册" clearable style="width: 200px"
                         @change="loadData">
                         <el-option v-for="book in books" :key="book.id" :label="book.name" :value="book.id" />
                     </el-select>
                 </el-form-item>
+
+                <!-- 查询按钮 -->
                 <el-form-item>
                     <el-button type="primary" icon="Search" @click="loadData">查询</el-button>
                     <el-button icon="Refresh" @click="resetSearch">重置</el-button>
@@ -91,7 +111,7 @@
                 <el-table-column label="操作" width="150" align="center" fixed="right">
                     <template #default="scope">
                         <el-button size="small" type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
-                        <el-button size="small" type="info" link @click="handleView(scope.row)">查看</el-button>
+                        <el-button size="small" type="info" link @click="handleView(scope.row)" style="color: #009688;">查看</el-button>
                         <el-button size="small" type="danger" link @click="handleDelete(scope.row.id)">删除</el-button>
                     </template>
                 </el-table-column>
@@ -318,11 +338,59 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import katex from 'katex'
 
+// 数据定义
+const loading = ref(false)
+const saving = ref(false)
+const tableData = ref([])
+
+const total = ref(0)
+const pageNum = ref(1)
+const pageSize = ref(10)
+
+const dialogVisible = ref(false)
+const viewDialogVisible = ref(false)
+const formRef = ref(null)
+
+const searchForm = ref({ subjectId: null, bookId: null })
+const subjects = ref([]) 
+const books = ref([])
+const viewQuestion = ref(null)
+const recognizing = ref(false)
+const uploadRef = ref(null)
+
+const form = ref({
+    id: null,
+    subjectIds: [],
+    bookIds: [],
+    type: 1,
+    content: '',
+    options: ['', '', '', ''],
+    answer: '',
+    analysis: '',
+    difficulty: 3,
+    tags: []
+})
+
+const tagOptions = ref(['考研真题', '模拟题', '易错题', '重点', '基础', '进阶'])
+
+// 计算属性处理动态绑定
+const dynamicContent = computed({
+    get() {
+        return form.value.type === 4 ? form.value.answer : form.value.analysis
+    },
+    set(value) {
+        if (form.value.type === 4) {
+            form.value.answer = value
+        } else {
+            form.value.analysis = value
+        }
+    }
+})
 
 // Latex 渲染函数
 const renderLatex = (content) => {
@@ -351,53 +419,6 @@ const renderLatex = (content) => {
     })
 }
 
-// 创建一个计算属性来处理动态绑定
-const dynamicContent = computed({
-    get() {
-        return form.value.type === 4 ? form.value.answer : form.value.analysis
-    },
-    set(value) {
-        if (form.value.type === 4) {
-            form.value.answer = value
-        } else {
-            form.value.analysis = value
-        }
-    }
-})
-
-// 数据定义
-const loading = ref(false)
-const saving = ref(false)
-const tableData = ref([])
-const total = ref(0)
-const pageNum = ref(1)
-const pageSize = ref(10)
-const dialogVisible = ref(false)
-const viewDialogVisible = ref(false)
-const formRef = ref(null)
-
-const searchForm = ref({ subjectId: null, bookId: null })
-const subjects = ref([]) // 新增科目列表
-const books = ref([])
-const viewQuestion = ref(null)
-const recognizing = ref(false)
-const uploadRef = ref(null)
-
-const form = ref({
-    id: null,
-    subjectIds: [],
-    bookIds: [],
-    type: 1,
-    content: '',
-    options: ['', '', '', ''],
-    answer: '',
-    analysis: '',
-    difficulty: 3,
-    tags: []
-})
-
-const tagOptions = ref(['考研真题', '模拟题', '易错题', '重点', '基础', '进阶'])
-
 // 校验规则
 const rules = {
     subjectIds: [{ required: true, message: '请选择所属科目', trigger: 'change' }],
@@ -408,12 +429,12 @@ const rules = {
     difficulty: [{ required: true, message: '请选择难度', trigger: 'change' }]
 }
 
-// 获取科目列表 (使用 manage-tree 接口获取完整层级结构)
+// 获取科目列表
 const loadSubjects = async () => {
     try {
         const res = await request.get('/subject/manage-tree')
         subjects.value = res.data || res || []
-        // console.log('科目树:', subjects.value)
+        console.log('科目树:', subjects.value)
     } catch (e) {
         ElMessage.error('获取科目列表失败')
         console.error(e)
@@ -462,7 +483,6 @@ const isNodeFullySelected = (node) => {
     const selectedSet = new Set(form.value.subjectIds)
     return allIds.every(id => selectedSet.has(id))
 }
-
 
 // 检测是否部分选中
 const isNodePartiallySelected = (node) => {
@@ -745,6 +765,12 @@ onMounted(() => {
     /* padding: 4px 0; */
 }
 
+.text-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 .title-text {
     font-size: 18px;
     font-weight: 600;
@@ -765,6 +791,11 @@ onMounted(() => {
     border-radius: 2px;
 }
 
+.header-desc {
+    font-size: 13px;
+    color: #909399;
+}
+
 /* 搜索表单 */
 .search-form {
     background: #fcfcfd;
@@ -772,6 +803,60 @@ onMounted(() => {
     border-radius: 8px;
     margin-bottom: 20px;
     border: 1px solid #ebeef5;
+}
+
+/* 树节点布局 */
+.custom-tree-node {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 4px;
+    font-size: 14px;
+}
+
+.node-label-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    /* 图标和文字的间距 */
+}
+
+.node-text{
+    font-weight: 500;
+}
+
+/* 图标颜色区分 */
+.folder-icon {
+    color: #e6a23c;
+    /* 文件夹用暖色 */
+    font-size: 14px;
+}
+
+.leaf-icon {
+    color: #909399;
+    /* 叶子节点用中性色 */
+    font-size: 13px;
+}
+
+.node-text {
+    color: #303133;
+}
+
+/* 全选复选框美化 */
+.node-action :deep(.el-checkbox) {
+    height: auto;
+    margin-right: 0;
+}
+
+.node-action :deep(.el-checkbox__label) {
+    font-size: 12px;
+    color: #409eff;
+    padding-left: 4px;
+}
+
+.all-text {
+    font-weight: 500;
 }
 
 /* 表格 */
