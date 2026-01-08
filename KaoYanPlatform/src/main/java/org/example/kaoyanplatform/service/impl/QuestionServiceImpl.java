@@ -170,13 +170,20 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
     }
 
     @Override
-    public Page<Question> questionPage(Page<Question> page, Integer subjectId, Integer bookId) {
+    public Page<Question> questionPage(Page<Question> page, List<Integer> subjectIds, Integer bookId) {
         QueryWrapper<Question> queryWrapper = new QueryWrapper<>();
 
-        // 如果提供了subjectId，通过映射表查询
-        if (subjectId != null) {
-            List<Long> questionIds = mapQuestionSubjectMapper.getQuestionIdsBySubjectId(subjectId);
-            if (questionIds != null && !questionIds.isEmpty()) {
+        // 如果提供了subjectIds（多个科目），通过映射表查询
+        if (subjectIds != null && !subjectIds.isEmpty()) {
+            // 查询与任一科目关联的题目
+            Set<Long> questionIds = new HashSet<>();
+            for (Integer subjectId : subjectIds) {
+                List<Long> ids = mapQuestionSubjectMapper.getQuestionIdsBySubjectId(subjectId);
+                if (ids != null && !ids.isEmpty()) {
+                    questionIds.addAll(ids);
+                }
+            }
+            if (!questionIds.isEmpty()) {
                 queryWrapper.in("id", questionIds);
             } else {
                 // 没有找到题目，返回空页
@@ -188,9 +195,10 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         if (bookId != null) {
             List<Long> questionIds = mapQuestionBookMapper.getQuestionIdsByBookId(bookId);
             if (questionIds != null && !questionIds.isEmpty()) {
-                if (subjectId != null) {
-                    // 如果同时提供了subjectId和bookId，取交集
-                    queryWrapper.in("id", questionIds);
+                if (subjectIds != null && !subjectIds.isEmpty()) {
+                    // 如果同时提供了subjectIds和bookId，取交集
+                    Set<Long> finalQuestionIds = new HashSet<>(questionIds);
+                    queryWrapper.in("id", finalQuestionIds);
                 } else {
                     queryWrapper.in("id", questionIds);
                 }

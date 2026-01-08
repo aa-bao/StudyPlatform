@@ -24,7 +24,7 @@ public interface BookService extends IService<Book> {
     /**
      * 分页查询习题册（支持科目筛选）
      */
-    Page<Book> bookPage(Page<Book> page, Integer subjectId);
+    Page<Book> bookPage(Page<Book> page, java.util.List<Integer> subjectIds);
 
     /**
      * 获取所有书本列表（带关联信息）

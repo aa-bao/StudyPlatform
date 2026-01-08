@@ -11,6 +11,11 @@ const routes = [
     path: '/login',
     component: () => import('@/views/Login.vue')
   },
+  // 沉浸式模考页
+  {
+    path: '/exam/start',
+    component: () => import('@/views/quiz/MockExamView.vue')
+  },
   // 用户端
   {
     path: '/user',
@@ -49,7 +54,8 @@ const routes = [
       // 真题模考
       {
         path: 'mock-exam',
-        component: () => import('@/views/quiz/MockExam.vue')
+        component: () => import('@/views/quiz/MockExam.vue'),
+        meta: { hideLayout: true } 
       },
     ]
   },

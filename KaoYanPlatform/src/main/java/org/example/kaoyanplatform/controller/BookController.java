@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Tag(name = "习题册管理", description = "习题册增删改查接口")
@@ -105,9 +106,17 @@ public class BookController {
     public Result findPage(
             @RequestParam Integer pageNum,
             @RequestParam Integer pageSize,
-            @RequestParam(required = false) Integer subjectId) {
+            @RequestParam(required = false) String subjectIds) {
         Page<Book> page = new Page<>(pageNum, pageSize);
-        return Result.success(bookService.bookPage(page, subjectId));
+        List<Integer> subjectIdList = null;
+        if (subjectIds != null && !subjectIds.isEmpty()) {
+            subjectIdList = Arrays.stream(subjectIds.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Integer::parseInt)
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        return Result.success(bookService.bookPage(page, subjectIdList));
     }
 
     // 7. 根据科目获取书本列表

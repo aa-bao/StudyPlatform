@@ -45,11 +45,11 @@ public interface QuestionService extends IService<Question> {
     /**
      * 分页查询题目（支持关联查询）
      * @param page 分页对象
-     * @param subjectId 科目ID（可选）
+     * @param subjectIds 科目ID列表（可选）
      * @param bookId 书本ID（可选）
      * @return 分页结果
      */
-    Page<Question> questionPage(Page<Question> page, Integer subjectId, Integer bookId);
+    Page<Question> questionPage(Page<Question> page, List<Integer> subjectIds, Integer bookId);
 
     LLMQuestionOutputDTO recognizeImageToText(MultipartFile file) throws Exception;
 

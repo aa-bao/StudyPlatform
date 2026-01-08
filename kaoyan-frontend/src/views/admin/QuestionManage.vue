@@ -18,7 +18,7 @@
             <!-- 搜索表单 -->
             <el-form :inline="true" :model="searchForm" class="search-form">
                 <el-form-item label="所属科目">
-                    <el-tree-select v-model="form.subjectIds" :data="subjects"
+                    <el-tree-select v-model="searchForm.subjectIds" :data="subjects"
                         :props="{ label: 'name', value: 'id', children: 'children' }" multiple collapse-tags collapse-tags-tooltip clearable placeholder="请选择科目"
                         popper-class="subject-tree-popper" check-strictly
                         style="width: 260px">
@@ -313,7 +313,7 @@
                 <el-descriptions-item label="解析">
                     <div v-html="renderLatex(viewQuestion.analysis || '暂无解析')"></div>
                 </el-descriptions-item>
-                <el-descriptions-item label="难度">{{ viewQuestion.difficulty }}分</el-descriptions-item>
+                <el-descriptions-item label="难度">L {{ viewQuestion.difficulty }}</el-descriptions-item>
                 <el-descriptions-item label="科目">
                     <template v-if="viewQuestion.subjectNames && viewQuestion.subjectNames.length">
                         <el-tag v-for="(name, index) in viewQuestion.subjectNames" :key="index" size="small" style="margin: 2px;">
@@ -356,7 +356,7 @@ const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
 const formRef = ref(null)
 
-const searchForm = ref({ subjectId: null, bookId: null })
+const searchForm = ref({ subjectIds: [], bookId: null })
 const subjects = ref([]) 
 const books = ref([])
 const viewQuestion = ref(null)
@@ -453,10 +453,10 @@ const handleSelectAll = (node) => {
         }
         return ids
     }
-    
+
     const allIds = collectIds(node)
-    const selectedSet = new Set(form.value.subjectIds)
-    
+    const selectedSet = new Set(searchForm.value.subjectIds)
+
     if (selectedSet.has(node.id)) {
         // 取消全选：移除该节点及其所有子节点
         allIds.forEach(id => selectedSet.delete(id))
@@ -464,8 +464,8 @@ const handleSelectAll = (node) => {
         // 全选：添加该节点及其所有子节点
         allIds.forEach(id => selectedSet.add(id))
     }
-    
-    form.value.subjectIds = Array.from(selectedSet)
+
+    searchForm.value.subjectIds = Array.from(selectedSet)
 }
 
 // 检测是否全选
@@ -480,7 +480,7 @@ const isNodeFullySelected = (node) => {
         return ids
     }
     const allIds = collectIds(node)
-    const selectedSet = new Set(form.value.subjectIds)
+    const selectedSet = new Set(searchForm.value.subjectIds)
     return allIds.every(id => selectedSet.has(id))
 }
 
@@ -496,7 +496,7 @@ const isNodePartiallySelected = (node) => {
         return ids
     }
     const allIds = collectIds(node)
-    const selectedSet = new Set(form.value.subjectIds)
+    const selectedSet = new Set(searchForm.value.subjectIds)
     const selectedCount = allIds.filter(id => selectedSet.has(id)).length
     return selectedCount > 0 && selectedCount < allIds.length
 }
@@ -521,8 +521,8 @@ const loadData = async () => {
             pageNum: pageNum.value,
             pageSize: pageSize.value
         }
-        if (searchForm.value.subjectId) {
-            params.subjectId = searchForm.value.subjectId
+        if (searchForm.value.subjectIds && searchForm.value.subjectIds.length > 0) {
+            params.subjectIds = searchForm.value.subjectIds.join(',')
         }
         if (searchForm.value.bookId) {
             params.bookId = searchForm.value.bookId
@@ -544,7 +544,7 @@ const loadData = async () => {
 
 // 重置搜索
 const resetSearch = () => {
-    searchForm.value = { subjectId: null, bookId: null }
+    searchForm.value = { subjectIds: [], bookId: null }
     pageNum.value = 1
     loadData()
 }

@@ -21,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -100,13 +102,20 @@ public class BookServiceImpl extends ServiceImpl<BookMapper, Book> implements Bo
     }
 
     @Override
-    public Page<Book> bookPage(Page<Book> page, Integer subjectId) {
+    public Page<Book> bookPage(Page<Book> page, List<Integer> subjectIds) {
         QueryWrapper<Book> queryWrapper = new QueryWrapper<>();
 
-        // 如果提供了subjectId，通过映射表查询
-        if (subjectId != null) {
-            List<Integer> bookIds = mapSubjectBookMapper.getBookIdsBySubjectId(subjectId);
-            if (bookIds != null && !bookIds.isEmpty()) {
+        // 如果提供了subjectIds（多个科目），通过映射表查询
+        if (subjectIds != null && !subjectIds.isEmpty()) {
+            // 查询与任一科目关联的书本
+            Set<Integer> bookIds = new HashSet<>();
+            for (Integer subjectId : subjectIds) {
+                List<Integer> ids = mapSubjectBookMapper.getBookIdsBySubjectId(subjectId);
+                if (ids != null && !ids.isEmpty()) {
+                    bookIds.addAll(ids);
+                }
+            }
+            if (!bookIds.isEmpty()) {
                 queryWrapper.in("id", bookIds);
             } else {
                 // 没有找到书本，返回空页

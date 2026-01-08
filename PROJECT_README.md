@@ -1,85 +1,223 @@
-# 项目背景与技术文档
+# KaoYanPlatform 考研刷题平台 - 技术文档
 
-> **文档说明**: 本文档提供 **KaoYanPlatform** (考研刷题平台) 的完整技术架构说明，涵盖前端 (`kaoyan-frontend`) 和后端 (`KaoYanPlatform`) 的全栈上下文，供 AI 和开发者快速理解项目。
+> **文档说明**: 本文挡提供 **KaoYanPlatform** (考研刷题平台) 的完整技术架构说明，涵盖前端 (`kaoyan-frontend`) 和后端 (`KaoYanPlatform`) 的全栈上下文，供 AI 和开发者快速理解项目。
 
 ---
 
 ## 📋 目录
 
-1. [快速开始](#1-快速开始)
-2. [项目概览](#2-项目概览)
+1. [项目概述](#1-项目概述)
+2. [项目亮点](#2-项目亮点)
 3. [技术栈](#3-技术栈)
-4. [项目结构](#4-项目结构)
-5. [数据模型设计](#5-数据模型设计)
-6. [核心功能模块](#6-核心功能模块)
-7. [API 接口文档](#7-api-接口文档)
-8. [前端架构](#8-前端架构)
-9. [核心实现细节](#9-核心实现细节)
-10. [开发规范](#10-开发规范)
-11. [已知问题与优化建议](#11-已知问题与优化建议)
+4. [快速开始](#4-快速开始)
+5. [项目结构](#5-项目结构)
+6. [数据模型设计](#6-数据模型设计)
+7. [核心功能模块](#7-核心功能模块)
+8. [API 接口文档](#8-api-接口文档)
+9. [前端架构](#9-前端架构)
+10. [核心实现细节](#10-核心实现细节)
+11. [开发规范](#11-开发规范)
+12. [已知问题与优化建议](#12-已知问题与优化建议)
+13. [附录](#13-附录)
 
 ---
 
-## 1. 快速开始
+## 1. 项目概述
 
-### 1.1 环境要求
+### 1.1 项目定位
 
-- **JDK**: 17+
-- **Maven**: 3.6+
-- **MySQL**: 8.0+
-- **Node.js**: 16+
-- **IDE**: IntelliJ IDEA / VS Code
+**KaoYanPlatform** 是一款面向考研学生的在线刷题与学习管理平台，采用现代化的前后端分离架构设计。
 
-### 1.2 数据库初始化
+### 1.2 核心业务流程
 
-```sql
--- 创建数据库
-CREATE DATABASE kaoyan_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+```
+用户端流程:
+登录 → 仪表盘 → 选择科目 → 选择刷题模式
+  → 逐题精练/专项突破/真题模考
+  → 提交答案 → 查看解析 → 加入错题本/收藏
+  → 学习统计与进度追踪
 
--- 导入表结构和初始数据
-USE kaoyan_platform;
-SOURCE /path/to/schema.sql;
+管理员流程:
+登录 → 管理后台 → 题目管理/科目管理/用户管理/错题监控
+  → 数据统计与系统维护
 ```
 
-### 1.3 后端启动
+### 1.3 功能模块总览
+
+| 模块 | 前端页面 | 后端控制器 | 主要功能 |
+|------|---------|-----------|---------|
+| 用户端 | Login.vue, Dashboard.vue, SubjectList.vue | UserController, RecordController | 登录注册、学习统计、刷题、错题本 |
+| 刷题模块 | SinglePractice.vue, TopicDrill.vue, MockExam.vue | QuestionController, RecordController | 逐题精练、专项突破、真题模考 |
+| 管理后台 | AdminHome.vue, UserManage.vue, QuestionManage.vue, BookManage.vue, SubjectManage.vue, MistakeMonitor.vue | AdminController, UserController, QuestionController, BookController, SubjectController | 题目/习题册/科目/用户管理、错题监控 |
+
+---
+
+## 2. 项目亮点
+
+### 2.1 前后端分离架构
+
+- **后端**: Spring Boot 3.5.9 + MyBatis Plus 3.5.5，提供 RESTful API
+- **前端**: Vue 3.5 + Vite 7.3，采用 Composition API 和 Pinia 状态管理
+- **API 文档**: Knife4j (Swagger 增强版) 自动生成在线文档
+
+### 2.2 灵活的科目体系设计
+
+- **4 层级结构**: 考试规格 → 具体学科 → 知识点 → 题型方法
+- **多对多关系**: 通过 `scope` 字段实现科目与考试规格的灵活映射
+- **虚拟分组**: 自动创建"英语"、"数学"等虚拟分组，优化前端展示
+- **拖拽排序**: 支持通过拖拽调整科目层级和顺序
+
+### 2.3 完善的多对多关联体系
+
+- **映射表设计**: 使用 `map_question_book`、`map_question_subject`、`map_subject_book` 三张映射表
+- **灵活关联**: 一道题可关联多本书、多个科目；一本书可包含多个科目
+- **级联操作**: 新增/更新时自动维护关联关系，删除时自动清理映射表
+
+### 2.4 丰富的刷题体验
+
+- **多模式刷题**: 支持逐题精练、专项突破、真题模考三种模式
+- **LaTeX 公式渲染**: 完美支持数学公式（高等数学、线性代数、概率论等）
+- **画板草稿功能**: HTML5 Canvas 实现在线草稿纸，方便演算
+- **收藏与标记**: 支持收藏题目、自定义标签、错题本管理
+
+### 2.5 可视化数据展示
+
+- **学习统计**: 仪表盘展示累计刷题数、正确率、累计时长、倒计时
+- **ECharts 雷达图**: 多维度展示用户学习状态（正确率、覆盖度、活跃度）
+- **错题热力图**: 按科目展示错题分布，快速定位薄弱环节
+- **高频错题 TOP 20**: 帮助管理员发现需要改进的题目
+
+### 2.6 完善的权限管理
+
+- **角色分离**: 区分 `admin` 管理员和 `student` 普通用户
+- **路由守卫**: 前端路由拦截未授权访问
+- **Spring Security**: 后端安全控制（待扩展 JWT 认证）
+
+---
+
+## 3. 技术栈
+
+### 3.1 后端技术栈
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Spring Boot | 3.5.9 | 核心框架 |
+| MyBatis Plus | 3.5.5 | ORM 框架，支持自动填充、分页插件 |
+| MySQL | 8.0 | 关系型数据库 |
+| Knife4j | 4.5.0 | API 文档生成 (Swagger 增强版) |
+| Spring Security | - | 安全框架 |
+| Lombok | - | 简化 POJO 代码 |
+| Hutool | 5.8.25 | Java 工具库 |
+| Jackson | - | JSON 处理（MyBatis Plus TypeHandler） |
+
+### 3.2 前端技术栈
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Vue | 3.5 | 前端框架（Composition API） |
+| Vite | 7.3 | 构建工具（热更新、Rollup） |
+| Element Plus | 2.13 | UI 组件库 |
+| Pinia | 3.0 | 状态管理 |
+| Vue Router | 4.6 | 路由管理 |
+| Axios | 1.13 | HTTP 客户端 |
+| KaTeX | - | 数学公式渲染 |
+| ECharts | 6.0 | 数据可视化 |
+| @element-plus/icons-vue | - | 图标组件库 |
+
+### 3.3 数据库技术
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| MySQL | 8.0 | 主数据库 |
+| MyBatis Plus TypeHandler | - | JSON 字段自动转换（JacksonTypeHandler） |
+
+### 3.4 开发工具
+
+| 工具 | 用途 |
+|------|------|
+| IntelliJ IDEA | 后端开发 IDE |
+| VS Code | 前端开发 IDE |
+| Maven | 项目构建、依赖管理 |
+| npm/yarn | 前端包管理 |
+| Git | 版本控制 |
+
+---
+
+## 4. 快速开始
+
+### 4.1 环境要求
+
+| 环境 | 要求版本 |
+|------|---------|
+| JDK | 17+ |
+| Maven | 3.6+ |
+| MySQL | 8.0+ |
+| Node.js | 16+ |
+| 磁盘空间 | ≥ 1GB |
+
+### 4.2 数据库初始化
+
+```sql
+-- 1. 创建数据库
+CREATE DATABASE kaoyan_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+
+-- 2. 导入表结构和初始数据
+USE kaoyan_platform;
+SOURCE sql/schema.sql;
+```
+
+**数据库表结构概览**:
+- `tb_user` - 用户表
+- `tb_question` - 题目表
+- `tb_subject` - 科目表
+- `tb_book` - 习题册表
+- `tb_exam_record` - 答题记录表
+- `tb_mistake_record` - 错题记录表
+- `tb_collection` - 收藏表
+- `tb_user_progress` - 用户进度表
+- `map_question_book` - 题目-习题册映射表
+- `map_question_subject` - 题目-科目映射表
+- `map_subject_book` - 习题册-科目映射表
+
+### 4.3 后端启动
 
 ```bash
-# 进入后端目录
+# 1. 进入后端目录
 cd KaoYanPlatform
 
-# 修改配置文件
-# 编辑 src/main/resources/application.yml，配置数据库连接
+# 2. 修改配置文件（可选）
+# 编辑 src/main/resources/application.yml，配置数据库连接信息
 
-# 启动项目
+# 3. 启动项目
 mvn spring-boot:run
 
 # 或者直接运行主类
 # KaoYanPlatform/src/main/java/org/example/kaoyanplatform/KaoyanplatformApplication.java
 ```
 
-后端服务启动后访问：
-- **API 地址**: http://localhost:8081
-- **Swagger 文档**: http://localhost:8081/doc.html
+**后端启动后访问**:
+- API 地址: http://localhost:8081
+- Swagger 文档: http://localhost:8081/doc.html
 
-### 1.4 前端启动
+### 4.4 前端启动
 
 ```bash
-# 进入前端目录
+# 1. 进入前端目录
 cd kaoyan-frontend
 
-# 安装依赖
+# 2. 安装依赖
 npm install
 
-# 启动开发服务器
+# 3. 启动开发服务器
 npm run dev
 
-# 构建生产版本
+# 4. 构建生产版本
 npm run build
 ```
 
-前端服务启动后访问：http://localhost:5173
+**前端启动后访问**: http://localhost:5173
 
-### 1.5 默认账号
+### 4.5 默认测试账号
 
 | 角色 | 用户名 | 密码 |
 |------|--------|------|
@@ -88,151 +226,9 @@ npm run build
 
 ---
 
-## 2. 项目概览
+## 5. 项目结构
 
-### 2.1 项目定位
-
-**KaoYanPlatform** 是一个面向考研学生的在线刷题与学习管理平台，支持：
-
-- **多模式刷题**: 逐题精练、专项突破、真题模考
-- **智能错题管理**: 自动记录错题、分类归档、统计分析
-- **学习进度追踪**: 实时统计学习数据、可视化展示
-- **后台管理系统**: 题目/科目/用户/资源的全面管理
-
-### 2.2 核心业务流程
-
-```
-用户端流程:
-登录 → 仪表盘 → 选择科目 → 选择刷题模式
- → 逐题精练/专项突破/真题模考
- → 提交答案 → 查看解析 → 加入错题本/收藏
- → 学习统计与进度追踪
-
-管理员流程:
-登录 → 管理后台 → 题目管理/科目管理/用户管理/错题监控
- → 数据统计与系统维护
-```
-
-### 2.3 产品特色
-
-- **三种刷题模式**: 随心刷 | 精准练 | 整卷测
-- **LaTeX 公式支持**: 完美支持数学公式渲染
-- **画板草稿**: HTML5 Canvas 实现的在线草稿功能
-- **多对多关系**: 灵活的题目-书本-科目关联体系
-- **可视化监控**: ECharts 雷达图、热力图等数据可视化
-
-### 2.4 更新历史
-
-#### 2026-01-07: 完善 Swagger API 文档注解 📚
-
-完成所有 Controller 接口的 Swagger 注解完善，提供详细的接口文档用于测试和调试。
-
-**完善内容**:
-- ✅ AdminController: 管理员统计、错题热力图、热门错题
-- ✅ BookController: 习题册 CRUD、分页查询、科目关联
-- ✅ CollectionController: 收藏管理、标签管理
-- ✅ FileController: 文件上传
-- ✅ QuestionController: 题目 CRUD、错题本、分页查询
-- ✅ RecordController: 答题提交、统计查询、最近动态
-- ✅ SubjectController: 科目树、层级管理、拖拽排序
-- ✅ UserController: 用户认证、资料管理、头像上传、学习统计
-
-**注解特性**:
-- 详细的接口描述（`@Operation`）
-- 参数说明（`@Parameter`）包含是否必填、示例值
-- 请求体说明（`@RequestBody`）包含字段说明
-- 返回数据结构说明
-- 支持 Swagger UI 在线测试
-
-访问地址: http://localhost:8081/doc.html
-
-#### 2026-01-06: 科目层级结构重构为 4 级体系 🎯
-
-完成科目层级体系的重大重构，简化层级结构并引入 scope 字段实现多对多关系映射。
-
-**核心变更**:
-- ✅ 简化为 4 层级结构：Level 1(考试规格) → Level 2(具体学科) → Level 3(知识点) → Level 4(题型)
-- ✅ 移除原 Level 1(CATEGORY) 考试大类层级，避免层级混乱
-- ✅ 引入 scope 字段实现科目与考试规格的多对多关系（如：线性代数属于数一、数三，但不属于数二）
-- ✅ 创建虚拟分组节点（英语、数学）优化前端展示
-- ✅ 更新 `SubjectLevelConstants.java` 常量定义
-- ✅ 更新 `SubjectServiceImpl.java` 的 `getManageTree()` 方法
-- ✅ 更新前端 `BookManage.vue` 的级联选择器过滤逻辑
-- ✅ 更新前端 `SubjectManage.vue` 的层级选择器（4 级选项）
-
-**技术亮点**:
-- 后端自动创建虚拟分组节点（id=-2 英语、id=-3 数学）
-- 前端动态过滤科目树，根据考试规格 ID 显示对应科目
-- 支持 scope 为空时表示"适用于所有考试规格"
-
-#### 2026-01-06: 核心管理功能实现完成 ✨
-
-完成后台管理系统的核心功能模块，提供完整的题目、习题册、科目、用户、错题监控等管理能力。
-
-**新增功能模块**:
-- 题目管理模块（多对多关联、KaTeX 支持、批量操作）
-- 习题册管理模块（多科目关联、sort 排序）
-- 科目体系管理模块（树形结构、拖拽排序、scope 配置）
-- 用户管理与学习监控模块（ECharts 雷达图、学习统计）
-- 错题监控模块（热力统计、高频错题 TOP 20）
-
-#### 2026-01-06: 数据库表命名规范统一
-
-统一数据库表命名规范，所有表使用 `tb_` 前缀：
-- ✅ 重命名 `sys_user` 表为 `tb_user`
-- ✅ 更新 Java 实体类 `User.java` 的 `@TableName` 注解
-
-#### 2026-01-06: 数据库映射表重构
-
-将题目-书本-科目之间的直接外键关系改为使用映射表（`map_`前缀）管理：
-- ✅ 从 `tb_question` 表删除 `book_id` 和 `subject_id` 外键字段
-- ✅ 从 `tb_book` 表删除 `subject_id` 外键字段
-- ✅ 新增映射表：`map_question_book`、`map_question_subject`、`map_subject_book`
-- ✅ 支持多对多关系，提高数据灵活性
-
----
-
-## 2. 技术栈
-
-### 2.1 后端技术栈
-
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Spring Boot | 3.5.9 | 核心框架 |
-| MyBatis Plus | 3.5.5 | ORM 框架 |
-| MySQL | 8.0 | 关系型数据库 |
-| Knife4j | 4.5.0 | API 文档生成 (Swagger) |
-| Spring Security | - | 安全框架 |
-| Lombok | - | 简化 Java 代码 |
-| Hutool | 5.8.25 | Java 工具库 |
-| Jackson | - | JSON 处理 |
-
-### 2.2 前端技术栈
-
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Vue | 3.5 | 前端框架 (Composition API) |
-| Vite | 7.3 | 构建工具 |
-| Element Plus | 2.13 | UI 组件库 |
-| Pinia | 3.0 | 状态管理 |
-| Vue Router | 4.6 | 路由管理 |
-| Axios | 1.13 | HTTP 客户端 |
-| KaTeX | - | 数学公式渲染 |
-| ECharts | 6.0 | 数据可视化 |
-
-### 2.3 特色技术实现
-
-- **HTML5 Canvas**: 画板草稿功能
-- **Flex/Grid 布局**: 分屏刷题、错题本瀑布流
-- **Glassmorphism**: 毛玻璃特效 UI
-- **递归树处理**: 科目体系的层级管理
-- **拖拽排序**: Element Plus el-tree 实现科目拖拽
-
----
-
-## 3. 项目结构
-
-### 3.1 后端结构
+### 5.1 后端结构
 
 ```
 KaoYanPlatform/src/main/java/org/example/kaoyanplatform/
@@ -370,9 +366,9 @@ kaoyan-frontend/src/
 
 ---
 
-## 4. 数据模型设计
+## 6. 数据模型设计
 
-### 4.1 核心业务表
+### 6.1 核心业务表
 
 #### 用户表 (`tb_user`)
 
@@ -576,9 +572,9 @@ WHERE q.id = 1000;
 
 ---
 
-## 5. 核心功能模块
+## 7. 核心功能模块
 
-### 5.1 题目管理模块 (Question Management)
+### 7.1 题目管理模块 (Question Management)
 
 #### 功能特性
 
@@ -713,9 +709,9 @@ WHERE q.id = 1000;
 
 ---
 
-## 7. API 接口文档
+## 8. API 接口文档
 
-### 7.1 Swagger 文档访问
+### 8.1 Swagger 文档访问
 
 项目使用 **Knife4j** (Swagger 的增强版) 自动生成 API 文档。
 
@@ -834,9 +830,9 @@ export default request
 
 ---
 
-## 8. 前端架构
+## 9. 前端架构
 
-### 8.1 路由与权限
+### 9.1 路由与权限
 
 #### 路由结构
 
@@ -971,9 +967,9 @@ export const useUserStore = defineStore('user', {
 
 ---
 
-## 9. 核心实现细节
+## 10. 核心实现细节
 
-### 9.1 多对多关系管理
+### 10.1 多对多关系管理
 
 #### 设计理念
 
@@ -1281,9 +1277,9 @@ const renderedContent = computed(() => {
 
 ---
 
-## 10. 开发规范
+## 11. 开发规范
 
-### 10.1 代码规范
+### 11.1 代码规范
 
 #### 后端
 
@@ -1356,9 +1352,9 @@ import icon from '@/assets/icons/icon.svg?url'
 
 ---
 
-## 11. 已知问题与优化建议
+## 12. 已知问题与优化建议
 
-### 11.1 当前限制
+### 12.1 当前限制
 
 1. **题目与科目关联**: 一道题只能关联一个科目（通过 `map_question_subject` 的 `LIMIT 1` 实现）
 2. **文件存储**: 当前仅支持本地存储，未接入 OSS
@@ -1452,8 +1448,60 @@ A:
 
 ---
 
-**文档版本**: v1.2
-**最后更新**: 2026-01-07
+## 13. 附录
+
+### A. 常见问题
+
+#### Q1: 如何添加新的科目？
+
+A: 在管理后台的"科目体系管理"中，点击"新增科目"，填写科目信息并选择父节点。注意：
+- Level 1 科目的 `parent_id` 必须为 0
+- 如果科目属于多个考试规格，设置 `parent_id=0` 并填写 `scope` 字段（如：`"2,3"` 表示属于英语一、二）
+- 虚拟分组节点（英语、数学）由系统自动创建，无需手动添加
+
+#### Q2: scope 字段如何使用？
+
+A: scope 字段用于实现科目与考试规格的多对多关系：
+- **适用场景**: 当一个科目属于多个考试规格时使用
+- **格式**: 逗号分隔的考试规格 ID，如 `"4,5,6"` 表示属于数学一、二、三
+- **空值**: scope 为空或 null 时表示"适用于所有考试规格"
+- **示例**:
+  - 高等数学：`scope="4,5,6"` → 数一、数二、数三都要学
+  - 线性代数：`scope="4,6"` → 只属于数一、数三（数二不考）
+  - 马原：不填 scope → 通过 parent_id=1 绑定到政治
+
+#### Q3: 如何实现一道题关联多个科目？
+
+A: 当前一道题只能关联一个科目。如需扩展，需修改 `MistakeRecordServiceImpl.java` 中的 `getSubjectIdByQuestionId` 方法，移除 `LIMIT 1` 限制。
+
+#### Q4: 错题监控报错 "element cannot be mapped to a null key"？
+
+A: 这是因为部分题目没有关联科目。已在 `MistakeRecordServiceImpl.java` 中通过 `.filter()` 过滤掉没有科目关联的记录。
+
+#### Q5: 为什么 SubjectManage 页面显示英语、数学虚拟分组？
+
+A: 这是后端 `getManageTree()` 方法自动创建的虚拟节点，用于优化前端展示：
+- 英语分组（id=-2）包含：英语一、英语二
+- 数学分组（id=-3）包含：数学一、数学二、数学三
+- 虚拟节点不可编辑、删除、拖拽（通过 `id < 0` 或 `level === '0'` 判断）
+
+#### Q6: BookManage 页面的科目选择器为什么显示的科目树和 SubjectManage 不同？
+
+A: 两个页面的用途不同：
+- **BookManage**: 使用 `filterSubjectTreeForCascader()` 函数，根据 scope 字段动态过滤，确保习题册关联的科目符合所选考试规格
+- **SubjectManage**: 使用 `getManageTree()` 方法，显示完整的层级结构用于管理
+
+#### Q7: 如何添加新的管理页面？
+
+A:
+1. 在 `views/admin/` 下创建 Vue 组件
+2. 在 `router/index.js` 中添加路由
+3. 在 `AdminLayout.vue` 中添加菜单项
+
+---
+
+**文档版本**: v1.3
+**最后更新**: 2026-01-08
 **维护者**: AI Assistant
 
 ### B. 科目层级常量定义

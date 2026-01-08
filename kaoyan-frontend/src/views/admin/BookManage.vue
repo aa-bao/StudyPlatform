@@ -16,10 +16,10 @@
                 <!-- 搜索表单 -->
                 <el-form :inline="true" :model="searchForm" class="search-form">
                     <el-form-item label="所属科目">
-                        <el-tree-select v-model="form.subjectIds" :data="subjects" 
-                        :props="{ label: 'name', value: 'id', children: 'children' }" 
+                        <el-tree-select v-model="searchForm.subjectIds" :data="subjects"
+                        :props="{ label: 'name', value: 'id', children: 'children' }"
                         multiple collapse-tags
-                        collapse-tags-tooltip clearable 
+                        collapse-tags-tooltip clearable
                         placeholder="请选择科目" popper-class="subject-tree-popper"
                         check-strictly style="width: 260px">
                             <template #default="{ node, data }">
@@ -125,14 +125,34 @@
                 </el-form-item>
 
                 <el-form-item label="关联科目" prop="subjectIds">
-                    <el-cascader v-model="form.subjectIds" :options="subjectTree" :props="{
-                        value: 'id',
-                        label: 'name',
-                        children: 'children',
-                        checkStrictly: true,
-                        emitPath: false,
-                        multiple: true
-                    }" placeholder="可选择一个或多个科目" style="width: 100%" collapse-tags />
+                    <el-tree-select v-model="form.subjectIds" :data="subjectTreeForDialog"
+                    :props="{ label: 'name', value: 'id', children: 'children' }"
+                    multiple collapse-tags
+                    collapse-tags-tooltip clearable
+                    placeholder="请选择科目" popper-class="subject-tree-popper"
+                    check-strictly style="width: 100%">
+                        <template #default="{ node, data }">
+                            <div class="custom-tree-node">
+                                <div class="node-label-wrapper">
+                                    <el-icon v-if="data.children && data.children.length > 0" class="folder-icon">
+                                        <Collection />
+                                    </el-icon>
+                                    <el-icon v-else class="leaf-icon">
+                                        <Document />
+                                    </el-icon>
+                                    <span class="node-text">{{ node.label }}</span>
+                                </div>
+
+                                <div v-if="data.children && data.children.length > 0" class="node-action">
+                                    <el-checkbox :model-value="isDialogNodeFullySelected(data)"
+                                        :indeterminate="isDialogNodePartiallySelected(data)"
+                                        @change="handleDialogSelectAll(data)" @click.stop>
+                                        <span class="all-text">全选</span>
+                                    </el-checkbox>
+                                </div>
+                            </div>
+                        </template>
+                    </el-tree-select>
                 </el-form-item>
             </el-form>
             <template #footer>
@@ -164,6 +184,7 @@ const formRef = ref(null)
 
 const searchForm = ref({ subjectIds: [] })
 const subjects = ref([])
+const subjectTreeForDialog = ref([])
 
 const form = ref({
     id: null,
@@ -189,6 +210,8 @@ const loadSubjects = async () => {
     try {
         const res = await request.get('/subject/manage-tree')
         subjects.value = res.data || res || []
+        // 为对话框创建独立的数据源副本
+        subjectTreeForDialog.value = JSON.parse(JSON.stringify(subjects.value))
         console.log('科目树:', subjects.value)
     } catch (e) {
 
@@ -196,8 +219,68 @@ const loadSubjects = async () => {
         console.error(e)
     }
 }
-// 全选/取消全选处理
+// 全选/取消全选处理（搜索区域）
 const handleSelectAll = (node) => {
+    // 递归收集所有子节点 ID
+    const collectIds = (n) => {
+        const ids = [n.id]
+        if (n.children && n.children.length > 0) {
+            n.children.forEach(child => {
+                ids.push(...collectIds(child))
+            })
+        }
+        return ids
+    }
+
+    const allIds = collectIds(node)
+    const selectedSet = new Set(searchForm.value.subjectIds)
+
+    if (selectedSet.has(node.id)) {
+        // 取消全选：移除该节点及其所有子节点
+        allIds.forEach(id => selectedSet.delete(id))
+    } else {
+        // 全选：添加该节点及其所有子节点
+        allIds.forEach(id => selectedSet.add(id))
+    }
+
+    searchForm.value.subjectIds = Array.from(selectedSet)
+}
+
+// 检测是否全选（搜索区域）
+const isNodeFullySelected = (node) => {
+    const collectIds = (n) => {
+        const ids = [n.id]
+        if (n.children && n.children.length > 0) {
+            n.children.forEach(child => {
+                ids.push(...collectIds(child))
+            })
+        }
+        return ids
+    }
+    const allIds = collectIds(node)
+    const selectedSet = new Set(searchForm.value.subjectIds)
+    return allIds.every(id => selectedSet.has(id))
+}
+
+// 检测是否部分选中（搜索区域）
+const isNodePartiallySelected = (node) => {
+    const collectIds = (n) => {
+        const ids = [n.id]
+        if (n.children && n.children.length > 0) {
+            n.children.forEach(child => {
+                ids.push(...collectIds(child))
+            })
+        }
+        return ids
+    }
+    const allIds = collectIds(node)
+    const selectedSet = new Set(searchForm.value.subjectIds)
+    const selectedCount = allIds.filter(id => selectedSet.has(id)).length
+    return selectedCount > 0 && selectedCount < allIds.length
+}
+
+// 全选/取消全选处理（对话框）
+const handleDialogSelectAll = (node) => {
     // 递归收集所有子节点 ID
     const collectIds = (n) => {
         const ids = [n.id]
@@ -223,8 +306,8 @@ const handleSelectAll = (node) => {
     form.value.subjectIds = Array.from(selectedSet)
 }
 
-// 检测是否全选
-const isNodeFullySelected = (node) => {
+// 检测是否全选（对话框）
+const isDialogNodeFullySelected = (node) => {
     const collectIds = (n) => {
         const ids = [n.id]
         if (n.children && n.children.length > 0) {
@@ -239,8 +322,8 @@ const isNodeFullySelected = (node) => {
     return allIds.every(id => selectedSet.has(id))
 }
 
-// 检测是否部分选中
-const isNodePartiallySelected = (node) => {
+// 检测是否部分选中（对话框）
+const isDialogNodePartiallySelected = (node) => {
     const collectIds = (n) => {
         const ids = [n.id]
         if (n.children && n.children.length > 0) {
@@ -264,8 +347,8 @@ const loadData = async () => {
             pageNum: pageNum.value,
             pageSize: pageSize.value
         }
-        if (searchForm.value.subjectId) {
-            params.subjectId = searchForm.value.subjectId
+        if (searchForm.value.subjectIds && searchForm.value.subjectIds.length > 0) {
+            params.subjectIds = searchForm.value.subjectIds.join(',')
         }
 
         console.log('请求参数:', params)

@@ -18,8 +18,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Tag(name = "题目管理", description = "题目增删改查接口")
@@ -191,10 +194,18 @@ public class QuestionController {
     public Result findPage(
             @RequestParam Integer pageNum,
             @RequestParam Integer pageSize,
-            @RequestParam(required = false) Integer subjectId,
+            @RequestParam(required = false) String subjectIds,
             @RequestParam(required = false) Integer bookId) {
         Page<Question> page = new Page<>(pageNum, pageSize);
-        return Result.success(questionService.questionPage(page, subjectId, bookId));
+        List<Integer> subjectIdList = null;
+        if (subjectIds != null && !subjectIds.isEmpty()) {
+            subjectIdList = Arrays.stream(subjectIds.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Integer::parseInt)
+                    .collect(Collectors.toList());
+        }
+        return Result.success(questionService.questionPage(page, subjectIdList, bookId));
     }
 
     // 10. 手动保存错题

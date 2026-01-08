@@ -1,7 +1,8 @@
 <template>
     <div class="layout-wrapper">
         <el-container class="full-height">
-            <el-aside :width="isCollapse ? '64px' : '240px'" class="aside-menu">
+            <el-aside v-if="!route.meta.hideLayout" 
+            :width="isCollapse ? '64px' : '240px'" class="aside-menu">
                 <div class="logo-box">
                     <div class="sidebar-toggle" @click="isCollapse = !isCollapse">
                         <el-icon>
@@ -50,7 +51,7 @@
             </el-aside>
 
             <el-container direction="vertical" class="main-container">
-                <el-header class="header-bar" height="64px">
+                <el-header class="header-bar" height="64px" v-if="!route.meta.hideLayout">
                     <div class="header-left">
                         <span class="breadcrumb-text">不要埋没你的梦想</span>
                     </div>
@@ -83,7 +84,7 @@
                     </div>
                 </el-header>
 
-                <el-main class="content-main">
+              <el-main class="content-main" :class="{ 'no-padding': route.meta.hideLayout }">
                     <router-view v-slot="{ Component }">
                         <transition name="fade-transform" mode="out-in">
                             <component :is="Component" />
@@ -109,6 +110,7 @@ import mockExamIcon from '@/assets/icons/mock-exam.svg?url'
 import correctionNotebookIcon from '@/assets/icons/correction-notebook.svg?url'
 
 const router = useRouter()
+const route = useRoute();
 const userStore = useUserStore() // 使用 store
 const isCollapse = ref(true)
 const activeMenu = computed(() => router.path)
@@ -387,6 +389,16 @@ const handleLogout = () => {
     /* 移除默认内边距，由各个页面自己控制 */
     overflow-y: auto;
     flex: 1;
+}
+
+/* 隐藏了布局，去掉 main 区域的默认边距或背景限制 */
+.no-padding {
+    padding: 0 !important;
+    background-color: #f0f2f5;
+}
+
+.full-height {
+    height: 100vh;
 }
 
 /* 路由切换动画 */
