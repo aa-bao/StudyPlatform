@@ -1,231 +1,603 @@
 <template>
   <div class="exam-app" ref="examAppRef">
-    <!-- 导航栏 -->
-    <nav class="system-nav">
-      <div class="nav-left">
-        <div class="logo-group">
-          <span class="logo-group-eng">KaoYan Platform </span>
-          <span class="logo-group-ch">考研真题模考系统</span>
-        </div>
-        <span class="ai-tag">AI ENHANCED</span>
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-screen">
+      <div class="loader"></div>
+      <p>{{ loadingText }}</p>
+    </div>
+
+    <!-- 错误状态 -->
+    <div v-else-if="error" class="error-screen">
+      <div class="error-content">
+        <h2>加载失败</h2>
+        <p>{{ error }}</p>
+        <el-button @click="goBack">返回</el-button>
       </div>
+    </div>
 
-      <div class="nav-right">
-        <div class="top-tools">
-          <button @click="openDraft" class="nav-tool-btn">📝 草稿纸</button>
-          <button @click="askAIHelp" class="nav-tool-btn ai-btn">✨ AI 建议</button>
+    <!-- 考试界面 -->
+    <template v-else>
+      <!-- 导航栏 -->
+      <nav class="system-nav">
+        <div class="nav-left">
+          <div class="logo-group">
+            <span class="logo-group-eng">KaoYan Platform</span>
+            <span class="logo-group-ch">考研真题模考系统</span>
+          </div>
+          <span class="ai-tag">AI ENHANCED</span>
         </div>
 
-        <div class="timer-box">
-          <button @click="toggleFullScreen" class="fullscreen-btn">
-            <span class="icon">全屏</span>
+        <div class="nav-right">
+
+          <div class="top-tools">
+            <button @click="openDraft" class="nav-tool-btn">📝 草稿纸</button>
+          </div>
+
+          <div class="timer-box">
+            <button @click="toggleFullScreen" class="fullscreen-btn">
+              <span class="icon">全屏</span>
+            </button>
+            <span class="timer-label">倒计时</span>
+            <span class="timer-value">{{ formatTime }}</span>
+          </div>
+          <button @click="handleSubmit" :disabled="isSubmitted || submitting" class="submit-btn"
+            :class="{ 'submit-btn--disabled': isSubmitted || submitting }">
+            {{ isSubmitted ? '已提交' : '提交试卷' }}
           </button>
-          <span class="timer-label">倒计时</span>
-          <span class="timer-value">{{ formatTime }}</span>
         </div>
-        <button @click="handleSubmit" class="submit-btn">提交试卷</button>
-      </div>
-    </nav>
+      </nav>
 
-    <!-- 试卷 -->
-    <div class="main-layout">
-      <div class="paper-wrapper">
-        <div class="paper-page-container" :class="{ 'submitted-mask': isSubmitted }">
-
-          <div class="paper-sheet shadow-effect">
-            <div class="sealing-line">
-              <span class="seal-warning">密 封 线 内 不 要 答 题</span>
-            </div>
-
-            <header class="paper-header">
-              <div class="confidential-mark">绝密 <span class="star">★</span> 启用前</div>
-              <h1 class="main-title">2025年全国硕士研究生招生考试数学（一）真题</h1>
-              <div class="title-divider"></div>
-              <div class="exam-info">
-                <span>考试时间：180分钟</span>
-                <span>满分：150分</span>
+      <!-- 试卷 -->
+      <div class="main-layout">
+        <div class="paper-wrapper">
+          <div class="paper-page-container" :class="{ 'submitted-mask': isSubmitted }">
+            <div v-for="(page, pageIndex) in paperPages" :key="pageIndex" class="paper-sheet shadow-effect">
+              <div v-if="pageIndex === 0" class="sealing-line">
+                <span class="seal-warning">密 封 线 内 不 要 答 题</span>
               </div>
-              <div class="notice-box">
-                <p class="notice-title">考生注意事项：</p>
-                <ol class="notice-list">
-                  <li>答题前，考生务必将自己的姓名、准考证号填写在答题卡上。</li>
-                  <li>选择题每小题选出答案后，请在系统中点击对应选项。</li>
-                  <li>主观题请在输入框内作答，或使用草稿纸记录思路。</li>
-                </ol>
+
+              <header v-if="pageIndex === 0" class="paper-header">
+                <div class="confidential-mark">绝密 <span class="star">★</span> 启用前</div>
+                <h1 class="main-title">{{ paperInfo.title }}</h1>
+                <div class="title-divider"></div>
+                <div class="exam-info">
+                  <span>考试时间：{{ paperInfo.timeLimit || 180 }} 分钟</span>
+                  <span>满分：{{ paperInfo.totalScore || 150 }} 分</span>
+                </div>
+                <div class="notice-box">
+                  <p class="notice-title">考生注意事项：</p>
+                  <ol class="notice-list">
+                    <li>答题前，考生务必将自己的姓名、准考证号填写在答题卡上。</li>
+                    <li>选择题每小题选出答案后，请在系统中点击对应选项。</li>
+                    <li>主观题请在输入框内作答，或使用草稿纸记录思路。</li>
+                  </ol>
+                </div>
+              </header>
+
+              <!-- 题目列表 -->
+              <div v-for="q in page.questions" :key="q.id" :id="'q' + q.id" class="question-item">
+                <!-- 题型标题 -->
+                <div v-if="q.sectionTitle" class="section-banner">{{ q.sectionTitle }}</div>
+
+                <p class="question-title" v-html="renderLatex(q.content)"></p>
+
+                <!-- 选择题选项 -->
+                <div v-if="isChoiceQuestion(q.type)" class="options-grid">
+                  <label v-for="opt in Object.keys(q.options || {})" :key="opt" class="option-label">
+                    <input
+                      :type="q.type === 'single-choice' ? 'radio' : 'checkbox'"
+                      :name="'q' + q.id"
+                      :value="opt"
+                      :checked="isOptionSelected(q.id, opt)"
+                      @change="handleOptionChange(q.id, opt, q.type)"
+                    >
+                    <span class="option-text" v-html="'(' + opt + ') ' + renderLatex(q.options[opt])"></span>
+                  </label>
+                </div>
+
+                <!-- 填空题/主观题输入框 -->
+                <textarea
+                  v-else
+                  v-model="answers[q.id]"
+                  @input="markDone(q.id)"
+                  class="answer-area"
+                  rows="4"
+                  placeholder="请输入你的答案..."
+                ></textarea>
               </div>
-            </header>
 
-            <!-- 选择题 -->
-            <div class="section-banner">一、选择题：1～10小题，每小题5分，共50分。</div>
-            <div v-for="q in selectionQuestions.slice(0, 5)" :key="q.id" :id="'q' + q.id" class="question-item">
-              <p class="question-title" v-html="renderLatex(q.title)"></p>
-              <div class="options-grid">
-                <label v-for="opt in ['A', 'B', 'C', 'D']" :key="opt" class="option-label">
-                  <input type="radio" :name="'q' + q.id" :value="opt" v-model="answers[q.id]" @change="markDone(q.id)">
-                  <span class="option-text" v-html="'(' + opt + ') ' + (q.options ? renderLatex(q.options[opt]) : '[内容加载中...]')"></span>
-                </label>
-              </div>
+              <footer class="paper-footer">第 {{ pageIndex + 1 }} 页（共 {{ paperPages.length }} 页）</footer>
             </div>
-            <footer class="paper-footer">数学（一） 第 1 页（共 3 页）</footer>
-          </div>
-
-          <div class="paper-sheet shadow-effect">
-            <div v-for="q in selectionQuestions.slice(5, 10)" :key="q.id" :id="'q' + q.id" class="question-item">
-              <p class="question-title" v-html="renderLatex(q.title)"></p>
-              <div class="options-grid">
-                <label v-for="opt in ['A', 'B', 'C', 'D']" :key="opt" class="option-label">
-                  <input type="radio" :name="'q' + q.id" :value="opt" v-model="answers[q.id]" @change="markDone(q.id)">
-                  <span class="option-text" v-html="'(' + opt + ') ' + (q.options ? renderLatex(q.options[opt]) : '[内容加载中...]')"></span>
-                </label>
-              </div>
-            </div>
-
-            <!-- 填空题 -->
-            <div class="completion-banner">二、填空题：11～16小题。</div>
-            <div v-for="q in subjectiveQuestions.slice(0, 3)" :key="q.id" :id="'q' + q.id" class="question-item">
-              <p class="question-title" v-html="renderLatex(q.title)"></p>
-              <textarea v-model="answers[q.id]" @input="markDone(q.id)" class="answer-area" rows="4"
-                placeholder="请输入你的答案..."></textarea>
-            </div>
-            <footer class="paper-footer">数学（一） 第 2 页（共 3 页）</footer>
-          </div>
-
-            <!-- 解答题 -->
-            <div class="paper-sheet shadow-effect">
-              <div v-for="q in subjectiveQuestions.slice(3)" :key="q.id" :id="'q' + q.id" class="question-item">
-                <p class="question-title" v-html="renderLatex(q.title)"></p>
-              <textarea v-model="answers[q.id]" @input="markDone(q.id)" class="answer-area" rows="4"
-                placeholder="请输入你的答案..."></textarea>
-            </div>
-            <footer class="paper-footer">数学（一） 第 3 页（共 3 页）</footer>
           </div>
         </div>
       </div>
+
+      <!-- 答题卡侧边栏 -->
+      <aside class="sidebar-container" :class="{ 'is-hidden': !showSidebar }" :style="sidebarStyle"
+        @mousedown="handleDragStart">
+        <div class="toggle-handler" @click.stop="toggleSidebar">
+          {{ showSidebar ? '▶' : '◀' }}
+          <span class="toggle-text">答题卡</span>
+        </div>
+
+        <div class="sidebar-card card-glow">
+          <h3 class="card-title" style="cursor: move;">
+            <span>答题状态</span>
+            <span class="count-tag">{{ doneCount }} / {{ totalCount }}</span>
+          </h3>
+          <div class="answer-card-grid">
+            <div
+              v-for="q in allQuestions"
+              :key="q.id"
+              @click.stop="scrollToQuestion(q.id)"
+              class="card-number"
+              :class="{ 'is-done': doneSet.has(q.id) }"
+            >
+              {{ q.index }}
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 草稿区 -->
+      <transition name="fade">
+        <div v-show="showDraft" class="full-page-draft">
+          <div class="draft-toolbar">
+            <div class="tool-group">
+              <label>颜色：</label>
+              <input type="color" v-model="brushConfig.color">
+            </div>
+            <div class="tool-group">
+              <label>粗细：</label>
+              <input type="range" min="1" max="10" v-model="brushConfig.size">
+            </div>
+            <div class="divider"></div>
+            <button @click="undoLast" class="draft-btn">↩️ 撤销</button>
+            <button @click="clearCanvas" class="draft-btn danger">🗑️ 清空</button>
+            <button @click="showDraft = false" class="draft-btn primary">关闭</button>
+          </div>
+
+          <canvas ref="draftCanvas" class="draft-canvas" @mousedown="startDraw" @mousemove="draw" @mouseup="endDraw"
+            @mouseleave="endDraw"></canvas>
+        </div>
+      </transition>
+
+      <!-- 确认提交模态框 -->
+      <transition name="fade">
+        <div v-if="showConfirmModal" class="modal-overlay">
+          <div class="modal-content card-glow">
+            <div class="modal-icon">⚠️</div>
+            <h3 class="modal-title">确认提交试卷</h3>
+            <p class="modal-tips">
+              当前已完成 <span class="highlight">{{ doneCount }}</span> 题，剩余 <span class="highlight">{{ totalCount - doneCount }}</span> 题未作答。
+              提交后将无法修改答案，并立即生成 AI 阅卷报告。
+            </p>
+            <div class="modal-btns">
+              <button @click="showConfirmModal = false" class="modal-btn cancel">返回检查</button>
+              <button @click="confirmSubmit" class="modal-btn confirm">确认交卷</button>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <!-- 提交中提示 -->
+      <transition name="fade">
+        <div v-if="submitting" class="modal-overlay">
+          <div class="modal-content card-glow">
+            <div class="loader"></div>
+            <h3 class="modal-title">正在提交...</h3>
+            <p class="modal-tips">AI 正在批改您的试卷，请稍候</p>
+          </div>
+        </div>
+      </transition>
+
+      <!-- AI 阅卷报告模态框 -->
+      <transition name="fade">
+        <div v-if="showResultModal" class="modal-overlay">
+          <div class="modal-content report-modal card-glow">
+            <div class="modal-header">
+              <div class="modal-icon success">🎉</div>
+              <h3 class="modal-title">AI 智能阅卷报告</h3>
+            </div>
+
+            <div class="report-body">
+              <div class="report-card-content">
+                <div class="score-box">
+                  <span class="score-label">总得分</span>
+                  <span class="score-value">{{ examResult.totalScore || 0 }}</span>
+                  <span class="score-total">/ {{ paperInfo.totalScore || 150 }}</span>
+                </div>
+                <div class="analysis-box">
+                  <h4>💡 AI 总结</h4>
+                  <p style="white-space: pre-line;">{{ examResult.aiSummary || '暂无总结' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-btns">
+              <button @click="goBackToHome" class="modal-btn cancel">返回首页</button>
+              <button @click="showResultModal = false" class="modal-btn confirm">关闭</button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </template>
+
+    <!-- 回到主页 -->
+    <div v-if="isSubmitted" class="home-fab" @click="goBackToHome" title="返回首页">
+      <img :src="homeIcon" alt="主页" class="home-icon" />
     </div>
-
-    <aside class="sidebar-container" :class="{ 'is-hidden': !showSidebar }" :style="sidebarStyle"
-      @mousedown="handleDragStart">
-      <div class="toggle-handler" @click.stop="toggleSidebar">
-        {{ showSidebar ? '▶' : '◀' }}
-        <span class="toggle-text">答题卡</span>
-      </div>
-
-      <div class="sidebar-card card-glow">
-        <h3 class="card-title" style="cursor: move;">
-          <span>答题状态</span>
-          <span class="count-tag">{{ doneCount }} / 22</span>
-        </h3>
-        <div class="answer-card-grid">
-          <div v-for="i in 22" :key="i" @click.stop="scrollToQuestion(i)" class="card-number"
-            :class="{ 'is-done': doneSet.has(i) }">{{ i }}</div>
-        </div>
-      </div>
-    </aside>
-
-  <!-- 草稿区 -->
-  <transition name="fade">
-    <div v-show="showDraft" class="full-page-draft">
-      <div class="draft-toolbar">
-        <div class="tool-group">
-          <label>颜色：</label>
-          <input type="color" v-model="brushConfig.color">
-        </div>
-        <div class="tool-group">
-          <label>粗细：</label>
-          <input type="range" min="1" max="10" v-model="brushConfig.size">
-        </div>
-        <div class="divider"></div>
-        <button @click="undoLast" class="draft-btn">↩️ 撤销</button>
-        <button @click="clearCanvas" class="draft-btn danger">🗑️ 清空</button>
-        <button @click="showDraft = false" class="draft-btn primary">关闭</button>
-      </div>
-
-      <canvas ref="draftCanvas" class="draft-canvas" @mousedown="startDraw" @mousemove="draw" @mouseup="endDraw"
-        @mouseleave="endDraw"></canvas>
-    </div>
-  </transition>
-
-  <!-- 确认提交模态框 -->
-  <transition name="fade">
-    <div v-if="showConfirmModal" class="modal-overlay">
-      <div class="modal-content card-glow">
-        <div class="modal-icon">⚠️</div>
-        <h3 class="modal-title">确认提交试卷</h3>
-        <p class="modal-tips">
-          当前已完成 <span class="highlight">{{ doneCount }}</span> 题，剩余 <span class="highlight">{{ 22 - doneCount
-          }}</span> 题未作答。
-          提交后将无法修改答案，并立即生成 AI 阅卷报告。
-        </p>
-        <div class="modal-btns">
-          <button @click="showConfirmModal = false" class="modal-btn cancel">返回检查</button>
-          <button @click="confirmSubmit" class="modal-btn confirm">确认交卷</button>
-        </div>
-      </div>
-    </div>
-  </transition>
-
-  <!-- AI 阅卷报告模态框 -->
-  <transition name="fade">
-    <div v-if="showResultModal" class="modal-overlay">
-      <div class="modal-content report-modal card-glow">
-        <div class="modal-header">
-          <div class="modal-icon success">🎉</div>
-          <h3 class="modal-title">AI 智能阅卷报告</h3>
-        </div>
-        
-        <div class="report-body">
-           <div v-html="aiResultHtml"></div>
-        </div>
-
-        <div class="modal-btns">
-          <button @click="goBackToHome" class="modal-btn cancel">返回首页</button>
-          <button @click="showResultModal = false" class="modal-btn confirm">查看试卷详情</button>
-        </div>
-      </div>
-    </div>
-  </transition>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import { startExam, saveSnapshot, recordSwitch, submitExam as submitExamApi, getSessionDetail } from '@/api/examSession';
+import { getPaperDetail } from '@/api/paper';
+import homeIcon from '@/assets/icons/home.svg?url'
 
 const router = useRouter();
+const route = useRoute();
 
-// --- 1. 状态数据 ---
+// --- 状态数据 ---
 const examAppRef = ref(null);
 const isFullScreen = ref(false);
 const isSubmitted = ref(false);
-const showResultModal = ref(false); // 新增：控制结果弹窗
-const aiResultHtml = ref('');
-const switchCount = ref(0);
+const showResultModal = ref(false);
+const loading = ref(true);
+const loadingText = ref('正在加载试卷...');
+const error = ref(null);
+const submitting = ref(false);
 
-// 考试时长常量 (180分钟)
-const EXAM_DURATION = 180 * 60;
-// 当前剩余秒数 (响应式)
-const secondsLeft = ref(EXAM_DURATION);
-// 计时器引用，用于销毁
+// 试卷信息
+const paperInfo = ref({});
+const allQuestions = ref([]); // 所有题目
+const answers = reactive({}); // 用户答案
+const doneSet = reactive(new Set()); // 已答题目集合
+
+// 考试会话
+const sessionId = ref(null);
+const switchCount = ref(0);
+const secondsLeft = ref(180 * 60); // 剩余秒数
 let timerInterval = null;
 
-const doneSet = reactive(new Set()); // 已答题目的 ID 集合
-const answers = reactive({});        // 存储答案的键值对 { questionId: answer }
+// AI 阅卷结果
+const examResult = ref({
+  totalScore: 0,
+  aiSummary: ''
+});
 
-// --- 2. 逻辑：可拖动侧边栏 (答题卡) ---
+// 侧边栏
 const showSidebar = ref(true);
 const position = reactive({ x: window.innerWidth - 300, y: 120 });
 const isDragging = ref(false);
 const lastPositionX = ref(0);
 
+// 草稿纸
+const showDraft = ref(false);
+const draftCanvas = ref(null);
+const ctx = ref(null);
+const isDrawing = ref(false);
+const strokes = ref([]);
+const currentStroke = ref(null);
+const brushConfig = reactive({ color: '#333333', size: 3 });
+
+// 确认弹窗
+const showConfirmModal = ref(false);
+
+// --- 计算属性 ---
+const totalCount = computed(() => allQuestions.value.length);
+const doneCount = computed(() => doneSet.size);
+
+// 分页显示（每页5道题）
+const paperPages = computed(() => {
+  const pages = [];
+  const pageSize = 5;
+  let currentPage = { questions: [] };
+
+  allQuestions.value.forEach((q, index) => {
+    // 添加题型标题
+    if (q.type === 'single-choice' && (index === 0 || allQuestions.value[index - 1].type !== 'single-choice')) {
+      currentPage.questions.push({ sectionTitle: '一、选择题', id: `section-${index}` });
+    } else if (q.type === 'fill-blank' && (index === 0 || allQuestions.value[index - 1].type !== 'fill-blank')) {
+      currentPage.questions.push({ sectionTitle: '二、填空题', id: `section-${index}` });
+    } else if (q.type === 'subjective' && (index === 0 || allQuestions.value[index - 1].type !== 'subjective')) {
+      currentPage.questions.push({ sectionTitle: '三、解答题', id: `section-${index}` });
+    }
+
+    currentPage.questions.push(q);
+
+    if (currentPage.questions.length >= pageSize) {
+      pages.push(currentPage);
+      currentPage = { questions: [] };
+    }
+  });
+
+  if (currentPage.questions.length > 0) {
+    pages.push(currentPage);
+  }
+
+  return pages;
+});
+
+// 格式化时间
+const formatTime = computed(() => {
+  const m = Math.floor(secondsLeft.value / 60);
+  const s = secondsLeft.value % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+});
+
+// --- 初始化考试 ---
+const initExam = async () => {
+  try {
+    loading.value = true;
+    loadingText.value = '正在加载试卷信息...';
+
+    const { paperId, userId } = route.query;
+    if (!paperId || !userId) {
+      throw new Error('缺少必要参数');
+    }
+
+    // 获取试卷详情
+    const paperRes = await getPaperDetail(paperId);
+    if (paperRes.code !== 200 || !paperRes.data) {
+      throw new Error('试卷不存在');
+    }
+    paperInfo.value = paperRes.data;
+
+    // 开始考试
+    loadingText.value = '正在初始化考试...';
+    const startRes = await startExam(userId, paperId);
+    if (startRes.code !== 200) {
+      throw new Error('初始化考试失败');
+    }
+
+    const data = startRes.data;
+    sessionId.value = data.session.id;
+    secondsLeft.value = (data.paper.timeLimit || 180) * 60;
+
+    // 转换题目格式
+    allQuestions.value = convertQuestions(data.questions).map((q, index) => ({
+      ...q,
+      index: index + 1
+    }));
+
+    // 初始化计时器
+    initTimer();
+
+    // 尝试恢复本地答案
+    restoreLocalState();
+
+    loading.value = false;
+  } catch (err) {
+    console.error('初始化考试失败:', err);
+    error.value = err.message || '加载失败';
+    loading.value = false;
+  }
+};
+
+// 转换题目格式
+const convertQuestions = (apiQuestions) => {
+  return apiQuestions.map(q => ({
+    id: String(q.id),
+    type: getQuestionType(q.type),
+    content: q.content,
+    options: convertOptions(q.options || []),
+    answer: q.answer
+  }));
+};
+
+// 题目类型映射
+const getQuestionType = (type) => {
+  const typeMap = {
+    1: 'single-choice',
+    2: 'multiple-choice',
+    3: 'fill-blank',
+    4: 'subjective'
+  };
+  return typeMap[type] || 'subjective';
+};
+
+// 转换选项格式
+const convertOptions = (optionsArray) => {
+  if (!optionsArray || !Array.isArray(optionsArray)) {
+    return {};
+  }
+  const optionsObj = {};
+  const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
+  optionsArray.forEach((opt, index) => {
+    if (index < labels.length) {
+      const match = opt.match(/^[\(（]?([A-H])[.\.)\)）]\s*(.+)$/);
+      if (match) {
+        optionsObj[match[1]] = match[2];
+      } else {
+        optionsObj[labels[index]] = opt;
+      }
+    }
+  });
+
+  return optionsObj;
+};
+
+// 判断是否为选择题
+const isChoiceQuestion = (type) => {
+  return type === 'single-choice' || type === 'multiple-choice';
+};
+
+// 判断选项是否被选中
+const isOptionSelected = (questionId, option) => {
+  const answer = answers[questionId];
+  if (!answer) return false;
+
+  if (Array.isArray(answer)) {
+    return answer.includes(option);
+  }
+  return answer === option;
+};
+
+// 处理选项变化
+const handleOptionChange = (questionId, option, questionType) => {
+  if (questionType === 'single-choice') {
+    answers[questionId] = option;
+  } else if (questionType === 'multiple-choice') {
+    if (!Array.isArray(answers[questionId])) {
+      answers[questionId] = [];
+    }
+    const index = answers[questionId].indexOf(option);
+    if (index > -1) {
+      answers[questionId].splice(index, 1);
+    } else {
+      answers[questionId].push(option);
+    }
+  }
+  markDone(questionId);
+  saveSnapshotDebounced();
+};
+
+// 标记已答
+const markDone = (id) => {
+  const answer = answers[id];
+  if (answer && (typeof answer === 'string' ? answer.trim() : true)) {
+    doneSet.add(id);
+  } else {
+    doneSet.delete(id);
+  }
+  saveSnapshotDebounced();
+};
+
+// LaTeX 渲染
+const renderLatex = (latex) => {
+  if (!latex) return '';
+  try {
+    const result = [];
+    let lastIndex = 0;
+    let match;
+    const regex = /\$([^$]+)\$/g;
+
+    while ((match = regex.exec(latex)) !== null) {
+      const [fullMatch, formula] = match;
+      const before = latex.slice(lastIndex, match.index);
+      if (before) result.push(before);
+      const rendered = katex.renderToString(formula, {
+        throwOnError: false,
+        displayMode: false,
+        output: 'html',
+      });
+      result.push(rendered);
+      lastIndex = regex.lastIndex;
+    }
+
+    const after = latex.slice(lastIndex);
+    if (after) result.push(after);
+
+    return result.join('');
+  } catch (e) {
+    console.error('LaTeX 渲染失败:', e);
+    return latex;
+  }
+};
+
+// 计时器
+const initTimer = () => {
+  const updateTimer = () => {
+    if (secondsLeft.value > 0) {
+      secondsLeft.value--;
+    } else {
+      clearInterval(timerInterval);
+      handleSubmit(true);
+    }
+  };
+  timerInterval = setInterval(updateTimer, 1000);
+};
+
+// 保存快照（防抖）
+let saveSnapshotTimer = null;
+const saveSnapshotDebounced = () => {
+  if (saveSnapshotTimer) clearTimeout(saveSnapshotTimer);
+  saveSnapshotTimer = setTimeout(() => {
+    saveSnapshotToLocal();
+  }, 1000);
+};
+
+// 保存快照到后端
+const saveSnapshotToLocal = async () => {
+  if (!sessionId.value) return;
+
+  try {
+    // 将多选答案数组转换为逗号分隔的字符串
+    const answersToSave = {};
+    Object.keys(answers).forEach(qid => {
+      const answer = answers[qid];
+      if (Array.isArray(answer)) {
+        answersToSave[qid] = answer.sort().join(',');
+      } else {
+        answersToSave[qid] = answer;
+      }
+    });
+
+    await saveSnapshot(sessionId.value, JSON.stringify(answersToSave));
+  } catch (err) {
+    console.error('保存快照失败:', err);
+  }
+};
+
+// 恢复本地状态
+const restoreLocalState = () => {
+  const savedState = localStorage.getItem('mock_exam_state');
+  if (savedState) {
+    try {
+      const parsed = JSON.parse(savedState);
+      if (parsed.sessionId === sessionId.value) {
+        Object.assign(answers, parsed.answers || {});
+        Object.keys(parsed.answers || {}).forEach(id => {
+          if (parsed.answers[id]) doneSet.add(id);
+        });
+        strokes.value = parsed.strokes || [];
+      }
+    } catch (err) {
+      console.error('恢复状态失败:', err);
+    }
+  }
+};
+
+// 保存本地状态
+const saveLocalState = () => {
+  localStorage.setItem('mock_exam_state', JSON.stringify({
+    sessionId: sessionId.value,
+    answers,
+    strokes: strokes.value
+  }));
+};
+
+// 滚动到题目
+const scrollToQuestion = (id) => {
+  const el = document.getElementById('q' + id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+// 全屏切换
+const toggleFullScreen = () => {
+  if (!document.fullscreenElement) {
+    examAppRef.value.requestFullscreen().then(() => isFullScreen.value = true);
+  } else {
+    document.exitFullscreen();
+    isFullScreen.value = false;
+  }
+};
+
+// 侧边栏切换
 const toggleSidebar = () => {
   if (showSidebar.value) {
     lastPositionX.value = position.x;
-    position.x = window.innerWidth; // 隐藏到边缘，只留拉手
+    position.x = window.innerWidth;
     showSidebar.value = false;
   } else {
-    position.x = lastPositionX.value; // 恢复位置
+    position.x = lastPositionX.value;
     if (position.x > window.innerWidth - 260) position.x = window.innerWidth - 260;
     showSidebar.value = true;
   }
@@ -234,11 +606,10 @@ const toggleSidebar = () => {
 const sidebarStyle = computed(() => ({
   left: `${position.x}px`,
   top: `${position.y}px`,
-  // 拖动时不使用过渡动画，切换隐藏时使用
   transition: isDragging.value ? 'none' : 'left 0.4s cubic-bezier(0.4, 0, 0.2, 1), top 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
 }));
 
-// 拖动逻辑
+// 侧边栏拖动
 const handleDragStart = (e) => {
   if (e.target.closest('.card-number') || e.target.closest('.toggle-handler')) return;
   isDragging.value = true;
@@ -253,7 +624,6 @@ const handleDragStart = (e) => {
 
   const handleMouseUp = () => {
     isDragging.value = false;
-    // 边界限制
     if (position.x < 0) position.x = 0;
     if (position.x > window.innerWidth - 260) position.x = window.innerWidth - 260;
     if (position.y < 0) position.y = 0;
@@ -265,155 +635,7 @@ const handleDragStart = (e) => {
   window.addEventListener('mouseup', handleMouseUp);
 };
 
-// --- 3. 题目数据 ---
-
-const renderLatex = (latex) => {
-  if (!latex) return '';
-  
-  try {
-    const result = [];
-    let lastIndex = 0;
-    let match;
-    
-    const regex = /\$([^$]+)\$/g;
-    
-    while ((match = regex.exec(latex)) !== null) {
-      const [fullMatch, formula] = match;
-      const before = latex.slice(lastIndex, match.index);
-      
-      if (before) {
-        result.push(before);
-      }
-      
-      const rendered = katex.renderToString(formula, {
-        throwOnError: false,
-        displayMode: false,
-        output: 'html',
-      });
-      
-      result.push(rendered);
-      lastIndex = regex.lastIndex;
-    }
-    
-    const after = latex.slice(lastIndex);
-    if (after) {
-      result.push(after);
-    }
-    
-    return result.join('');
-  } catch (e) {
-    console.error('LaTeX 渲染失败:', e);
-    return latex;
-  }
-};
-
-const selectionQuestions = ref([
-  {
-    id: 1,
-    title: '1. 设函数 $f(x) = \\lim_{n \\to \\infty} \\frac{x^{2n-1} + ax^2 + bx}{x^{2n} + 1}$ 在 $(-\\infty, +\\infty)$ 内连续，则（ ）',
-    options: {
-      A: '$a=1, b=1$',
-      B: '$a=1, b=-1$',
-      C: '$a=-1, b=1$',
-      D: '$a=-1, b=-1$'
-    }
-  },
-  {
-    id: 2,
-    title: '2. 设函数 $f(x) = \\int_0^x e^{-t^2} dt$，则 $f\'(0) =$（ ）',
-    options: {
-      A: '$0$',
-      B: '$1$',
-      C: '$e$',
-      D: '$e^{-1}$'
-    }
-  },
-  {
-    id: 3,
-    title: '3. 设 $\\alpha$ 为常数，则级数 $\\sum_{n=1}^{\\infty} \\frac{(-1)^n}{n^\\alpha}$ 收敛的充分必要条件是（ ）',
-    options: {
-      A: '$\\alpha \\leq 0$',
-      B: '$0 < \\alpha \\leq 1$',
-      C: '$\\alpha > 1$',
-      D: '$\\alpha > 0$'
-    }
-  },
-  {
-    id: 4,
-    title: '4. 设 $A$ 为 $3$ 阶实对称矩阵，且 $A^2 = A$，若 $A$ 的秩为 $2$，则 $A$ 的特征值为（ ）',
-    options: {
-      A: '$1, 1, 0$',
-      B: '$1, 1, 1$',
-      C: '$1, 0, 0$',
-      D: '$0, 0, 0$'
-    }
-  },
-  {
-    id: 5,
-    title: '5. 设随机变量 $X$ 与 $Y$ 相互独立，且 $X \\sim N(0, 1)$，$Y \\sim N(0, 1)$，则 $E(XY) =$（ ）',
-    options: {
-      A: '$0$',
-      B: '$1$',
-      C: '$-1$',
-      D: '$2$'
-    }
-  },
-  ...Array.from({ length: 5 }, (_, i) => ({
-    id: i + 6,
-    title: `${i + 6}. 设函数 $f(x) = \\frac{1}{1+x^2}$，则 $f^{(n)}(0) =$（ ）`,
-    options: {
-      A: '$0$',
-      B: '$1$',
-      C: '$(-1)^n n!$',
-      D: '$(-1)^{\\lfloor n/2 \\rfloor} n!$'
-    }
-  }))
-]);
-const subjectiveQuestions = ref(Array.from({ length: 12 }, (_, i) => ({
-  id: i + 11,
-  title: `${i + 11}. 计算积分 $I = \\int_0^{\\infty} \\frac{\\sin x}{x} dx$。`
-})));
-
-// --- 4. 逻辑：倒计时与持久化 ---
-
-// 格式化时间显示 (mm:ss)
-const formatTime = computed(() => {
-  const m = Math.floor(secondsLeft.value / 60);
-  const s = secondsLeft.value % 60;
-  return `${m}:${s < 10 ? '0' : ''}${s}`;
-});
-
-const initTimer = () => {
-  let endTime = localStorage.getItem('exam_end_time');
-  if (!endTime) {
-    endTime = Date.now() + EXAM_DURATION * 1000;
-    localStorage.setItem('exam_end_time', endTime);
-  }
-
-  const updateTimer = () => {
-    const now = Date.now();
-    const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
-    secondsLeft.value = remaining; // 修正变量名
-
-    if (remaining <= 0) {
-      clearInterval(timerInterval);
-      handleSubmit(true); // 时间到自动提交
-    }
-  };
-
-  timerInterval = setInterval(updateTimer, 1000);
-  updateTimer();
-};
-
-// --- 5. 逻辑：草稿纸 (全屏画布) ---
-const showDraft = ref(false);
-const draftCanvas = ref(null);
-const ctx = ref(null);
-const isDrawing = ref(false);
-const strokes = ref([]);
-const currentStroke = ref(null);
-const brushConfig = reactive({ color: '#333333', size: 3 });
-
+// 草稿纸功能
 const openDraft = () => {
   showDraft.value = true;
   nextTick(() => {
@@ -465,98 +687,80 @@ const redrawCanvas = () => {
 };
 
 const undoLast = () => { strokes.value.pop(); redrawCanvas(); };
-const clearCanvas = () => { if (confirm('确定清空草稿吗？')) { strokes.value = []; redrawCanvas(); } };
+const clearCanvas = () => { strokes.value = []; redrawCanvas(); };
 
-// --- 6. 交互逻辑 ---
-const markDone = (id) => {
-  if (answers[id] && String(answers[id]).trim() !== '') {
-    doneSet.add(Number(id));
-  } else {
-    doneSet.delete(Number(id));
-  }
-};
-
-const scrollToQuestion = (id) => {
-  const el = document.getElementById('q' + id);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-};
-
-const toggleFullScreen = () => {
-  if (!document.fullscreenElement) {
-    examAppRef.value.requestFullscreen().then(() => isFullScreen.value = true);
-  } else {
-    document.exitFullscreen();
-    isFullScreen.value = false;
-  }
-};
-
-// 提交试卷逻辑
-const showConfirmModal = ref(false); // 控制弹窗显示
-// 点击导航栏“提交试卷”按钮触发
+// 提交试卷
 const handleSubmit = (isAuto = false) => {
   if (isAuto === true) {
-    // 如果是倒计时结束自动提交，不弹窗，直接执行
     confirmSubmit();
   } else {
-    // 手动点击，打开自定义弹窗
     showConfirmModal.value = true;
   }
 };
 
-// 弹窗中点击“确认交卷”触发
-const confirmSubmit = () => {
-  showConfirmModal.value = false; // 关闭确认弹窗
-  isSubmitted.value = true;       // 标记为已提交状态
+const confirmSubmit = async () => {
+  showConfirmModal.value = false;
+  isSubmitted.value = true;
+  submitting.value = true;
 
-  // 模拟 AI 报告生成（确保 aiResultHtml 有内容）
-  aiResultHtml.value = `
-    <div class="report-card-content">
-      <div class="score-box">
-        <span class="score-label">预估得分</span>
-        <span class="score-value">115</span>
-        <span class="score-total">/ 150</span>
-      </div>
-      <div class="analysis-box">
-        <h4>💡 AI 简评</h4>
-        <p>你的计算准确度较高，但在逻辑证明题的严谨性上还有提升空间。建议加强对中值定理应用场景的复习。</p>
-      </div>
-    </div>
-  `;
+  try {
+    // 先保存快照
+    await saveSnapshotToLocal();
 
-  // 清除本地缓存
-  localStorage.removeItem('exam_end_time');
-  localStorage.removeItem('exam_answers');
-  localStorage.removeItem('exam_draft_strokes');
+    // 提交考试
+    const submitRes = await submitExamApi(sessionId.value);
+    if (submitRes.code !== 200) {
+      throw new Error('提交失败');
+    }
 
-  // 显示结果弹窗
-  showResultModal.value = true;
-};
+    // 获取考试结果
+    const resultRes = await getSessionDetail(sessionId.value);
+    if (resultRes.code === 200 && resultRes.data) {
+      examResult.value = {
+        totalScore: resultRes.data.totalScore || 0,
+        aiSummary: resultRes.data.aiSummary || ''
+      };
+    }
 
-const handleVisibilityChange = () => {
-  if (document.hidden) switchCount.value++;
-};
+    // 清除本地缓存
+    localStorage.removeItem('mock_exam_state');
+    localStorage.removeItem('exam_end_time');
 
-// --- 7. 生命周期与监听 ---
-// 自动保存答案和草稿
-watch(answers, (newVal) => localStorage.setItem('exam_answers', JSON.stringify(newVal)), { deep: true });
-watch(strokes, (newVal) => localStorage.setItem('exam_draft_strokes', JSON.stringify(newVal)), { deep: true });
-
-onMounted(() => {
-  initTimer(); // 初始化计时器
-
-  // 恢复答案
-  const savedAnswers = localStorage.getItem('exam_answers');
-  if (savedAnswers) {
-    Object.assign(answers, JSON.parse(savedAnswers));
-    Object.keys(answers).forEach(id => {
-      if (answers[id]) doneSet.add(Number(id));
-    });
+    // 显示结果
+    showResultModal.value = true;
+  } catch (err) {
+    console.error('提交考试失败:', err);
+    ElMessage.error(err.message || '提交失败');
+    isSubmitted.value = false;
+  } finally {
+    submitting.value = false;
   }
+};
 
-  // 恢复草稿
-  const savedStrokes = localStorage.getItem('exam_draft_strokes');
-  if (savedStrokes) strokes.value = JSON.parse(savedStrokes);
+// 切屏检测
+const handleVisibilityChange = () => {
+  if (document.hidden && sessionId.value && !isSubmitted.value) {
+    switchCount.value++;
+    recordSwitch(sessionId.value).catch(err => console.error('记录切屏失败:', err));
+  }
+};
 
+// 返回
+const goBack = () => {
+  router.back();
+};
+
+const goBackToHome = () => {
+  router.push('/user/paper-list');
+};
+
+// 监听状态变化
+watch(answers, () => saveLocalState(), { deep: true });
+watch(strokes, () => saveLocalState(), { deep: true });
+
+// 生命周期
+onMounted(() => {
+  initExam();
   document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
@@ -564,15 +768,7 @@ onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
-
-const doneCount = computed(() => doneSet.size);
-const askAIHelp = () => alert("注意检查前十道选择题！");
-
-const goBackToHome = () => {
-  router.push('/user/subject');
-};
 </script>
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&display=swap');
@@ -585,6 +781,41 @@ const goBackToHome = () => {
   overflow-y: auto;
 }
 
+/* 加载和错误状态 */
+.loading-screen,
+.error-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: #fff;
+}
+
+.loader {
+  border: 4px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 4px solid #3498db;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-content {
+  text-align: center;
+}
+
+.error-content h2 {
+  color: #f56c6c;
+  margin-bottom: 10px;
+}
+
 /* 顶部栏 */
 .system-nav {
   display: flex;
@@ -594,7 +825,6 @@ const goBackToHome = () => {
   height: 64px;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
-  /* 毛玻璃效果 */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   border-bottom: 1px solid #eaeaea;
   position: fixed;
@@ -603,7 +833,6 @@ const goBackToHome = () => {
   z-index: 1000;
 }
 
-/* 左侧 Logo 区域 */
 .nav-left {
   display: flex;
   align-items: center;
@@ -630,7 +859,6 @@ const goBackToHome = () => {
   letter-spacing: 2px;
 }
 
-/* AI Tag 标签 */
 .ai-tag {
   background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
   color: white;
@@ -642,7 +870,6 @@ const goBackToHome = () => {
   box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
 }
 
-/* 右侧工具区域 */
 .nav-right {
   display: flex;
   align-items: center;
@@ -651,7 +878,6 @@ const goBackToHome = () => {
   font-size: 14px;
 }
 
-/* 导航栏工具组 */
 .top-tools {
   display: flex;
   gap: 12px;
@@ -680,20 +906,6 @@ const goBackToHome = () => {
   color: #1e293b;
 }
 
-/* AI 按钮特殊处理 */
-.nav-tool-btn.ai-btn {
-  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
-  border-color: #ddd6fe;
-  color: #6d28d9;
-  font-weight: 500;
-}
-
-.nav-tool-btn.ai-btn:hover {
-  box-shadow: 0 2px 4px rgba(109, 40, 217, 0.1);
-  transform: translateY(-1px);
-}
-
-/* 计时器盒子 */
 .timer-box {
   display: flex;
   align-items: center;
@@ -718,7 +930,6 @@ const goBackToHome = () => {
   text-align: center;
 }
 
-/* 按钮基础样式 */
 button {
   cursor: pointer;
   transition: all 0.2s ease;
@@ -726,7 +937,6 @@ button {
   outline: none;
 }
 
-/* 全屏按钮 */
 .fullscreen-btn {
   background: none;
   border: none;
@@ -746,7 +956,6 @@ button {
   color: #111827;
 }
 
-/* 提交按钮 */
 .submit-btn {
   background: #2563eb;
   color: white;
@@ -763,17 +972,29 @@ button {
   box-shadow: 0 6px 12px -2px rgba(37, 99, 235, 0.3);
 }
 
-.submit-btn:active {
-  transform: translateY(0);
+/* 禁用状态 */
+.submit-btn:disabled,
+.submit-btn--disabled {
+  background: #cbd5e1; /* 灰色 */
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
-/* 基础样式还原 */
+.submit-btn:not(:disabled):hover {
+  background: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.4);
+}
+
 .main-layout {
   max-width: 1400px;
   margin: 0 auto;
   display: flex;
   gap: 24px;
-  padding: 24px;
+  /* padding: 24px; */
+  /* padding-top: 0px; */
 }
 
 .paper-wrapper {
@@ -783,15 +1004,12 @@ button {
   padding: 24px;
 }
 
-
-/* 试卷分页效果 */
 .paper-page-container {
   display: flex;
   flex-direction: column;
   gap: 30px;
   padding-bottom: 50px;
 }
-
 
 .paper-sheet {
   background: white;
@@ -805,7 +1023,6 @@ button {
   font-family: 'Noto Serif SC', serif;
 }
 
-/* 密封线 */
 .sealing-line {
   position: absolute;
   left: 0;
@@ -822,7 +1039,6 @@ button {
   z-index: 10;
 }
 
-/* “密封线内不要答题” 警告文字 */
 .seal-warning {
   writing-mode: vertical-rl;
   font-size: 14px;
@@ -848,10 +1064,8 @@ button {
   font-size: 18px;
 }
 
-/* 试卷头部样式 */
 .paper-header {
   text-align: center;
-  /* padding: 30px 0; */
 }
 
 .main-title {
@@ -869,7 +1083,131 @@ button {
   margin: 20px auto;
 }
 
-/* 侧边栏容器 */
+.exam-info {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  font-size: 16px;
+  margin-bottom: 30px;
+  color: #636363;
+  font-style: italic;
+}
+
+.notice-box {
+  border: 2px solid black;
+  margin: 20px auto;
+  padding: 5px 15px;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.notice-title {
+  font-weight: bold;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.notice-list {
+  padding-left: 1.2em;
+  margin: 0;
+  list-style-position: outside;
+  margin-bottom: 10px;
+}
+
+.section-banner {
+  background: #eef3f8;
+  padding: 8px;
+  font-weight: bold;
+  margin-top: 20px;
+}
+
+.question-item {
+  padding: 5px;
+  transition: background-color 0.3s;
+  border-radius: 10px;
+}
+
+.question-title {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #1a1a1a;
+  margin-bottom: 16px;
+  font-weight: 500;
+  display: flex;
+}
+
+.options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+  padding-left: 10px;
+}
+
+.option-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background-color: #f9fafb;
+  transition: all 0.2s ease;
+}
+
+.option-label:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.option-label:has(input:checked),
+.option-label:has(input:checked ~ input) {
+  background-color: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.option-label input[type="radio"],
+.option-label input[type="checkbox"] {
+  margin-top: 4px;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+
+.option-text {
+  font-size: 15px;
+  line-height: 1.5;
+  color: inherit;
+}
+
+.answer-area {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+}
+
+.paper-footer {
+  margin-top: auto;
+  padding: 20px 0;
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+}
+
+:deep(.katex) {
+  font-size: 1.05em;
+}
+
+.question-title :deep(.katex) {
+  font-size: 1.1em;
+}
+
+.option-text :deep(.katex) {
+  font-size: 1.05em;
+}
+
 .sidebar-container {
   position: fixed;
   z-index: 2000;
@@ -878,11 +1216,9 @@ button {
   user-select: none;
 }
 
-/* 切换侧边栏的拉手 */
 .toggle-handler {
   position: absolute;
   left: -30px;
-  /* 露出一截在外面 */
   top: 50%;
   transform: translateY(-50%);
   width: 30px;
@@ -913,23 +1249,6 @@ button {
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
-/* 拖动时的临时状态 */
-.is-dragging {
-  transition: none !important;
-  /* 拖动时关闭动画，防止卡顿 */
-  opacity: 0.9;
-}
-
-/* 通用卡片样式 */
-.sidebar-card {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 20px;
-  border: 1px solid #eef2f6;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-
-/* 答题卡标题 */
 .card-title {
   font-size: 15px;
   font-weight: 600;
@@ -949,7 +1268,6 @@ button {
   font-family: monospace;
 }
 
-/* 答题卡网格 - 考研答题卡风格 */
 .answer-card-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -984,158 +1302,6 @@ button {
   box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
 }
 
-
-/* 考试时间、分值 */
-.exam-info {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
-  font-size: 16px;
-  margin-bottom: 30px;
-  color: #636363;
-  font-style: italic;
-}
-
-/* 考试注意事外外部容器 */
-.notice-box {
-  border: 2px solid black;
-  margin: 20px auto;
-  padding: 5px 15px;
-  text-align: left;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-/* 考试注意事项 */
-.notice-title {
-  font-weight: bold;
-  margin-left: 0;
-  padding-left: 0;
-}
-
-.notice-list {
-  /* 清除默认内边距 */
-  padding-left: 1.2em;
-  margin: 0;
-  list-style-position: outside;
-  margin-bottom: 10px;
-}
-
-/* 选择题名称栏 */
-.section-banner {
-  background: #eef3f8;
-  padding: 8px;
-  font-weight: bold;
-}
-
-/* 题目单项容器 */
-.question-item {
-  padding: 5px;
-  transition: background-color 0.3s;
-  border-radius: 10px;
-}
-
-/* 题干样式 */
-.question-title {
-  font-size: 16px;
-  line-height: 1.6;
-  color: #1a1a1a;
-  margin-bottom: 16px;
-  font-weight: 500;
-  display: flex;
-}
-
-/* 选项网格布局 - 考研试卷通常是 1列或 2列 */
-.options-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px 24px;
-  padding-left: 10px;
-}
-
-/* 选项标签容器 */
-.option-label {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  cursor: pointer;
-  padding: 10px 14px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background-color: #f9fafb;
-  transition: all 0.2s ease;
-}
-
-.option-label:hover {
-  background-color: #f3f4f6;
-  border-color: #d1d5db;
-}
-
-/* 选中状态样式 */
-.option-label:has(input:checked) {
-  background-color: #eff6ff;
-  border-color: #3b82f6;
-  color: #1d4ed8;
-  font-weight: 600;
-}
-
-.option-label input[type="radio"] {
-  margin-top: 4px;
-  cursor: pointer;
-  accent-color: #2563eb;
-}
-
-/* 选项文字 */
-.option-text {
-  font-size: 15px;
-  line-height: 1.5;
-  color: inherit;
-}
-
-/* 试卷页脚 */
-.paper-footer {
-  margin-top: auto;
-  padding: 20px 0;
-  text-align: center;
-  font-size: 12px;
-  color: #666;
-}
-
-/* KaTeX 公式样式 */
-:deep(.katex) {
-  font-size: 1.05em;
-}
-
-:deep(.katex-display) {
-  margin: 0.5em 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-/* 题目标题中的 KaTeX 公式 */
-.question-title :deep(.katex) {
-  font-size: 1.1em;
-}
-
-/* 选项中的 KaTeX 公式 */
-.option-text :deep(.katex) {
-  font-size: 1.05em;
-}
-
-/* 填空题名称栏 */
-.completion-banner {
-  background: #eef3f8;
-  padding: 8px;
-  margin-top: 20px;
-  font-weight: bold;
-}
-
-.answer-area {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-}
-
 .full-page-draft {
   position: fixed;
   top: 0;
@@ -1143,16 +1309,13 @@ button {
   width: 100vw;
   height: 100vh;
   z-index: 3000;
-  /* 高于导航栏和答题卡 */
   background: rgba(255, 255, 255, 0.4);
-  /* 半透明背景，能看到试卷 */
   backdrop-filter: blur(2px);
 }
 
 .draft-toolbar {
   position: absolute;
   top: 80px;
-  /* 避开导航栏位置 */
   left: 50%;
   transform: translateX(-50%);
   background: white;
@@ -1167,7 +1330,6 @@ button {
 
 .draft-canvas {
   cursor: crosshair;
-  /* 十字准星 */
 }
 
 .draft-btn {
@@ -1193,7 +1355,6 @@ button {
   color: #ef4444;
 }
 
-/* 弹窗遮罩层 */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1202,15 +1363,12 @@ button {
   height: 100%;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
-  /* 背景模糊，更有质感 */
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  /* 确保在最上层 */
 }
 
-/* 弹窗主体 */
 .modal-content {
   background: white;
   padding: 40px;
@@ -1243,7 +1401,6 @@ button {
   font-size: 1.1em;
 }
 
-/* 按钮组 */
 .modal-btns {
   display: flex;
   gap: 15px;
@@ -1279,7 +1436,6 @@ button {
   transform: translateY(-2px);
 }
 
-/* 渐变过渡动画 */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s;
@@ -1290,8 +1446,7 @@ button {
   opacity: 0;
 }
 
-/* 结果报告弹窗特别样式 */
-.modal-content.report-modal {
+.report-modal {
   width: 600px;
   max-width: 90vw;
   text-align: left;
@@ -1307,14 +1462,18 @@ button {
   color: #10b981;
 }
 
-/* 报告内部样式 (v-html 内容) */
-:deep(.report-card-content) {
+.report-body {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.report-card-content {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-:deep(.score-box) {
+.score-box {
   background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
   border: 1px solid #fcd34d;
   padding: 20px;
@@ -1323,26 +1482,26 @@ button {
   color: #92400e;
 }
 
-:deep(.score-label) {
+.score-label {
   display: block;
   font-size: 14px;
   opacity: 0.8;
   margin-bottom: 5px;
 }
 
-:deep(.score-value) {
+.score-value {
   font-size: 48px;
   font-weight: 900;
   line-height: 1;
 }
 
-:deep(.score-total) {
+.score-total {
   font-size: 16px;
   opacity: 0.6;
   margin-left: 5px;
 }
 
-:deep(.analysis-box) {
+.analysis-box {
   background: #f0f9ff;
   border: 1px solid #bae6fd;
   padding: 20px;
@@ -1350,15 +1509,88 @@ button {
   color: #0369a1;
 }
 
-:deep(.analysis-box h4) {
+.analysis-box h4 {
   margin: 0 0 10px 0;
   font-size: 16px;
   font-weight: bold;
 }
 
-:deep(.analysis-box p) {
+.analysis-box p {
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
 }
+
+
+.submitted-mask {
+  position: relative;
+}
+
+.submitted-mask::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+}
+
+/* 回到主页按钮 */
+.home-fab {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+
+  background: rgba(37, 100, 235, 0.849);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 6px 20px rgba(37, 99, 235, 0.3),
+    0 3px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  outline: none;
+}
+
+/* 悬停 */
+.home-fab:hover {
+  background: rgb(37, 100, 235);
+  transform: translateY(-4px) scale(1.08);
+  box-shadow:
+    0 10px 30px rgba(37, 99, 235, 0.4),
+    0 5px 12px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* 点击 */
+.home-fab:active {
+  transform: translateY(0) scale(1.02);
+  background: rgba(37, 99, 235, 0.5);
+  box-shadow:
+    0 4px 16px rgba(37, 99, 235, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* 图标 */
+.home-icon {
+  width: 26px;
+  height: 26px;
+  fill: white;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4));
+}
+
 </style>

@@ -2,11 +2,11 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 const request = axios.create({
-    baseURL: 'http://localhost:8081', // 注意这里是你改后的 8081
+    baseURL: 'http://localhost:8081',
     timeout: 5000
 })
 
-// 响应拦截器：直接把 Result 里的 data 剥离出来
+// 响应拦截器
 request.interceptors.response.use(
     response => {
         const res = response.data

@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.kaoyanplatform.common.Result;
 import org.example.kaoyanplatform.entity.User;
 import org.example.kaoyanplatform.entity.dto.UserStudyStatsDTO;
+import org.example.kaoyanplatform.entity.dto.HomePageDataDTO;
 import org.example.kaoyanplatform.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -73,7 +74,7 @@ public class UserController {
     }
 
     @PostMapping("/update")
-    @Operation(summary = "更新个人资料", description = "根据ID更新用户的昵称、头像、目标院校等非敏感信息。")
+    @Operation(summary = "更新个人信息", description = "根据ID更新用户的昵称、头像、目标院校等非敏感信息。")
     public Result update(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "更新数据（必须包含id）",
@@ -201,7 +202,17 @@ public class UserController {
         return Result.success(result);
     }
 
-    @GetMapping("/study-stats/{userId}")
+    @GetMapping("userInfo")
+    @Operation(summary = "根据用户ID获取用户信息", description = "通过传入的用户ID查询并返回对应的用户详细信息")
+    @ApiResponse(responseCode = "200", description = "成功返回用户信息")
+    public Result getUserInfo(
+            @Parameter(description = "用户唯一标识 ID", required = true, example = "12345")
+            @RequestParam Long userId) {
+        User userInfo = userService.getById(userId);
+        return Result.success(userInfo);
+    }
+
+    @GetMapping("/studyStats/{userId}")
     @Operation(summary = "获取用户学习统计数据", description = "获取指定用户的总答题量、正确率、连续打卡天数等统计信息。")
     public Result getUserStudyStats(
             @Parameter(description = "用户ID", required = true, example = "1")
@@ -211,5 +222,17 @@ public class UserController {
             return Result.error("用户不存在");
         }
         return Result.success(stats);
+    }
+
+    @GetMapping("/homeData/{userId}")
+    @Operation(summary = "获取用户首页数据", description = "获取用户首页所需的所有数据，包括用户信息、学习统计、科目列表、每日语录和推荐内容。")
+    public Result getHomePageData(
+            @Parameter(description = "用户ID", required = true, example = "1")
+            @PathVariable Long userId) {
+        var homeData = userService.getHomePageData(userId);
+        if (homeData == null) {
+            return Result.error("用户不存在");
+        }
+        return Result.success(homeData);
     }
 }

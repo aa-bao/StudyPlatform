@@ -1942,3 +1942,339 @@ public final class GLMGradingConstants {
     public static final Integer DEFAULT_TIME_LIMIT = 180;    // 默认时间（分钟）
 }
 ```
+
+---
+
+## 14. 首页数据接口 (Home Page API)
+
+### 14.1 功能概述
+
+用户首页 (`/user/home`) 需要展示多种数据，包括用户信息、学习统计、考试科目、每日励志语录和个性化推荐。为优化性能，提供统一的首页数据接口，一次性返回所有所需数据。
+
+### 14.2 数据结构设计
+
+#### HomePageDataDTO.java
+
+```java
+@Data
+public class HomePageDataDTO {
+    private UserInfo userInfo;           // 用户基本信息
+    private StudyStats studyStats;       // 学习统计数据
+    private List<Subject> subjects;      // 考试科目列表
+    private DailyQuote dailyQuote;       // 每日励志语录
+    private List<Recommendation> recommendations; // 个性化推荐
+}
+```
+
+**内嵌类说明**:
+
+1. **UserInfo** - 用户基本信息
+   - id, username, nickname, avatar, role
+   - targetSchool, targetTotalScore
+   - examYear, examDate, examSubjects
+
+2. **StudyStats** - 学习统计
+   - questionsDone: 累计刷题数
+   - todayStudyTime: 今日学习时长(小时)
+   - accuracy: 总体正确率
+   - mistakesCount: 错题本数量
+   - totalStudyHours: 总学习时长(小时)
+   - consecutiveDays: 连续打卡天数
+
+3. **Subject** - 科目信息
+   - id, name, level
+
+4. **DailyQuote** - 每日励志语录
+   - content: 语录内容
+   - author: 作者
+
+5. **Recommendation** - 个性化推荐
+   - id, subjectName, subjectColor
+   - difficulty, content, reason
+
+### 14.3 API 接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/user/homeData/{userId}` | GET | 获取用户首页数据 |
+
+#### 请求示例
+
+```http
+GET http://localhost:8081/user/homeData/1
+```
+
+#### 响应示例
+
+```json
+{
+  "code": 200,
+  "msg": "成功",
+  "data": {
+    "userInfo": {
+      "id": 1,
+      "username": "student",
+      "nickname": "考研人_abc123",
+      "avatar": "http://localhost:8081/uploads/avatar.jpg",
+      "role": "student",
+      "targetSchool": "清华大学",
+      "targetTotalScore": 400,
+      "examYear": "2026",
+      "examDate": "2025-12-20",
+      "examSubjects": "政治,英语一,数学一"
+    },
+    "studyStats": {
+      "questionsDone": 128,
+      "todayStudyTime": 2.5,
+      "accuracy": 78.5,
+      "mistakesCount": 26,
+      "totalStudyHours": 42.0,
+      "consecutiveDays": 7
+    },
+    "subjects": [
+      {"id": 1, "name": "政治", "level": 1},
+      {"id": 4, "name": "数学一", "level": 1},
+      {"id": 2, "name": "英语一", "level": 1}
+    ],
+    "dailyQuote": {
+      "content": "不积跬步，无以至千里；不积小流，无以成江海。",
+      "author": "荀子"
+    },
+    "recommendations": []
+  }
+}
+```
+
+### 14.4 后端实现
+
+#### UserService.java
+
+```java
+/**
+ * 获取用户首页数据
+ * @param userId 用户ID
+ * @return 首页数据
+ */
+HomePageDataDTO getHomePageData(Long userId);
+```
+
+#### UserServiceImpl.java
+
+```java
+@Override
+public HomePageDataDTO getHomePageData(Long userId) {
+    HomePageDataDTO homeData = new HomePageDataDTO();
+    
+    // 1. 获取并组装用户基本信息
+    User user = getById(userId);
+    HomePageDataDTO.UserInfo userInfo = new HomePageDataDTO.UserInfo();
+    // ... 设置用户信息
+    homeData.setUserInfo(userInfo);
+    
+    // 2. 获取学习统计数据
+    HomePageDataDTO.StudyStats stats = new HomePageDataDTO.StudyStats();
+    // ... 从UserProgress、ExamRecord等表统计
+    homeData.setStudyStats(stats);
+    
+    // 3. 获取考试科目列表（Level 1 - 考试规格）
+    QueryWrapper<Subject> subjectWrapper = new QueryWrapper<>();
+    subjectWrapper.eq("level", "1");
+    List<Subject> subjects = subjectMapper.selectList(subjectWrapper);
+    homeData.setSubjects(subjectList);
+    
+    // 4. 每日励志语录（可扩展为随机或按日期）
+    HomePageDataDTO.DailyQuote quote = new HomePageDataDTO.DailyQuote();
+    quote.setContent("不积跬步，无以至千里...");
+    quote.setAuthor("荀子");
+    homeData.setDailyQuote(quote);
+    
+    // 5. 个性化推荐（后续可基于算法实现）
+    homeData.setRecommendations(new ArrayList<>());
+    
+    return homeData;
+}
+```
+
+#### UserController.java
+
+```java
+@GetMapping("/homeData/{userId}")
+@Operation(summary = "获取用户首页数据")
+public Result getHomePageData(
+        @Parameter(description = "用户ID", required = true) 
+        @PathVariable Long userId) {
+    var homeData = userService.getHomePageData(userId);
+    if (homeData == null) {
+        return Result.error("用户不存在");
+    }
+    return Result.success(homeData);
+}
+```
+
+### 14.5 前端实现
+
+#### API 调用 (user.js)
+
+```javascript
+// 获取用户首页数据
+export function getHomePageDataApi(userId) {
+    return request({
+        url: `/user/homeData/${userId}`,
+        method: 'get'
+    })
+}
+```
+
+#### Home.vue 数据获取
+
+```javascript
+import { getHomePageDataApi } from '@/api/user'
+import { ElMessage } from 'element-plus'
+
+// 获取首页数据
+const fetchHomePageData = async () => {
+    try {
+        const userId = localStorage.getItem('userId')
+        if (!userId) {
+            ElMessage.error('未登录，请先登录')
+            router.push('/login')
+            return
+        }
+
+        const res = await getHomePageDataApi(userId)
+        if (res.code === 200) {
+            const data = res.data
+            
+            // 更新用户信息
+            if (data.userInfo) {
+                userInfo.value = data.userInfo
+            }
+            
+            // 更新学习统计
+            if (data.studyStats) {
+                stats.value.questionsDone = data.studyStats.questionsDone || 0
+                stats.value.studyTime = data.studyStats.todayStudyTime || 0
+                stats.value.accuracy = data.studyStats.accuracy || 0
+                stats.value.mistakes = data.studyStats.mistakesCount || 0
+                
+                userStats.value.questionsDone = data.studyStats.questionsDone || 0
+                userStats.value.accuracy = data.studyStats.accuracy || 0
+                userStats.value.studyHours = data.studyStats.totalStudyHours || 0
+            }
+            
+            // 更新考试科目
+            if (data.subjects && data.subjects.length > 0) {
+                examSubjects.value = data.subjects
+            }
+            
+            // 更新每日语录
+            if (data.dailyQuote) {
+                dailyQuote.value = data.dailyQuote
+            }
+        }
+    } catch (error) {
+        console.error('获取首页数据失败:', error)
+        ElMessage.error('获取首页数据失败')
+    }
+}
+
+// 组件挂载时获取数据
+onMounted(() => {
+    fetchHomePageData()
+    // ... 其他初始化逻辑
+})
+```
+
+### 14.6 数据初始化改进
+
+**改进前** (静态硬编码):
+
+```javascript
+const stats = ref({
+    questionsDone: 128,
+    studyTime: 2.5,
+    accuracy: 78,
+    mistakes: 26
+})
+```
+
+**改进后** (动态获取):
+
+```javascript
+const stats = ref({ 
+    questionsDone: 0, 
+    studyTime: 0, 
+    accuracy: 0, 
+    mistakes: 0 
+})
+
+// 通过 fetchHomePageData() 从后端获取真实数据
+```
+
+### 14.7 性能优化
+
+1. **单次请求替代多次请求**
+   - 改进前: 需要 5 次独立请求 (用户信息、统计、科目、语录、推荐)
+   - 改进后: 1 次请求获取所有数据
+
+2. **减少网络开销**
+   - 降低 HTTP 请求头和数据传输开销
+   - 减少前端等待时间
+
+3. **数据一致性**
+   - 确保所有数据来自同一时间点
+   - 避免多次请求间的数据变化
+
+### 14.8 扩展建议
+
+1. **每日励志语录**
+   - 创建 `tb_daily_quote` 表
+   - 根据日期随机选择或按日期匹配
+   - 支持管理员上传自定义语录
+
+2. **个性化推荐**
+   - 基于错题记录推荐薄弱知识点题目
+   - 基于学习进度推荐下一步练习
+   - 协同过滤推荐相似用户的学习路径
+
+3. **学习时长统计**
+   - 在 `UserProgress` 表添加 `study_duration` 字段
+   - 记录每次学习的实际时长
+   - 实现精确的学习时间统计
+
+4. **连续打卡**
+   - 创建 `tb_check_in` 表
+   - 记录每日打卡记录
+   - 计算连续打卡天数
+
+5. **数据缓存**
+   - 对首页数据进行 Redis 缓存
+   - 设置合理的过期时间（如 5 分钟）
+   - 用户提交答题后清除缓存
+
+### 14.9 测试用例
+
+```javascript
+// 测试用例 1: 正常获取首页数据
+test('should fetch home page data successfully', async () => {
+    const userId = 1
+    const res = await getHomePageDataApi(userId)
+    expect(res.code).toBe(200)
+    expect(res.data.userInfo).toBeDefined()
+    expect(res.data.studyStats).toBeDefined()
+    expect(res.data.subjects).toBeInstanceOf(Array)
+})
+
+// 测试用例 2: 用户不存在
+test('should return error for non-existent user', async () => {
+    const userId = 99999
+    const res = await getHomePageDataApi(userId)
+    expect(res.code).toBe(500)
+    expect(res.msg).toContain('用户不存在')
+})
+```
+
+---
+
+**文档更新日期**: 2026-01-10  
+**更新内容**: 新增第14章 - 首页数据接口文档，包含DTO设计、API接口、前后端实现和扩展建议

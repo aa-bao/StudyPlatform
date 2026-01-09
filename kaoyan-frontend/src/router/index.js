@@ -11,16 +11,17 @@ const routes = [
     path: '/login',
     component: () => import('@/views/Login.vue')
   },
-  // 沉浸式模考页
-  {
-    path: '/exam/start',
-    component: () => import('@/views/quiz/MockExamView.vue')
-  },
   // 用户端
   {
     path: '/user',
     component: () => import('@/views/layout/UserLayout.vue'),
-    children: [{
+    children: [
+      {
+        // 首页
+        path: 'home',
+        component: () => import('@/views/Home.vue')
+      },
+      {
       // 备考面板
         path: 'dashboard',
         component: () => import('@/views/Dashboard.vue')
@@ -51,12 +52,17 @@ const routes = [
         path: 'topic-drill',
         component: () => import('@/views/quiz/TopicDrill.vue')
       },
-      // 真题模考
-      {
-        path: 'mock-exam',
-        component: () => import('@/views/quiz/MockExam.vue'),
-        meta: { hideLayout: true } 
-      },
+      // 套卷刷题列表
+       {
+         path: 'paper-list',
+         component: () => import('@/views/PaperList.vue')
+       },
+      // 沉浸式套卷刷题页面
+       {
+         path: 'mock-exam',
+         component: () => import('@/views/quiz/MockExam.vue'),
+         meta: { hideLayout: true }
+       },
     ]
   },
 

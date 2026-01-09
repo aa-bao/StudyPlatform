@@ -1,6 +1,7 @@
 <template>
     <div class="layout-wrapper">
         <el-container class="full-height">
+            <!-- 侧边栏 -->
             <el-aside v-if="!route.meta.hideLayout" 
             :width="isCollapse ? '64px' : '240px'" class="aside-menu">
                 <div class="logo-box">
@@ -18,6 +19,13 @@
                 <el-menu :default-active="activeMenu" router :collapse="isCollapse" class="el-menu-vertical custom-menu"
                     text-color="#606266" active-text-color="#409EFF">
 
+                    <el-menu-item index="/user/home">
+                        <el-icon>
+                            <img :src="homeIcon" class="menu-icon-svg" />
+                        </el-icon>
+                        <template #title>主页</template>
+                    </el-menu-item>
+
                     <el-menu-item index="/user/dashboard">
                         <el-icon>
                             <img :src="dashboardIcon" class="menu-icon-svg" />
@@ -29,7 +37,14 @@
                         <el-icon>
                             <img :src="singlePracticeIcon" class="menu-icon-svg" />
                         </el-icon>
-                        <template #title>开始刷题</template>
+                        <template #title>开始学习</template>
+                    </el-menu-item>
+
+                    <el-menu-item index="/user/paper-list">
+                        <el-icon>
+                            <img :src="mockExamIcon" class="menu-icon-svg" />
+                        </el-icon>
+                        <template #title>套卷模考</template>
                     </el-menu-item>
 
                     <el-menu-item index="/user/correction-notebook">
@@ -108,6 +123,7 @@ import singlePracticeIcon from '@/assets/icons/single-practice.svg?url'
 import topicDrillIcon from '@/assets/icons/topic-drill.svg?url'
 import mockExamIcon from '@/assets/icons/mock-exam.svg?url'
 import correctionNotebookIcon from '@/assets/icons/correction-notebook.svg?url'
+import homeIcon from '@/assets/icons/home.svg?url'
 
 const router = useRouter()
 const route = useRoute();
@@ -155,11 +171,14 @@ const handleLogout = () => {
 
 </script>
 
+<!-- 只需要替换 <style scoped> 部分 -->
+
 <style scoped>
 .layout-wrapper {
     height: 100vh;
     width: 100vw;
     overflow: hidden;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
 }
 
 .full-height {
@@ -173,12 +192,13 @@ const handleLogout = () => {
     flex-direction: column;
 }
 
-/* 侧边栏美化 */
+/* 侧边栏 */
 .aside-menu {
-    background-color: #fff;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
     height: 100vh;
-    border-right: 1px solid #e6e6e6 !important;
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    border-right: 1px solid rgba(229, 231, 235, 0.5) !important;
+    box-shadow: 2px 0 15px rgba(0, 0, 0, 0.05);
     transition: width 0.3s cubic-bezier(0.2, 0, 0, 1);
     overflow: hidden;
     z-index: 10;
@@ -191,9 +211,8 @@ const handleLogout = () => {
     display: flex;
     align-items: center;
     padding-left: 20px;
-    background: #fff;
-    border-bottom: 1px solid #e6e6e6;
-    box-shadow: none;
+    background: rgba(255, 255, 255, 0.6);
+    border-bottom: 1px solid rgba(229, 231, 235, 0.5);
     overflow: hidden;
     white-space: nowrap;
 }
@@ -206,20 +225,21 @@ const handleLogout = () => {
     height: 24px;
     cursor: pointer;
     margin-right: 12px;
-    color: #606266;
+    color: #6b7280;
     transition: all 0.3s;
 }
 
 .sidebar-toggle:hover {
-    color: #409EFF;
+    color: #3b82f6;
     transform: scale(1.1);
 }
 
 .logo-text {
-    color: #303133;
+    background: linear-gradient(to right, #1f2937, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     font-size: 18px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    font-weight: 700;
     white-space: nowrap;
 }
 
@@ -227,7 +247,7 @@ const handleLogout = () => {
 .custom-menu {
     border-right: none;
     padding-top: 10px;
-    background-color: transparent;
+    background: transparent;
 }
 
 .el-menu-vertical:not(.el-menu--collapse) {
@@ -238,22 +258,21 @@ const handleLogout = () => {
     margin: 4px 10px;
     height: 48px;
     line-height: 48px;
-    border-radius: 6px;
-    color: #606266 !important;
+    border-radius: 8px;
+    color: #6b7280 !important;
     transition: all 0.2s;
 }
 
 :deep(.el-menu-item:hover) {
-    background-color: #ecf5ff !important;
-    color: #409EFF !important;
+    background: rgba(59, 130, 246, 0.1) !important;
+    color: #3b82f6 !important;
 }
 
 :deep(.el-menu-item.is-active) {
-    background-color: #e6f7ff !important;
-    color: #1890ff !important;
-    font-weight: 500;
+    background: rgba(59, 130, 246, 0.15) !important;
+    color: #3b82f6 !important;
+    font-weight: 600;
     position: relative;
-    box-shadow: none;
 }
 
 :deep(.el-menu-item.is-active)::after {
@@ -263,29 +282,18 @@ const handleLogout = () => {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: #1890ff;
+    background: #3b82f6;
     border-radius: 2px 0 0 2px;
-}
-
-:deep(.el-menu-item .el-icon) {
-    font-size: 18px;
-    margin-right: 10px;
-    color: inherit;
 }
 
 /* 菜单图标 SVG 样式 */
 .menu-icon-svg {
     width: 1em;
     height: 1em;
-    /* 
-       利用 filter 实现颜色动态变化：
-       初始状态：黑色图标 -> 转为深灰色 (#606266)
-    */
     filter: invert(41%) sepia(5%) saturate(542%) hue-rotate(182deg) brightness(91%) contrast(87%);
     transition: all 0.2s;
 }
 
-/* 选中或悬停时：变为主题蓝 (#409EFF) */
 :deep(.el-menu-item:hover) .menu-icon-svg,
 :deep(.el-menu-item.is-active) .menu-icon-svg {
     filter: invert(53%) sepia(96%) saturate(3089%) hue-rotate(196deg) brightness(100%) contrast(101%);
@@ -295,69 +303,49 @@ const handleLogout = () => {
 :deep(.el-menu--collapse .el-menu-item) {
     justify-content: center;
     margin: 4px 0 !important;
-    /* 移除水平 margin */
     padding: 0 !important;
-    /* 移除默认 padding */
     width: 100%;
-    /* 占满宽度 */
 }
 
 :deep(.el-menu--collapse .el-menu-item .el-icon) {
     margin-right: 0;
     text-align: center;
-    /* 确保图标内部也居中 */
     vertical-align: middle;
-}
-
-:deep(.el-menu--collapse .el-tooltip__trigger) {
-    justify-content: center;
-    padding: 0 !important;
 }
 
 .menu-divider {
     height: 1px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(229, 231, 235, 0.5);
     margin: 20px 20px;
 }
 
 .admin-entry {
-    color: #e6a23c !important;
-    border: 1px dashed rgba(230, 162, 60, 0.3);
+    color: #f59e0b !important;
+    border: 1px dashed rgba(245, 158, 11, 0.3);
 }
 
 .admin-entry:hover {
-    background-color: rgba(230, 162, 60, 0.1) !important;
-    border-color: #e6a23c;
+    background: rgba(245, 158, 11, 0.1) !important;
+    border-color: #f59e0b;
 }
 
 /* 顶部栏美化 */
 .header-bar {
-    background: #fff;
-    border-bottom: 1px solid #e6e6e6;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(229, 231, 235, 0.5);
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
     z-index: 9;
     flex-shrink: 0;
 }
 
-.header-left {
-    display: flex;
-    align-items: center;
-}
-
 .breadcrumb-text {
     font-size: 16px;
-    color: #303133;
+    color: #1f2937;
     font-weight: 500;
-    letter-spacing: 0.5px;
-}
-
-.header-right {
-    display: flex;
-    align-items: center;
 }
 
 .user-info {
@@ -366,39 +354,32 @@ const handleLogout = () => {
     cursor: pointer;
     padding: 4px 8px;
     border-radius: 40px;
-    transition: background 0.3s;
+    transition: all 0.3s;
     border: 1px solid transparent;
 }
 
 .user-info:hover {
-    background: #f7f8fa;
-    border-color: #e6e6e6;
+    background: rgba(255, 255, 255, 0.5);
+    border-color: rgba(229, 231, 235, 0.5);
 }
 
 .user-name {
     font-size: 14px;
-    color: #606266;
+    color: #6b7280;
     margin: 0 10px;
     font-weight: 500;
 }
 
 /* 内容区 */
 .content-main {
-    background-color: #f0f2f5;
+    background: transparent;
     padding: 0;
-    /* 移除默认内边距，由各个页面自己控制 */
     overflow-y: auto;
     flex: 1;
 }
 
-/* 隐藏了布局，去掉 main 区域的默认边距或背景限制 */
 .no-padding {
     padding: 0 !important;
-    background-color: #f0f2f5;
-}
-
-.full-height {
-    height: 100vh;
 }
 
 /* 路由切换动画 */
@@ -417,7 +398,6 @@ const handleLogout = () => {
     transform: translateX(20px);
 }
 
-/* 简单的淡入淡出 */
 .fade-enter-active,
 .fade-leave-active {
     transition: opacity 0.3s ease;

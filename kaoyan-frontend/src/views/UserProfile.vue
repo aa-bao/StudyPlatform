@@ -13,7 +13,7 @@
                 :on-change="handleAvatarChange">
                 <div class="avatar-wrapper">
                   <el-avatar :size="100" class="user-avatar"
-                    :src="userInfo.avatar || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'" />
+                    :src="userInfo.avatar || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png '" />
                   <div class="avatar-mask">
                     <el-icon class="camera-icon">
                       <Camera />
@@ -81,10 +81,8 @@
           <el-card class="settings-card animate-card">
             <template #header>
               <div class="card-header">
-                <div class="header-left">
-                  <span class="header-title">个人设置</span>
-                  <span class="header-desc">完善个人信息，定制专属复习计划</span>
-                </div>
+                <span class="header-title">个人设置</span>
+                <span class="header-desc">完善个人信息，定制专属复习计划</span>
               </div>
             </template>
 
@@ -190,32 +188,33 @@
         <!-- 右侧统计面板 -->
         <el-col :xs="24" :sm="6" :md="6" :lg="8" class="right-col">
           <div class="stats-column">
-            <div class="stat-card-vertical">
+            <!-- 统计卡片 -->
+            <div class="stat-card-vertical stat-gradient-blue">
               <div class="stat-icon-v icon-blue"><el-icon>
                   <Timer />
                 </el-icon></div>
               <div class="stat-info-v">
-                <div class="stat-value-v">126</div>
+                <div class="stat-value-v color-blue">126</div>
                 <div class="stat-label-v">累计学习(小时)</div>
               </div>
             </div>
 
-            <div class="stat-card-vertical">
+            <div class="stat-card-vertical stat-gradient-green">
               <div class="stat-icon-v icon-green"><el-icon>
                   <Collection />
                 </el-icon></div>
               <div class="stat-info-v">
-                <div class="stat-value-v">382</div>
+                <div class="stat-value-v color-green">382</div>
                 <div class="stat-label-v">刷题数量(道)</div>
               </div>
             </div>
 
-            <div class="stat-card-vertical">
+            <div class="stat-card-vertical stat-gradient-orange">
               <div class="stat-icon-v icon-orange"><el-icon>
                   <Trophy />
                 </el-icon></div>
               <div class="stat-info-v">
-                <div class="stat-value-v">78%</div>
+                <div class="stat-value-v color-orange">78%</div>
                 <div class="stat-label-v">平均正确率</div>
               </div>
             </div>
@@ -335,6 +334,12 @@ const daysToExam = computed(() => {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 })
 
+// 计算颜色类名
+const getColorClass = (value) => {
+  const colors = ['color-blue', 'color-green', 'color-orange']
+  return colors[value % colors.length]
+}
+
 // 4. 加载数据逻辑
 const loadUserData = () => {
   const userStr = localStorage.getItem('user') || localStorage.getItem('userInfo')
@@ -354,6 +359,17 @@ const loadUserData = () => {
 }
 
 onMounted(loadUserData)
+
+// 目标设置表单
+const miniForm = reactive({
+  targetSchool: '',
+  targetScore: 370
+})
+
+// 近期目标复选框
+const memo1 = ref(true)
+const memo2 = ref(false)
+const memo3 = ref(false)
 
 // 5. 修改基本资料
 const handleUpdateInfo = async () => {
@@ -450,10 +466,10 @@ const handleChangePassword = async () => {
 </script>
 
 <style scoped>
-/* 容器布局 */
+/* 整体布局 */
 .profile-container {
   min-height: 100vh;
-  background-color: transparent;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
   padding: 20px;
 }
 
@@ -462,266 +478,34 @@ const handleChangePassword = async () => {
   margin: 0 auto;
 }
 
-/* 统计卡片 */
-.stat-row {
-  margin-bottom: 20px;
-}
-
-.stat-card-vertical {
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 18px;
-  padding: 22px;
-  margin-bottom: 18px;
-  display: flex;
-  align-items: center;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
-}
-
-.stat-icon-v {
-  width: 50px;
-  height: 50px;
-  border-radius: 15px;
-  box-shadow: 0 5px 15px -3px currentColor;
-  /* 让图标带点发光感 */
-}
-
-.stat-value-v {
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -1px;
-}
-
-/* 备考便签美化：像便利贴一样 */
-.memo-card {
-  margin-top: 25px;
-  background: linear-gradient(135deg, #fffcf0 0%, #fffef9 100%) !important;
-  border: 1px solid #f9f2d0 !important;
-}
-
-.memo-header {
-  padding: 15px 20px;
-  color: #856404;
-  font-weight: 700;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.memo-item {
-  padding: 10px 20px;
-}
-
-
-.stat-gradient-blue {
-  background: linear-gradient(135deg, #e6f7ff 0%, #ffffff 100%);
-  border: 1px solid #bae7ff;
-}
-
-.stat-gradient-green {
-  background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
-  border: 1px solid #d9f7be;
-}
-
-.stat-gradient-orange {
-  background: linear-gradient(135deg, #fff7e6 0%, #ffffff 100%);
-  border: 1px solid #ffe7ba;
-}
-
-.stat-card-vertical:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-}
-
-.icon-blue {
-  background: #e6f7ff;
-  color: #1890ff;
-}
-
-.icon-green {
-  background: #f6ffed;
-  color: #52c41a;
-}
-
-.icon-orange {
-  background: #fff7e6;
-  color: #fa8c16;
-}
-
-.stat-icon-v {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 26px;
-  margin-right: 18px;
-}
-
-.stat-gradient-blue .stat-icon-v {
-  color: #1890ff;
-}
-
-.stat-gradient-green .stat-icon-v {
-  color: #52c41a;
-}
-
-.stat-gradient-orange .stat-icon-v {
-  color: #fa8c16;
-}
-
-.stat-info-v {
-  flex: 1;
-}
-
-.stat-value-v {
-  font-size: 24px;
-  font-weight: 700;
-  color: #303133;
-  line-height: 1.2;
-}
-
-.stat-value-v .unit {
-  font-size: 14px;
-  font-weight: 400;
-  color: #909399;
-  margin-left: 2px;
-}
-
-.stat-label-v {
-  font-size: 13px;
-  color: #606266;
-  margin-top: 4px;
-}
-
-/* 目标设置卡片美化 */
-.goals-setting-card {
-  margin-top: 24px;
-  border-radius: 12px;
-  border: none;
-}
-
-.card-header-small {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #f0f0f0;
-  margin-bottom: 0;
-}
-
-.card-header-small .title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.target-form-mini {
-  padding-top: 5px;
-}
-
-.form-item-mini {
-  margin-bottom: 15px;
-}
-
-.form-item-mini .label {
-  font-size: 13px;
-  color: #606266;
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-
-.school-input :deep(.el-input__wrapper) {
-  background-color: #f5f7fa;
-  box-shadow: none !important;
-  border: 1px solid #e4e7ed;
-}
-
-.school-input :deep(.el-input__wrapper.is-focus) {
-  border-color: #409eff;
-  background-color: #fff;
-}
-
-.score-input-wrapper-single {
-  background: #fff0f0;
-  border: 1px solid #fde2e2;
-  border-radius: 8px;
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mini-input-large :deep(.el-input__wrapper) {
-  padding: 0;
-  box-shadow: none !important;
-  background: transparent;
-}
-
-.mini-input-large :deep(.el-input__inner) {
-  text-align: center;
-  font-weight: 700;
-  color: #f56c6c;
-  font-size: 24px;
-  height: 32px;
-  line-height: 32px;
-}
-
-.unit {
-  color: #f56c6c;
-  font-size: 14px;
-  margin-left: 4px;
-  font-weight: 500;
-}
-
-/* 页面标题 */
-.page-header {
-  margin-bottom: 15px;
-  padding-top: 15px;
-}
-
-.page-title {
-  font-size: 24px;
-  color: #303133;
-  font-weight: 600;
-  margin: 0 0 8px;
-}
-
-.page-subtitle {
-  font-size: 14px;
-  color: #909399;
-  margin: 0;
-}
-
-/* 卡片通用动画 */
+/* 卡片通用样式 */
 .animate-card {
   transition: all 0.3s ease;
-  border: none;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  border-radius: 14px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(229, 231, 235, 0.3);
+  overflow: hidden;
 }
 
 .animate-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
 }
 
-/* 左侧卡片 */
+/* 左侧用户卡片 */
 .user-card {
-  text-align: center;
-  background: #fff;
-  overflow: hidden;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
 }
 
 .user-card-top {
   padding: 40px 20px 30px;
-  background: linear-gradient(180deg, hsl(100, 53%, 90%) 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #e6f7ff 0%, rgba(255, 255, 255, 0.9) 100%);
   position: relative;
-  border-bottom: 1px solid #f5f7fa;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .role-badge {
@@ -729,19 +513,19 @@ const handleChangePassword = async () => {
   top: 15px;
   right: 15px;
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
 }
 
 .role-badge.admin {
-  background: #fef0f0;
-  color: #f56c6c;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
 }
 
 .role-badge:not(.admin) {
-  background: #ecf5ff;
-  color: #409eff;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
 }
 
 .avatar-wrapper {
@@ -751,7 +535,7 @@ const handleChangePassword = async () => {
   margin: 0 auto 15px;
   cursor: pointer;
   border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s;
 }
 
@@ -782,7 +566,6 @@ const handleChangePassword = async () => {
 
 .camera-icon {
   font-size: 20px;
-  margin-bottom: 2px;
 }
 
 .upload-text {
@@ -791,13 +574,13 @@ const handleChangePassword = async () => {
 
 .user-name {
   font-size: 20px;
-  color: #303133;
+  color: #1f2937;
   margin: 10px 0 5px;
   font-weight: 600;
 }
 
 .user-slogan {
-  color: #909399;
+  color: #6b7280;
   font-size: 13px;
   margin: 0 0 15px;
 }
@@ -806,8 +589,8 @@ const handleChangePassword = async () => {
 .countdown-badge {
   display: inline-flex;
   align-items: baseline;
-  background: #fff0f0;
-  color: #f56c6c;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
   padding: 4px 12px;
   border-radius: 20px;
   margin-top: 5px;
@@ -835,7 +618,7 @@ const handleChangePassword = async () => {
   align-items: center;
   margin-bottom: 15px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #f5f7fa;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.5);
   font-size: 14px;
 }
 
@@ -846,11 +629,11 @@ const handleChangePassword = async () => {
 }
 
 .bio-item .label {
-  color: #909399;
+  color: #6b7280;
 }
 
 .bio-item .value {
-  color: #303133;
+  color: #1f2937;
   font-weight: 500;
 }
 
@@ -863,43 +646,75 @@ const handleChangePassword = async () => {
   flex: 1;
 }
 
-:deep(.el-card__header) {
-  border-bottom: none;
-  padding-bottom: 0;
+/* 近期目标卡片 */
+.memo-card {
+  margin-top: 20px;
+  background: linear-gradient(135deg, #fffef0 0%, #ffffff 100%) !important;
+  border: 1px solid #f9f2d0 !important;
+}
+
+.memo-header {
+  padding: 15px 20px;
+  color: #854d0e;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.memo-title {
+  font-size: 16px;
+}
+
+.memo-icon {
+  color: #f59e0b;
+}
+
+.memo-list {
+  padding: 0 20px 20px;
+}
+
+.memo-item {
+  padding: 8px 0;
+}
+
+/* 中间设置面板 */
+.settings-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
 }
 
 .card-header {
-  border-bottom: 1px solid #f0f0f0;
-  padding-bottom: 15px;
+  display: flex;
+  flex-direction: column;
 }
 
 .header-title {
   font-size: 18px;
   font-weight: 600;
-  color: #303133;
+  color: #1f2937;
 }
 
 .header-desc {
   font-size: 13px;
-  color: #999;
-  margin-left: 10px;
+  color: #6b7280;
 }
 
 /* 自定义Tabs */
 :deep(.el-tabs__nav-wrap::after) {
   height: 1px;
-  background-color: #f0f0f0;
+  background-color: rgba(229, 231, 235, 0.5);
 }
 
 :deep(.el-tabs__item) {
   font-size: 15px;
   height: 45px;
   line-height: 45px;
-  color: #606266;
+  color: #6b7280;
 }
 
 :deep(.el-tabs__item.is-active) {
-  color: #409eff;
+  color: #3b82f6;
   font-weight: 600;
 }
 
@@ -911,7 +726,11 @@ const handleChangePassword = async () => {
   max-width: 400px;
 }
 
-/* 输入框和卡片统一宽度 */
+/* 表单样式 */
+.profile-form {
+  margin-top: 10px;
+}
+
 .profile-form :deep(.el-input),
 .profile-form :deep(.el-select) {
   width: 100%;
@@ -921,21 +740,21 @@ const handleChangePassword = async () => {
   width: 100%;
   height: 48px;
   font-size: 16px;
-  background: linear-gradient(90deg, #409eff, #36cfc9);
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
   border: none;
-  box-shadow: 0 4px 14px rgba(64, 158, 255, 0.4);
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
   transition: all 0.3s;
 }
 
 .submit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.6);
-  background: linear-gradient(90deg, #66b1ff, #5cdbd3);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
+/* 科目选择卡片 */
 .subject-selection-card {
-  background: #fcfcfc;
-  border: 1px solid #ebeef5;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(229, 231, 235, 0.5);
   border-radius: 8px;
   padding: 0;
   overflow: hidden;
@@ -943,57 +762,38 @@ const handleChangePassword = async () => {
 }
 
 .subject-selection-card:hover {
-  border-color: #c0c4cc;
+  border-color: rgba(191, 219, 254, 0.7);
 }
 
-/* 标签页美化 */
-:deep(.el-tabs__item.is-active) {
-  font-size: 16px;
-  color: #409eff;
-  position: relative;
-}
-
-:deep(.el-tabs__item.is-active)::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 3px;
-  background: #409eff;
-  border-radius: 2px;
-}
-
-:deep(.el-tabs__active-bar) {
-  display: none;
-}
-
-/* 复原科目选择卡片内部样式 */
 .subject-group {
   padding: 15px 20px;
-  display: flex;
-  flex-direction: column;
 }
 
 .group-title {
   font-size: 12px;
-  color: #909399;
+  color: #6b7280;
   margin-bottom: 10px;
   font-weight: 600;
   text-transform: uppercase;
 }
 
+.group-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .subject-divider {
   height: 1px;
-  background: #ebeef5;
+  background: rgba(229, 231, 235, 0.5);
   margin: 0;
 }
 
 .fixed-subject {
   margin-right: 0 !important;
   width: 100%;
-  background-color: #f2f6fc;
+  background-color: #f9fafb;
+  border-color: #e5e7eb !important;
 }
 
 :deep(.el-radio),
@@ -1006,13 +806,13 @@ const handleChangePassword = async () => {
 :deep(.el-radio.is-bordered),
 :deep(.el-checkbox.is-bordered) {
   padding: 0 15px;
-  border-radius: 4px;
-  border-color: #dcdfe6;
+  border-radius: 8px;
+  border-color: #d1d5db;
 }
 
 :deep(.el-radio.is-bordered.is-checked) {
-  background-color: #ecf5ff;
-  border-color: #409eff;
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
 }
 
 .form-actions {
@@ -1020,14 +820,187 @@ const handleChangePassword = async () => {
   text-align: left;
 }
 
+/* 右侧统计面板 */
+.right-col {
+  padding-left: 10px;
+}
+
+.stats-column {
+  margin-top: 0;
+}
+
+/* 统计卡片样式 */
+.stat-card-vertical {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(229, 231, 235, 0.3);
+}
+
+.stat-card-vertical:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.1);
+}
+
+.stat-gradient-blue {
+  background: linear-gradient(135deg, #e6f7ff 0%, rgba(255, 255, 255, 0.9) 100%);
+  border: 1px solid #bae7ff;
+}
+
+.stat-gradient-green {
+  background: linear-gradient(135deg, #f6ffed 0%, rgba(255, 255, 255, 0.9) 100%);
+  border: 1px solid #d9f7be;
+}
+
+.stat-gradient-orange {
+  background: linear-gradient(135deg, #fff7e6 0%, rgba(255, 255, 255, 0.9) 100%);
+  border: 1px solid #ffe7ba;
+}
+
+.stat-icon-v {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  margin-right: 18px;
+  flex-shrink: 0;
+  box-shadow: 0 5px 15px -3px currentColor;
+}
+
+.icon-blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.icon-green {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.icon-orange {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.stat-info-v {
+  flex: 1;
+}
+
+.stat-value-v {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #1f2937;
+}
+
+.stat-label-v {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+/* 目标设置卡片 */
+.goals-setting-card {
+  margin-top: 20px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
+}
+
+.goal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.5);
+}
+
+.goal-header .title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.target-form-mini {
+  padding: 20px;
+}
+
+.form-item-mini {
+  margin-bottom: 16px;
+}
+
+.form-item-mini .label {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.school-input :deep(.el-input__wrapper) {
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: none !important;
+  border: 1px solid rgba(229, 231, 235, 0.5);
+}
+
+.school-input :deep(.el-input__wrapper.is-focus) {
+  border-color: #3b82f6;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.score-input-wrapper-single {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-input-large :deep(.el-input__wrapper) {
+  padding: 0;
+  box-shadow: none !important;
+  background: transparent;
+}
+
+.mini-input-large :deep(.el-input__inner) {
+  text-align: center;
+  font-weight: 700;
+  color: #ef4444;
+  font-size: 24px;
+  height: 40px;
+  line-height: 40px;
+}
+
+.unit {
+  color: #ef4444;
+  font-size: 14px;
+  margin-left: 4px;
+  font-weight: 500;
+}
+
 /* 响应式调整 */
 @media (max-width: 768px) {
-  .profile-content {
-    padding: 20px 15px;
+  .profile-container {
+    padding: 15px;
   }
 
   .left-col {
     margin-bottom: 20px;
+  }
+
+  .right-col {
+    padding-left: 0;
+    margin-top: 20px;
   }
 
   .submit-btn {
@@ -1037,6 +1010,17 @@ const handleChangePassword = async () => {
   :deep(.el-radio.is-bordered) {
     width: 100%;
     margin-right: 0;
+    margin-bottom: 8px;
+  }
+
+  .group-content {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 900px) {
+  .center-col {
+    margin-bottom: 20px;
   }
 }
 </style>

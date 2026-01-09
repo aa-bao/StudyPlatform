@@ -18,7 +18,7 @@ export function registerApi(data) {
     })
 }
 
-// 更新基本信息
+// 更新个人信息
 export function updateUserApi(data) {
     return request({
         url: '/user/update',
@@ -52,6 +52,14 @@ export function uploadAvatarApi(formData) {
 export function getUserInfoApi() {
     return request({
         url: '/user/info',
+        method: 'get'
+    })
+}
+
+// 获取用户首页数据
+export function getHomePageDataApi(userId) {
+    return request({
+        url: `/user/homeData/${userId}`,
         method: 'get'
     })
 }

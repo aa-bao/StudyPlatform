@@ -11,6 +11,7 @@ import org.example.kaoyanplatform.entity.Subject;
 import org.example.kaoyanplatform.entity.User;
 import org.example.kaoyanplatform.entity.UserProgress;
 import org.example.kaoyanplatform.entity.dto.UserStudyStatsDTO;
+import org.example.kaoyanplatform.entity.dto.HomePageDataDTO;
 import org.example.kaoyanplatform.mapper.MapQuestionSubjectMapper;
 import org.example.kaoyanplatform.mapper.SubjectMapper;
 import org.example.kaoyanplatform.mapper.UserMapper;
@@ -199,4 +200,89 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                         map -> ((Number) map.get("count")).intValue()
                 ));
     }
+
+
+    @Override
+    public HomePageDataDTO getHomePageData(Long userId) {
+        HomePageDataDTO homeData = new HomePageDataDTO();
+
+        // 1. 获取用户基本信息
+        User user = getById(userId);
+        if (user == null) {
+            return null;
+        }
+
+        HomePageDataDTO.UserInfo userInfo = new HomePageDataDTO.UserInfo();
+        userInfo.setId(user.getId());
+        userInfo.setUsername(user.getUsername());
+        userInfo.setNickname(user.getNickname());
+        userInfo.setAvatar(user.getAvatar());
+        userInfo.setRole(user.getRole());
+        userInfo.setTargetSchool(user.getTargetSchool());
+        userInfo.setTargetTotalScore(user.getTargetTotalScore());
+        userInfo.setExamYear(user.getExamYear());
+        userInfo.setExamDate("2025-12-20"); // 默认考试日期
+        userInfo.setExamSubjects(user.getExamSubjects());
+        homeData.setUserInfo(userInfo);
+
+        // 2. 获取学习统计数据
+        HomePageDataDTO.StudyStats stats = new HomePageDataDTO.StudyStats();
+
+        // 获取总刷题数
+        QueryWrapper<UserProgress> progressWrapper = new QueryWrapper<>();
+        progressWrapper.eq("user_id", userId);
+        List<UserProgress> progressList = userProgressMapper.selectList(progressWrapper);
+
+        int totalQuestions = progressList.stream()
+                .mapToInt(p -> p.getFinishedCount() != null ? p.getFinishedCount() : 0)
+                .sum();
+        stats.setQuestionsDone(totalQuestions);
+
+        // 获取总正确数，计算正确率
+        int totalCorrect = progressList.stream()
+                .mapToInt(p -> p.getCorrectCount() != null ? p.getCorrectCount() : 0)
+                .sum();
+        double accuracy = totalQuestions > 0 ? (totalCorrect * 100.0 / totalQuestions) : 0.0;
+        stats.setAccuracy(Math.round(accuracy * 10.0) / 10.0);
+
+        // 获取错题本数量
+        // 这里需要注入MistakeRecordMapper，暂时用模拟数据
+        stats.setMistakesCount(0);
+
+        // 学习时长（暂时用模拟数据，后续可以添加字段）
+        stats.setTodayStudyTime(0.0);
+        stats.setTotalStudyHours(0.0);
+        stats.setConsecutiveDays(0);
+
+        homeData.setStudyStats(stats);
+
+        // 3. 获取科目列表（Level 1 - 考试规格）
+        QueryWrapper<Subject> subjectWrapper = new QueryWrapper<>();
+        subjectWrapper.eq("level", "1");
+        subjectWrapper.orderByAsc("sort");
+        List<Subject> subjects = subjectMapper.selectList(subjectWrapper);
+
+        List<HomePageDataDTO.Subject> subjectList = subjects.stream()
+                .map(s -> {
+                    HomePageDataDTO.Subject dto = new HomePageDataDTO.Subject();
+                    dto.setId(s.getId());
+                    dto.setName(s.getName());
+                    dto.setLevel(Integer.parseInt(s.getLevel()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+        homeData.setSubjects(subjectList);
+
+        // 4. 每日励志语录（暂时硬编码，后续可以做成随机或按日期获取）
+        HomePageDataDTO.DailyQuote quote = new HomePageDataDTO.DailyQuote();
+        quote.setContent("不积跬步，无以至千里；不积小流，无以成江海。");
+        quote.setAuthor("荀子");
+        homeData.setDailyQuote(quote);
+
+        // 5. 个性化推荐（暂时返回空列表，后续可以根据算法实现）
+        homeData.setRecommendations(new ArrayList<>());
+
+        return homeData;
+    }
+
 }

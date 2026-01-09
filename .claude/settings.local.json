@@ -4,7 +4,10 @@
       "Bash(where:*)",
       "Bash(mvn compile:*)",
       "Bash(cat:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(mkdir:*)",
+      "Bash(move PaperExam.vue PaperList.vue)",
+      "Bash(powershell:*)"
     ]
   }
 }
