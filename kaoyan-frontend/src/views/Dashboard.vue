@@ -3,7 +3,8 @@
         <!-- 顶部筛选区域 -->
         <div class="dashboard-header">
             <div class="welcome-section">
-                <h1>数据看板 <span class="subtitle">学习数据全景分析</span></h1>
+                <h1>数据看板 </h1>
+                <span class="subtitle">学习数据全景分析</span>
                 <p class="last-update">最后更新: {{ lastUpdateTime }}</p>
             </div>
 
@@ -16,7 +17,10 @@
                         :value="subject.id" />
                 </el-select>
                 <el-button type="primary" @click="exportReport">
-                    <el-icon name="Download" /> 导出学习报告
+                    <el-icon :size="24">
+                        <Download />
+                    </el-icon>
+                    导出学习报告
                 </el-button>
             </div>
         </div>
@@ -1048,16 +1052,19 @@ onMounted(async () => {
 }
 
 .welcome-section {
+    display: flex;
+    flex-direction: column;
     position: relative;
     z-index: 1;
     max-width: 650px;
+    gap: 8px;
 }
 
 .welcome-section h1 {
-    font-size: 32px;
+    font-size: 45px;
     font-weight: 800;
     margin: 0 0 10px;
-    background: linear-gradient(to right, #1a365d, #2c5282, #409eff);
+    background: linear-gradient(to right, #3a6197, #4a92da);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     position: relative;
@@ -1068,7 +1075,6 @@ onMounted(async () => {
     font-size: 18px;
     color: #4a5568;
     font-weight: 500;
-    margin-left: 8px;
 }
 
 .last-update {

@@ -19,7 +19,8 @@ const routes = [
       {
         // 首页
         path: 'home',
-        component: () => import('@/views/Home.vue')
+        component: () => import('@/views/Home.vue'),
+        meta: { hideLayout: true }
       },
       {
       // 备考面板

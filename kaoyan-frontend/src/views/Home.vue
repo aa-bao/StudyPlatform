@@ -40,38 +40,52 @@
                 <h4>功能导航</h4>
                 <el-menu :default-active="$route.path" router class="el-menu-vertical">
                     <el-menu-item index="/user/dashboard">
-                        <el-icon name="House" />
-                        <span>数据看板</span>
+                        <el-icon>
+                            <PieChart />
+                        </el-icon>
+                        <span>备考看板</span>
                     </el-menu-item>
-                    <el-sub-menu index="subjects">
-                        <template #title>
-                            <el-icon name="Reading" />
-                            <span>科目练习</span>
-                        </template>
-                        <el-menu-item v-for="subject in examSubjects" :key="subject.id"
-                            :index="'/subject/' + subject.id">
-                            {{ subject.name }}
-                        </el-menu-item>
-                    </el-sub-menu>
+                    <el-menu-item index="subject">
+                        <el-icon>
+                            <Reading />
+                        </el-icon>
+                        <span>科目练习</span>
+                    </el-menu-item>
                     <el-menu-item index="/user/correction-notebook">
-                        <el-icon name="Failed" />
+                        <el-icon>
+                            <Failed />
+                        </el-icon>
                         <span>错题本</span>
                     </el-menu-item>
                     <el-menu-item index="/user/paper-list">
-                        <el-icon name="Document" />
+                        <el-icon>
+                            <Document />
+                        </el-icon>
                         <span>真题模考</span>
                     </el-menu-item>
                     <el-menu-item index="/user/topic-drill?rootId=1">
-                        <el-icon name="Operation" />
+                        <el-icon>
+                            <Operation />
+                        </el-icon>
                         <span>知识体系树</span>
                     </el-menu-item>
                     <el-menu-item index="/rankings">
-                        <el-icon name="Trophy" />
+                        <el-icon>
+                            <Trophy />
+                        </el-icon>
                         <span>排行榜</span>
                     </el-menu-item>
                     <el-menu-item index="/user/profile">
-                        <el-icon name="User" />
+                        <el-icon>
+                            <User />
+                        </el-icon>
                         <span>个人中心</span>
+                    </el-menu-item>
+                    <el-menu-item index="/user/community">
+                        <el-icon>
+                            <School />
+                        </el-icon>
+                        <span>学习社区</span>
                     </el-menu-item>
                 </el-menu>
             </div>
@@ -91,8 +105,12 @@
             <!-- 顶部欢迎区域 -->
             <div class="dashboard-header">
                 <div class="welcome-section">
-                    <h1>你好，{{ userInfo.nickname }}！今天也要加油哦！</h1>
-                    <p class="target-text">🎯 考研目标：{{ userInfo.target_school }} | {{ userInfo.exam_year }}届</p>
+                    <h1 class="welcome-title">你好，{{ userInfo.nickname }}！今天也要加油哦！</h1>
+                    <p class="target-text">
+                        🎯 考研目标：
+                        <span class="target-school">{{ userInfo.targetSchool }}</span> 
+                        <span class="custom-tag">{{ userInfo.examYear }}</span>
+                    </p>
                     <div class="countdown-badge" v-if="daysLeft >= 0">
                         <span class="countdown-number">{{ daysLeft }}</span> 天后考研
                     </div>
@@ -100,20 +118,22 @@
 
                 <div class="quick-actions">
                     <el-button type="primary" size="large" @click="startPractice" class="action-button">
-                        <el-icon>
-                            <img :src="singlePracticeIcon" class="menu-icon-svg" />
+                        <el-icon :size="18">
+                            <Reading />
                         </el-icon>
                         <span>开始学习</span>
                     </el-button>
+
                     <el-button size="large" @click="viewMistakes" class="action-button">
-                        <el-icon>
-                            <img :src="correctionNotebookIcon" class="menu-icon-svg" />
+                        <el-icon :size="18">
+                            <Failed />
                         </el-icon>
                         <span>查看错题</span>
                     </el-button>
+
                     <el-button size="large" @click="startMockExam" class="action-button">
-                        <el-icon>
-                            <img :src="mockExamIcon" class="menu-icon-svg" />
+                        <el-icon :size="18">
+                            <DocumentChecked />
                         </el-icon>
                         <span>真题模考</span>
                     </el-button>
@@ -122,9 +142,11 @@
 
             <!-- 数据统计卡片 -->
             <div class="stats-overview">
-                <div class="stat-card primary-card" @click="goToPractice()">
+                <div class="stat-card primary-card" @click="ViewDashboard()">
                     <div class="stat-icon bg-primary">
-                        <el-icon name="Collection" size="24" />
+                        <el-icon :size="24">
+                            <Collection />
+                        </el-icon>
                     </div>
                     <div class="stat-content">
                         <span class="stat-value">{{ stats.questionsDone }}</span>
@@ -132,9 +154,11 @@
                     </div>
                 </div>
 
-                <div class="stat-card success-card" @click="viewMistakes()">
+                <div class="stat-card success-card" @click="ViewDashboard()">
                     <div class="stat-icon bg-success">
-                        <el-icon name="Timer" size="24" />
+                        <el-icon :size="24">
+                            <Timer />
+                        </el-icon>
                     </div>
                     <div class="stat-content">
                         <span class="stat-value">{{ stats.studyTime }}h</span>
@@ -142,9 +166,11 @@
                     </div>
                 </div>
 
-                <div class="stat-card warning-card" @click="viewMistakes()">
+                <div class="stat-card warning-card" @click="ViewDashboard()">
                     <div class="stat-icon bg-warning">
-                        <el-icon name="Promotion" size="24" />
+                        <el-icon :size="24">
+                            <Promotion />
+                        </el-icon>
                     </div>
                     <div class="stat-content">
                         <span class="stat-value">{{ stats.accuracy }}%</span>
@@ -154,7 +180,9 @@
 
                 <div class="stat-card danger-card" @click="viewMistakes()">
                     <div class="stat-icon bg-danger">
-                        <el-icon name="Failed" size="24" />
+                        <el-icon :size="24">
+                            <Failed />
+                        </el-icon>
                     </div>
                     <div class="stat-content">
                         <span class="stat-value">{{ stats.mistakes }}</span>
@@ -278,14 +306,59 @@
                 </div>
             </div>
         </div>
+
+        <!-- 悬浮胶囊按钮组 -->
+        <div class="floating-capsules">
+            <!-- AI助手 -->
+            <div class="floating-capsule ai-capsule" @click="handleFloatingAction">
+                <div class="capsule-content">
+                    <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 19V5M5 12l7-7 7 7"/>
+                    </svg>
+                    <span class="capsule-text">AI助手</span>
+                </div>
+            </div>
+
+            <!-- 反馈 -->
+            <div class="floating-capsule feedback-capsule" @click="handleFeedback">
+                <div class="capsule-content">
+                    <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span class="capsule-text">反馈</span>
+                </div>
+            </div>
+
+            <!-- 客服 -->
+            <div class="floating-capsule service-capsule" @click="handleService">
+                <div class="capsule-content">
+                    <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                    </svg>
+                    <span class="capsule-text">客服</span>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
 // 导入图标
-import singlePracticeIcon from '@/assets/icons/single-practice.svg?url'
-import mockExamIcon from '@/assets/icons/mock-exam.svg?url'
-import correctionNotebookIcon from '@/assets/icons/correction-notebook.svg?url'
+// import singlePracticeIcon from '@/assets/icons/single-practice.svg?url'
+// import mockExamIcon from '@/assets/icons/mock-exam.svg?url'
+// import correctionNotebookIcon from '@/assets/icons/correction-notebook.svg?url'
+import {
+    Reading,
+    Failed,
+    Document,
+    Operation,
+    Trophy,
+    User,
+    DocumentChecked,
+    Collection,
+    Timer,
+    Promotion
+} from '@element-plus/icons-vue'
 
 import { ref, onMounted, onUnmounted, computed, onBeforeUnmount} from 'vue'
 import * as echarts from 'echarts'
@@ -323,6 +396,9 @@ const quotes = [
     { content: "长风破浪会有时，直挂云帆济沧海。", author: "李白" }
 ]
 
+// 每日语录（从后端获取）
+const dailyQuote = ref(null)
+
 // 确保初始值有效
 const currentQuote = ref(quotes.length > 0 ? quotes[0] : null)
 let currentIndex = 0
@@ -336,7 +412,7 @@ const nextQuote = () => {
 
 // 组件挂载后启动轮播
 onMounted(() => {
-    intervalId = setInterval(nextQuote, 5000) // 每5秒切换一次
+    intervalId = setInterval(nextQuote, 100000) // 每100秒切换一次
 })
 
 // 组件卸载前清除定时器
@@ -446,6 +522,9 @@ const getProgressColor = (percentage) => {
 const startPractice = () => {
     router.push('/user/subject')
 }
+const ViewDashboard = () => {
+    router.push('/user/dashboard')
+}
 const viewMistakes = () => {
     router.push('/user/correction-notebook')
 }
@@ -475,16 +554,18 @@ const generateNewPlan = () => {
 // 获取首页数据
 const fetchHomePageData = async () => {
     try {
-        const userId = localStorage.getItem('userId')
-        // if (!userId) {
-        //     ElMessage.error('未登录，请先登录')
-        //     router.push('/login')
-        //     return
-        // }
+        const userId = JSON.parse(localStorage.getItem('user') || '{}').id;
+        console.log('userId:', userId)
+        if (!userId) {
+            ElMessage.error('未登录，请先登录')
+            router.push('/login')
+            return
+        }
 
         const res = await getHomePageDataApi(userId)
         if (res.code === 200) {
             const data = res.data
+            console.log('首页数据:', data)
 
             if (data.userInfo) {
                 userInfo.value = data.userInfo
@@ -502,6 +583,7 @@ const fetchHomePageData = async () => {
 
             if (data.subjects && data.subjects.length > 0) {
                 examSubjects.value = data.subjects
+                console.log('examSubjects:', examSubjects)
             }
 
             if (data.dailyQuote) {
@@ -622,8 +704,11 @@ const initCharts = () => {
             textStyle: { color: '#1f2937' }
         },
         grid: {
-            height: '70%',
-            y: '15%'
+            left: '15%',
+            right: '5%',
+            top: '10%',
+            bottom: '20%',
+            containLabel: true
         },
         xAxis: {
             type: 'category',
@@ -707,6 +792,19 @@ const initCharts = () => {
 
 
 
+// 悬浮胶囊点击事件
+const handleFloatingAction = () => {
+    ElMessage.info('AI助手功能开发中...')
+}
+
+const handleFeedback = () => {
+    ElMessage.info('反馈功能开发中...')
+}
+
+const handleService = () => {
+    ElMessage.info('客服功能开发中...')
+}
+
 // 组件挂载
 onMounted(() => {
     // 获取首页数据
@@ -733,6 +831,7 @@ onMounted(() => {
     background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
     color: #1f2937;
     font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    padding: 20px;
 }
 
 /* 侧边栏样式 */
@@ -789,7 +888,6 @@ onMounted(() => {
 .user-profile-section {
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(229, 231, 235, 0.5);
-    margin-bottom: 20px;
     text-align: center;
 }
 
@@ -836,8 +934,8 @@ onMounted(() => {
 }
 
 .nav-menu h4 {
-    color: #9ca3af;
-    font-size: 14px;
+    color: #4677da;
+    font-size: 20px;
     margin: 15px 0 10px;
     padding-left: 10px;
     text-transform: uppercase;
@@ -913,8 +1011,8 @@ onMounted(() => {
 /* 主内容区样式 */
 .main-content {
     flex: 1;
-    margin-left: 200px;
-    padding: 20px;
+    margin-left: 260px;
+    /* padding: 20px; */
 }
 
 .dashboard-header {
@@ -926,6 +1024,12 @@ onMounted(() => {
     gap: 20px;
 }
 
+.welcome-section {
+    border-radius: 16px;
+    margin-bottom: 24px;
+    animation: fadeInUp 0.6s ease-out;
+}
+
 .welcome-section h1 {
     font-size: 28px;
     margin-bottom: 8px;
@@ -934,13 +1038,100 @@ onMounted(() => {
     -webkit-text-fill-color: transparent;
 }
 
-.target-text {
+/* 目标院校 */
+.target-school {
+    font-weight: 600;
+    color: #2b6cb0;
+}
+
+/* 考研年份tag */
+.custom-tag {
+    display: inline-block;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1890ff;
+    background-color: #e6f4ff;
+    border: 1px solid #bae7ff;
+    border-radius: 12px;
+    margin-left: 8px;
+    line-height: 1.4;
+}
+
+/* 倒计时badge */
+.countdown-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #ff6b35, #f7931e);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 16px;
+    box-shadow: 0 4px 8px rgba(247, 147, 30, 0.3);
+    animation: float 3s ease-in-out infinite;
+}
+
+.countdown-number {
+    font-size: 20px;
+    font-weight: 800;
+    min-width: 28px;
+    text-align: center;
+}
+
+/* 微动效 */
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 响应式：小屏优化 */
+@media (max-width: 768px) {
+    .welcome-section {
+        padding: 16px;
+    }
+
+    .welcome-title {
+        font-size: 22px;
+    }
+
+    .countdown-badge {
+        font-size: 14px;
+        padding: 6px 12px;
+    }
+
+    .countdown-number {
+        font-size: 18px;
+    }
+}
+
+/* .target-text {
     color: #6b7280;
     font-size: 16px;
     margin-bottom: 10px;
-}
+} */
 
-.countdown-badge {
+/* .countdown-badge {
     display: inline-block;
     background: linear-gradient(45deg, #ef4444, #f87171);
     color: white;
@@ -955,7 +1146,7 @@ onMounted(() => {
     font-size: 20px;
     font-weight: 700;
     margin-right: 4px;
-}
+} */
 
 .quick-actions {
     display: flex;
@@ -971,7 +1162,7 @@ onMounted(() => {
     transition: all 0.3s ease;
     background: white;
     border: 1px solid rgba(229, 231, 235, 0.5);
-}
+    border-radius: 16px;}
 
 .action-button:hover {
     transform: translateY(-2px);
@@ -1039,6 +1230,7 @@ onMounted(() => {
     justify-content: center;
     margin-right: 15px;
     flex-shrink: 0;
+    /* z-index: 0; */
 }
 
 .bg-primary {
@@ -1495,6 +1687,140 @@ onMounted(() => {
 
     .action-button {
         width: 100%;
+    }
+}
+
+/* 悬浮胶囊样式 */
+.floating-capsules {
+    position: fixed;
+    right: 30px;
+    bottom: 30px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.floating-capsule {
+    cursor: pointer;
+    animation: slideInRight 0.5s ease-out;
+}
+
+.floating-capsule:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.floating-capsule:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.floating-capsule:nth-child(3) {
+    animation-delay: 0.2s;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.capsule-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    border-radius: 50px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+/* AI助手胶囊 - 紫色渐变 */
+.ai-capsule .capsule-content {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+}
+
+/* 反馈胶囊 - 橙色渐变 */
+.feedback-capsule .capsule-content {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    box-shadow: 0 8px 24px rgba(245, 87, 108, 0.4);
+}
+
+/* 客服胶囊 - 绿色渐变 */
+.service-capsule .capsule-content {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    box-shadow: 0 8px 24px rgba(79, 172, 254, 0.4);
+}
+
+.capsule-content:hover {
+    transform: translateY(-3px) scale(1.05);
+}
+
+.ai-capsule .capsule-content:hover {
+    box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5);
+}
+
+.feedback-capsule .capsule-content:hover {
+    box-shadow: 0 12px 32px rgba(245, 87, 108, 0.5);
+}
+
+.service-capsule .capsule-content:hover {
+    box-shadow: 0 12px 32px rgba(79, 172, 254, 0.5);
+}
+
+.capsule-icon {
+    width: 24px;
+    height: 24px;
+    color: white;
+    animation: bounce 2s infinite;
+}
+
+.feedback-capsule .capsule-icon,
+.service-capsule .capsule-icon {
+    animation: bounce 2s infinite 0.5s;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+.capsule-text {
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .floating-capsules {
+        right: 20px;
+        bottom: 20px;
+        gap: 12px;
+    }
+
+    .capsule-content {
+        padding: 10px 18px;
+    }
+
+    .capsule-icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    .capsule-text {
+        font-size: 14px;
     }
 }
 </style>
