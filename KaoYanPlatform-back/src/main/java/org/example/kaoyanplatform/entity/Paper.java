@@ -16,10 +16,11 @@ public class Paper {
     private Integer totalScore;
     private Integer timeLimit;
     private Integer paperType;
-    
+    private Integer year;
+
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<PaperSection> structureJson;
-    
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
     

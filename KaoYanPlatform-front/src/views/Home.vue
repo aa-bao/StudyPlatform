@@ -1,7 +1,7 @@
 <template>
     <div class="dashboard-container">
         <!-- 侧边栏 -->
-        <div class="sidebar">
+        <div class="sidebar" :class="{ 'sidebar-exiting': isSidebarExiting }">
             <div class="logo-section">
                 <div class="logo-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -362,11 +362,15 @@ import {
 
 import { ref, onMounted, onUnmounted, computed, onBeforeUnmount} from 'vue'
 import * as echarts from 'echarts'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { getHomePageDataApi } from '@/api/user'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
+
+// 侧边栏动画状态
+const isSidebarExiting = ref(false)
 
 const userInfo = ref({})
 
@@ -805,6 +809,14 @@ const handleService = () => {
     ElMessage.info('客服功能开发中...')
 }
 
+// 监听路由变化，添加侧边栏退出动画
+const handleRouteChange = () => {
+    // 如果不是首页，触发退出动画
+    if (route.path !== '/user/home') {
+        isSidebarExiting.value = true
+    }
+}
+
 // 组件挂载
 onMounted(() => {
     // 获取首页数据
@@ -817,6 +829,11 @@ onMounted(() => {
 
     // 初始化图表
     const cleanup = initCharts()
+
+    // 监听路由变化
+    router.afterEach(() => {
+        handleRouteChange()
+    })
 
     // 在组件卸载时清理
     onUnmounted(cleanup)
@@ -848,6 +865,13 @@ onMounted(() => {
     top: 0;
     z-index: 100;
     box-shadow: 2px 0 15px rgba(0, 0, 0, 0.05);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-exiting {
+    opacity: 0;
+    transform: translateX(-20px);
+    filter: blur(2px);
 }
 
 .logo-section {
@@ -869,6 +893,18 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     margin-right: 12px;
+    animation: logoBounce 2s ease-in-out infinite;
+}
+
+@keyframes logoBounce {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+    }
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+    }
 }
 
 .logo-icon svg {
@@ -920,6 +956,26 @@ onMounted(() => {
     font-weight: 700;
     color: #3b82f6;
     display: block;
+    animation: pulseBounce 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseBounce {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    25% {
+        opacity: 0.9;
+        transform: scale(1.05);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.15);
+    }
+    75% {
+        opacity: 0.9;
+        transform: scale(1.05);
+    }
 }
 
 .stat-label {
@@ -940,11 +996,48 @@ onMounted(() => {
     padding-left: 10px;
     text-transform: uppercase;
     letter-spacing: 1px;
+    animation: fadeInDown 0.6s ease-out;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .el-menu-vertical {
     background: transparent;
     border-right: none;
+}
+
+/* 为菜单项添加交错淡入动画 */
+.el-menu-item {
+    animation: slideInLeft 0.4s ease-out backwards;
+}
+
+.el-menu-item:nth-child(1) { animation-delay: 0.05s; }
+.el-menu-item:nth-child(2) { animation-delay: 0.1s; }
+.el-menu-item:nth-child(3) { animation-delay: 0.15s; }
+.el-menu-item:nth-child(4) { animation-delay: 0.2s; }
+.el-menu-item:nth-child(5) { animation-delay: 0.25s; }
+.el-menu-item:nth-child(6) { animation-delay: 0.3s; }
+.el-menu-item:nth-child(7) { animation-delay: 0.35s; }
+.el-menu-item:nth-child(8) { animation-delay: 0.4s; }
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 .el-menu-item,
@@ -955,11 +1048,35 @@ onMounted(() => {
     margin: 5px 0;
     border-radius: 8px;
     transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.el-menu-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(to bottom, #3b82f6, #60a5fa);
+    transform: scaleY(0);
+    transition: transform 0.3s ease;
+}
+
+.el-menu-item.is-active::before {
+    transform: scaleY(1);
 }
 
 .el-menu-item:hover,
 .el-sub-menu__title:hover {
     background: rgba(59, 130, 246, 0.1) !important;
+    transform: translateX(5px);
+}
+
+.el-menu-item:active {
+    transform: translateX(8px) scale(0.98);
+    transition: all 0.1s ease;
 }
 
 .el-menu-item.is-active {

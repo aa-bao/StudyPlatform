@@ -8,7 +8,8 @@
       "Bash(mkdir:*)",
       "Bash(move PaperExam.vue PaperList.vue)",
       "Bash(powershell:*)",
-      "mcp__context7__query-docs"
+      "mcp__context7__query-docs",
+      "Bash(git add:*)"
     ]
   }
 }

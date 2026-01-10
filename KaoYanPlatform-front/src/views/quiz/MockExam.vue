@@ -263,6 +263,7 @@ const doneSet = reactive(new Set()); // 已答题目集合
 const sessionId = ref(null);
 const switchCount = ref(0);
 const secondsLeft = ref(180 * 60); // 剩余秒数
+const examEndTime = ref(null); // 考试结束时间戳
 let timerInterval = null;
 
 // AI 阅卷结果
@@ -288,6 +289,9 @@ const brushConfig = reactive({ color: '#333333', size: 3 });
 
 // 确认弹窗
 const showConfirmModal = ref(false);
+
+// 历史记录保护
+const exitAttemptCount = ref(0); // 用户尝试退出次数
 
 // --- 计算属性 ---
 const totalCount = computed(() => allQuestions.value.length);
@@ -342,6 +346,40 @@ const initExam = async () => {
       throw new Error('缺少必要参数');
     }
 
+    // 检查本地是否已有考试结束时间 (刷新恢复的情况)
+    const storageKey = `exam_session_${paperId}_${userId}`;
+    const savedSessionData = localStorage.getItem(storageKey);
+
+    let timeLimit = (paperInfo.value.timeLimit || 180) * 60; // 转换为秒
+    let isRestored = false;
+
+    if (savedSessionData) {
+      // 从本地恢复结束时间
+      try {
+        const parsed = JSON.parse(savedSessionData);
+        examEndTime.value = parsed.examEndTime;
+
+        // 计算剩余时间
+        const now = Date.now();
+        const remaining = Math.max(0, Math.floor((examEndTime.value - now) / 1000));
+
+        if (remaining === 0) {
+          // 考试时间已到，清除本地数据
+          localStorage.removeItem(storageKey);
+          localStorage.removeItem(`exam_end_time_${parsed.sessionId}`);
+          isRestored = false;
+        } else {
+          // 时间还有剩余，标记为恢复状态
+          timeLimit = remaining;
+          isRestored = true;
+        }
+      } catch (err) {
+        console.error('恢复时间失败，重新开始考试:', err);
+        localStorage.removeItem(storageKey);
+        isRestored = false;
+      }
+    }
+
     // 获取试卷详情
     const paperRes = await getPaperDetail(paperId);
     if (paperRes.code !== 200 || !paperRes.data) {
@@ -349,7 +387,7 @@ const initExam = async () => {
     }
     paperInfo.value = paperRes.data;
 
-    // 开始考试
+    // 开始考试 (无论是新开始还是刷新，都调用此接口获取题目)
     loadingText.value = '正在初始化考试...';
     const startRes = await startExam(userId, paperId);
     if (startRes.code !== 200) {
@@ -358,7 +396,32 @@ const initExam = async () => {
 
     const data = startRes.data;
     sessionId.value = data.session.id;
-    secondsLeft.value = (data.paper.timeLimit || 180) * 60;
+
+    // 如果不是恢复状态，设置新的结束时间
+    if (!isRestored) {
+      timeLimit = (data.paper.timeLimit || 180) * 60;
+      examEndTime.value = Date.now() + timeLimit * 1000;
+      localStorage.setItem(`exam_end_time_${sessionId.value}`, examEndTime.value.toString());
+
+      // 保存session信息到本地
+      localStorage.setItem(storageKey, JSON.stringify({
+        sessionId: sessionId.value,
+        examEndTime: examEndTime.value,
+        paperId,
+        userId
+      }));
+    } else {
+      // 恢复状态，更新localStorage中的sessionId
+      localStorage.setItem(`exam_end_time_${sessionId.value}`, examEndTime.value.toString());
+      localStorage.setItem(storageKey, JSON.stringify({
+        sessionId: sessionId.value,
+        examEndTime: examEndTime.value,
+        paperId,
+        userId
+      }));
+    }
+
+    secondsLeft.value = timeLimit;
 
     // 转换题目格式
     allQuestions.value = convertQuestions(data.questions).map((q, index) => ({
@@ -505,13 +568,22 @@ const renderLatex = (latex) => {
 // 计时器
 const initTimer = () => {
   const updateTimer = () => {
-    if (secondsLeft.value > 0) {
-      secondsLeft.value--;
-    } else {
+    if (!examEndTime.value) return;
+
+    const now = Date.now();
+    const remaining = Math.max(0, Math.floor((examEndTime.value - now) / 1000));
+    secondsLeft.value = remaining;
+
+    if (remaining === 0) {
       clearInterval(timerInterval);
       handleSubmit(true);
     }
   };
+
+  // 立即更新一次
+  updateTimer();
+
+  // 每秒更新一次
   timerInterval = setInterval(updateTimer, 1000);
 };
 
@@ -724,7 +796,17 @@ const confirmSubmit = async () => {
 
     // 清除本地缓存
     localStorage.removeItem('mock_exam_state');
-    localStorage.removeItem('exam_end_time');
+    localStorage.removeItem(`exam_end_time_${sessionId.value}`);
+
+    // 清除session存储
+    const { paperId, userId } = route.query;
+    if (paperId && userId) {
+      const storageKey = `exam_session_${paperId}_${userId}`;
+      localStorage.removeItem(storageKey);
+    }
+
+    // 移除历史记录保护，允许用户正常返回
+    removeHistoryProtection();
 
     // 显示结果
     showResultModal.value = true;
@@ -745,6 +827,54 @@ const handleVisibilityChange = () => {
   }
 };
 
+// 添加历史记录保护
+const addHistoryProtection = () => {
+  // 在历史记录中添加一个新条目
+  window.history.pushState(null, '', window.location.href);
+  // 监听 popstate 事件
+  window.addEventListener('popstate', handlePopState);
+};
+
+// 处理返回按钮点击
+const handlePopState = (event) => {
+  // 如果考试已提交，不再阻止返回
+  if (isSubmitted.value) {
+    return;
+  }
+
+  // 再次推送状态，阻止返回
+  window.history.pushState(null, '', window.location.href);
+
+  // 增加尝试退出次数
+  exitAttemptCount.value++;
+
+  // 显示警告提示
+  ElMessage.warning(`考试期间请勿离开页面!（违规尝试 ${exitAttemptCount.value} 次）`);
+
+  // 如果用户多次尝试返回，可以强制退出
+  if (exitAttemptCount.value >= 3) {
+    ElMessageBox.confirm(
+      '检测到您多次尝试退出考试，是否强制结束考试？',
+      '警告',
+      {
+        confirmButtonText: '强制结束',
+        cancelButtonText: '继续考试',
+        type: 'warning'
+      }
+    ).then(() => {
+      // 强制提交考试
+      handleSubmit();
+    }).catch(() => {
+      // 用户选择继续考试
+    });
+  }
+};
+
+// 移除历史记录保护
+const removeHistoryProtection = () => {
+  window.removeEventListener('popstate', handlePopState);
+};
+
 // 返回
 const goBack = () => {
   router.back();
@@ -762,11 +892,15 @@ watch(strokes, () => saveLocalState(), { deep: true });
 onMounted(() => {
   initExam();
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  // 添加历史记录保护，防止用户通过浏览器返回按钮离开考试页面
+  addHistoryProtection();
 });
 
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
+  // 移除历史记录保护
+  removeHistoryProtection();
 });
 </script>
 

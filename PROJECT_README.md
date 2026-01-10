@@ -102,6 +102,14 @@
 - **考试统计**: 自动生成考试总结，包括正确率、时长、AI 反馈
 - **指数退避重试**: 处理 API 超时，最大重试 3 次
 
+### 2.8 考试会话管理增强功能
+
+- **倒计时持久化**: 基于固定时间戳的倒计时，支持页面刷新、标签页关闭后继续计时
+- **浏览器返回阻止**: 双重保护机制防止考生通过返回按钮离开考试页面
+- **答题快照保存**: 定时自动保存答题进度到 localStorage，防止数据丢失
+- **切屏检测**: 记录考生切屏次数，防止作弊行为
+- **异常恢复**: 支持超时自动提交和刷新后状态恢复
+
 ---
 
 ## 3. 技术栈
@@ -595,10 +603,15 @@ kaoyan-frontend/src/
 | start_time | datetime | | 开始时间 |
 | submit_time | datetime | | 提交时间 |
 | total_score | decimal(5,2) | | 总分 |
-| switch_count | int | DEFAULT 0 | 切换题目次数 |
+| switch_count | int | DEFAULT 0 | 切换题目次数（切屏检测） |
 | ai_summary | text | | AI 总结 |
 | snapshot_answers | json | | 答题快照 JSON |
 | create_time | datetime | | 创建时间 |
+
+**特殊说明**:
+- `switch_count`: 记录考生切换题目的次数，用于异常行为检测
+- `snapshot_answers`: 存储答题快照，支持意外中断后恢复
+- 前端使用 localStorage 存储额外的会话信息和考试结束时间戳，支持页面刷新后恢复状态
 
 #### 答题明细表 (`tb_exam_answer_detail`)
 
@@ -857,6 +870,155 @@ WHERE q.id = 1000;
    - weaknesses: 不足列表
 5. 保存批改结果
 ```
+
+#### 考试会话管理增强功能
+
+**倒计时持久化机制**
+
+系统实现了基于固定时间戳的倒计时持久化，确保考生在各种异常情况下都不会丢失考试进度：
+
+- **时间戳存储**: 首次开始考试时计算并存储固定的结束时间戳 `examEndTime = Date.now() + duration * 1000`
+- **localStorage 缓存**: 使用 `exam_session_${paperId}_${userId}` 键存储会话信息和结束时间
+- **刷新恢复**: 页面刷新时从 localStorage 恢复结束时间戳，计算剩余时间
+- **超时检测**: 重新打开页面时自动检测是否超时，超时则自动提交
+
+**核心实现逻辑**:
+
+```javascript
+// 初始化考试时检测并恢复会话
+const initExam = async () => {
+  const storageKey = `exam_session_${paperId}_${userId}`;
+  const savedSessionData = localStorage.getItem(storageKey);
+
+  if (savedSessionData) {
+    // 从本地恢复结束时间
+    const parsed = JSON.parse(savedSessionData);
+    examEndTime.value = parsed.examEndTime;
+
+    // 计算剩余时间
+    const remaining = Math.max(0, Math.floor((examEndTime.value - Date.now()) / 1000));
+
+    if (remaining === 0) {
+      // 超时，清除数据重新开始
+      localStorage.removeItem(storageKey);
+    } else {
+      // 恢复状态，使用保存的时间
+      secondsLeft.value = remaining;
+    }
+  } else {
+    // 首次开始，设置新的结束时间
+    examEndTime.value = Date.now() + timeLimit * 1000;
+    localStorage.setItem(storageKey, JSON.stringify({
+      sessionId: sessionId.value,
+      examEndTime: examEndTime.value,
+      paperId,
+      userId
+    }));
+  }
+}
+
+// 基于时间戳的计时器
+const initTimer = () => {
+  const updateTimer = () => {
+    const now = Date.now();
+    const remaining = Math.max(0, Math.floor((examEndTime.value - now) / 1000));
+    secondsLeft.value = remaining;
+
+    if (remaining === 0) {
+      clearInterval(timerInterval);
+      handleSubmit(true); // 自动提交
+    }
+  };
+
+  timerInterval = setInterval(updateTimer, 1000);
+};
+```
+
+**浏览器返回按钮阻止机制**
+
+采用双重保护防止考生通过浏览器返回按钮离开考试页面：
+
+1. **历史记录堆栈管理** (PaperList.vue):
+   - 使用 `router.replace` 替代 `router.push`，防止历史记录堆栈增加
+   - 替换当前历史记录条目，不添加新条目
+
+2. **popstate 事件监听** (MockExam.vue):
+   - 考试页面添加 popstate 事件监听
+   - 用户点击返回时重新推送历史记录状态
+   - 显示警告提示并记录违规次数
+   - 提交考试后自动移除保护
+
+**核心实现代码**:
+
+```javascript
+// PaperList.vue - 使用 router.replace
+router.replace({
+  path: '/user/mock-exam',
+  query: { paperId, userId }
+})
+
+// MockExam.vue - 历史记录保护
+const addHistoryProtection = () => {
+  window.history.pushState(null, '', window.location.href);
+  window.addEventListener('popstate', handlePopState);
+};
+
+const handlePopState = (event) => {
+  if (isSubmitted.value) return; // 已提交不再阻止
+
+  // 重新推送状态，阻止返回
+  window.history.pushState(null, '', window.location.href);
+  exitAttemptCount.value++;
+
+  ElMessage.warning(`考试期间请勿使用浏览器返回按钮（违规尝试 ${exitAttemptCount.value} 次）`);
+};
+
+const removeHistoryProtection = () => {
+  window.removeEventListener('popstate', handlePopState);
+};
+```
+
+**localStorage 数据结构**:
+
+```javascript
+// Session 信息（包含 sessionId 和结束时间）
+`exam_session_${paperId}_${userId}` = {
+  sessionId: string,
+  examEndTime: number,  // 时间戳
+  paperId: string,
+  userId: string
+}
+
+// 考试结束时间（备用）
+`exam_end_time_${sessionId}` = timestampString
+
+// 用户答案状态
+`mock_exam_state` = {
+  sessionId: string,
+  answers: object,
+  strokes: array
+}
+```
+
+**功能特性**:
+
+| 功能 | 说明 | 实现方式 |
+|------|------|----------|
+| 刷新页面恢复 | F5 刷新后倒计时继续 | localStorage 恢复 examEndTime |
+| 关闭重开恢复 | 关闭标签页后重新打开继续计时 | localStorage 持久化 |
+| 超时自动提交 | 检测到时间已到自动提交考试 | initTimer 中检测 remaining === 0 |
+| 返回按钮阻止 | 考试中点击返回不生效 | router.replace + popstate 监听 |
+| 答案自动保存 | 定时保存答题进度 | localStorage 存储 mock_exam_state |
+| 切屏检测 | 记录考生切屏次数 | visibilitychange 事件监听 |
+| 提交清理 | 提交后清除所有本地缓存 | localStorage.removeItem() |
+
+**注意事项**:
+
+1. **时间精度**: examEndTime 使用毫秒级时间戳，确保倒计时准确
+2. **数据清理**: 提交或超时后必须清理 localStorage，避免影响后续考试
+3. **浏览器隔离**: localStorage 是浏览器隔离的，更换浏览器会丢失数据
+4. **手动清除**: 用户可通过开发者工具手动清除 localStorage 数据
+5. **安全限制**: 客户端存储可能被篡改，服务器端应记录 session 开始时间作为验证
 
 ### 7.4 用户管理与学习监控模块 (User Management)
 
@@ -1697,6 +1859,68 @@ A:
 4. 设置每道题的顺序、分值和所属大题
 5. 保存后试卷即可供用户开始考试
 
+#### Q13: 考试倒计时持久化是如何实现的？
+
+A: 系统采用基于固定时间戳的方案：
+1. **首次开始**: 计算并存储结束时间戳 `examEndTime = Date.now() + duration * 1000`
+2. **localStorage 存储**: 使用 `exam_session_${paperId}_${userId}` 键保存会话信息
+3. **刷新恢复**: 页面加载时检测 localStorage，恢复结束时间戳并计算剩余时间
+4. **超时处理**: 检测到时间已到自动提交考试
+
+核心优势：
+- 时间戳固定，不会因刷新重置
+- 支持关闭标签页后重新打开继续计时
+- 每秒根据当前时间计算剩余时间，确保准确性
+
+#### Q14: 为什么每次刷新都调用 startExam API？
+
+A: 这是为了确保能正确获取题目数据。虽然会创建新的 session，但系统使用保存的 `examEndTime`，所以倒计时不会重置。这种方式简化了实现逻辑，避免了复杂的 session 恢复机制。
+
+#### Q15: 如何阻止用户使用浏览器返回按钮？
+
+A: 采用双重保护机制：
+1. **PaperList.vue**: 使用 `router.replace` 替代 `router.push`，防止历史记录堆栈增加
+2. **MockExam.vue**: 监听 `popstate` 事件，用户点击返回时重新推送历史记录状态，阻止实际导航
+3. **违规记录**: 记录用户尝试返回的次数，显示警告提示
+4. **提交恢复**: 考试提交后移除保护，恢复正常导航
+
+#### Q16: 如果用户关闭标签页超过考试时长会怎样？
+
+A: 重新打开页面时，系统会检测到时间已到（remaining === 0），自动提交试卷。用户无需担心超时未提交的问题。
+
+#### Q17: localStorage 数据会占用多少空间？
+
+A: 单个考试会话的数据结构如下：
+```javascript
+{
+  sessionId: "uuid-string",           // ~36 bytes
+  examEndTime: 1234567890123,         // 8 bytes
+  paperId: "uuid-string",             // ~36 bytes
+  userId: "uuid-string"               // ~36 bytes
+}
+```
+总计约 116 bytes，远低于 localStorage 5-10MB 的限制。即使存储 1000 个会话也只占约 116KB。
+
+#### Q18: 更换浏览器或设备会怎样？
+
+A: localStorage 是浏览器隔离的，更换浏览器或设备会丢失未保存的数据。这是客户端存储的限制，如需跨设备同步，需要实现服务器端 session 管理和账号系统。
+
+#### Q19: 如何手动清除考试数据？
+
+A:
+1. 打开浏览器开发者工具（F12）
+2. 进入 Application/Storage → Local Storage
+3. 删除以 `exam_session_` 或 `exam_end_time_` 开头的键
+4. 删除 `mock_exam_state` 键（答题状态）
+
+#### Q20: 考试期间切屏会被记录吗？
+
+A: 是的，系统通过 `visibilitychange` 事件监听页面可见性变化：
+- 当用户切换标签页或最小化窗口时触发
+- 调用 `/exam-session/switch` 接口记录切屏次数
+- 切屏次数保存在 `tb_exam_session` 表的 `switch_count` 字段
+- 可用于考后分析或异常行为检测
+
 A:
 1. 在 `views/admin/` 下创建 Vue 组件
 2. 在 `router/index.js` 中添加路由
@@ -1756,16 +1980,35 @@ A:
 
 ---
 
-**文档版本**: v1.5
-**最后更新**: 2026-01-09
+**文档版本**: v1.6
+**最后更新**: 2025-01-11
 **维护者**: AI Assistant
 **更新内容**:
-- 新增套卷刷题功能模块
-- 集成 GLM-4.7 AI 批改系统
-- 添加试卷管理和考试会话相关表
-- 完善套卷刷题相关 API 接口文档
-- 更新项目功能模块总览和亮点
-- 修正项目结构部分，添加所有新增文件和组件
+- 新增考试会话管理增强功能（第2.8节）
+- 完善考试会话表说明，增加 switch_count 和 snapshot_details 字段说明
+- 新增考试倒计时持久化机制完整文档（第7.3节）
+  - 基于时间戳的倒计时实现原理
+  - localStorage 数据结构设计
+  - 刷新恢复和超时自动提交机制
+- 新增浏览器返回按钮阻止机制文档（第7.3节）
+  - 历史记录堆栈管理（router.replace）
+  - popstate 事件监听实现
+  - 违规尝试次数记录
+- 新增功能特性对比表，汇总所有考试增强功能
+- 新增常见问题 Q13-Q20
+  - 倒计时持久化实现原理
+  - startExam API 调用说明
+  - 浏览器返回按钮阻止机制
+  - localStorage 空间占用分析
+  - 切屏检测功能说明
+- 更新项目亮点部分，增加考试会话管理增强功能
+- 更新相关文件清单，包含 PaperList.vue 和 MockExam.vue 修改说明
+
+**相关文件**:
+- `kaoyan-frontend/src/views/PaperList.vue` - 修改路由跳转方式为 router.replace
+- `kaoyan-frontend/src/views/quiz/MockExam.vue` - 新增历史记录保护和倒计时持久化功能
+- `docs/exam-timer-persistence.md` - 考试倒计时持久化功能详细文档
+- `docs/exam-persistence-changes.md` - 完整的改动总结文档（可选）
 
 ### B. 科目层级常量定义
 

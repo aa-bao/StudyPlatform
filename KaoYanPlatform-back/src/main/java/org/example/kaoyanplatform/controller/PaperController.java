@@ -94,13 +94,17 @@ public class PaperController {
     }
 
     @GetMapping("/list")
-    @Operation(summary = "获取试卷列表", description = "查询所有试卷，可按试卷类型筛选")
+    @Operation(summary = "获取试卷列表", description = "查询所有试卷，可按试卷类型、年份筛选")
     public Result<List<Paper>> getPapers(
-            @Parameter(description = "试卷类型：0-真题，1-模拟") @RequestParam(required = false) Integer paperType) {
+            @Parameter(description = "试卷类型：0-真题，1-模拟") @RequestParam(required = false) Integer paperType,
+            @Parameter(description = "试卷年份") @RequestParam(required = false) Integer year) {
         try {
             LambdaQueryWrapper<Paper> wrapper = new LambdaQueryWrapper<>();
             if (paperType != null) {
                 wrapper.eq(Paper::getPaperType, paperType);
+            }
+            if (year != null) {
+                wrapper.eq(Paper::getYear, year);
             }
             wrapper.orderByDesc(Paper::getCreateTime);
             List<Paper> papers = paperService.list(wrapper);
@@ -117,11 +121,12 @@ public class PaperController {
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize,
             @Parameter(description = "试卷类型：0-真题，1-模拟") @RequestParam(required = false) Integer paperType,
             @Parameter(description = "考试规格ID") @RequestParam(required = false) String examSpecId,
-            @Parameter(description = "试卷标题关键词") @RequestParam(required = false) String keyword) {
+            @Parameter(description = "试卷标题关键词") @RequestParam(required = false) String keyword,
+            @Parameter(description = "试卷年份") @RequestParam(required = false) Integer year) {
         try {
             Page<Paper> page = new Page<>(pageNum, pageSize);
             LambdaQueryWrapper<Paper> wrapper = new LambdaQueryWrapper<>();
-            
+
             if (paperType != null) {
                 wrapper.eq(Paper::getPaperType, paperType);
             }
@@ -131,7 +136,10 @@ public class PaperController {
             if (keyword != null && !keyword.isEmpty()) {
                 wrapper.like(Paper::getTitle, keyword);
             }
-            
+            if (year != null) {
+                wrapper.eq(Paper::getYear, year);
+            }
+
             wrapper.orderByDesc(Paper::getCreateTime);
             Page<Paper> result = paperService.page(page, wrapper);
             return Result.success(result);

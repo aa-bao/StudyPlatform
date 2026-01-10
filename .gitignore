@@ -13,6 +13,7 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+uploads/*
 *.class
 *.log
 *.ctxt
@@ -35,3 +36,7 @@ target/
 .project
 .settings/
 .factorypath
+
+# --- 临时文件忽略项 ---
+.claude/
+.vscode/
