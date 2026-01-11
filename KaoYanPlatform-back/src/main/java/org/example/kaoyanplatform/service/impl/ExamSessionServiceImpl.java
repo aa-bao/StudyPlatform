@@ -40,23 +40,65 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
 
     @Override
     @Transactional
-    public ExamStartDTO startExam(String userId, String paperId) {
+    public ExamStartDTO startOrResumeExam(String userId, String paperId) {
         Paper paper = paperService.getById(paperId);
         if (paper == null) {
             throw new RuntimeException("试卷不存在");
         }
 
-        ExamSession session = new ExamSession();
-        session.setUserId(userId);
-        session.setPaperId(paperId);
-        session.setStatus(0);
-        session.setStartTime(LocalDateTime.now());
-        session.setSwitchCount(0);
-        session.setTotalScore(BigDecimal.ZERO);
-        session.setSnapshotAnswers("{}");
-        
-        save(session);
+        // 1. 先查询是否有未完成的会话（status=0）
+        LambdaQueryWrapper<ExamSession> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(ExamSession::getUserId, userId)
+                   .eq(ExamSession::getPaperId, paperId)
+                   .eq(ExamSession::getStatus, 0)  // 0-进行中
+                   .orderByDesc(ExamSession::getCreateTime)
+                   .last("LIMIT 1");
 
+        System.out.println("查询未完成会话 - userId: " + userId + ", paperId: " + paperId);
+
+        ExamSession existingSession = getOne(queryWrapper);
+
+        System.out.println("查询结果: " + (existingSession != null ? "找到会话 " + existingSession.getId() : "未找到会话"));
+
+        ExamSession session;
+        boolean isNewSession = false;
+
+        if (existingSession != null) {
+            // 2. 如果有未完成的会话，复用该会话
+            session = existingSession;
+            System.out.println("复用现有会话 - startTime: " + session.getStartTime() + ", expectedEndTime: " + session.getExpectedEndTime());
+
+            // 检查考试是否已超时
+            if (session.getExpectedEndTime() != null &&
+                LocalDateTime.now().isAfter(session.getExpectedEndTime())) {
+                // 考试已超时，自动提交
+                submitExam(session.getId());
+                throw new RuntimeException("考试时间已到，本次考试已自动提交");
+            }
+        } else {
+            // 3. 如果没有未完成的会话，创建新会话
+            isNewSession = true;
+
+            Integer timeLimit = paper.getTimeLimit() != null ? paper.getTimeLimit() : 180;
+            LocalDateTime startTime = LocalDateTime.now();
+            LocalDateTime expectedEndTime = startTime.plusMinutes(timeLimit);
+
+            session = new ExamSession();
+            session.setUserId(userId);
+            session.setPaperId(paperId);
+            session.setStatus(0);
+            session.setStartTime(startTime);
+            session.setExpectedEndTime(expectedEndTime);
+            session.setSwitchCount(0);
+            session.setTotalScore(BigDecimal.ZERO);
+            session.setSnapshotAnswers("{}");
+
+            System.out.println("创建新会话 - userId: " + userId + ", startTime: " + startTime + ", expectedEndTime: " + expectedEndTime);
+
+            save(session);
+        }
+
+        // 获取题目列表
         List<Question> questions = mapPaperQuestionService.getQuestionsWithDetails(paperId);
 
         ExamStartDTO dto = new ExamStartDTO();
@@ -228,8 +270,8 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
                 objectiveTotal > 0 ? (double) objectiveCorrect / objectiveTotal * 100 : 0));
         summary.append(String.format("总得分：%.1f 分，平均每题得分：%.2f 分\n", session.getTotalScore().doubleValue(), avgScore));
         summary.append(String.format("答题时长：%d 分钟，切换题目次数：%d 次\n",
-                session.getStartTime() != null && session.getSubmitTime() != null ?
-                        java.time.Duration.between(session.getStartTime(), session.getSubmitTime()).toMinutes() : 0,
+                session.getCreateTime() != null && session.getSubmitTime() != null ?
+                        java.time.Duration.between(session.getCreateTime(), session.getSubmitTime()).toMinutes() : 0,
                 session.getSwitchCount()));
         summary.append("\nAI 批改反馈：\n");
 

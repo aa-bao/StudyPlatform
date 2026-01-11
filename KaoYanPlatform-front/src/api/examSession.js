@@ -69,3 +69,11 @@ export function getCorrectRate(sessionId) {
         method: 'get'
     })
 }
+
+// 获取用户未完成考试列表
+export function getIncompleteSessions(userId) {
+    return request({
+        url: `/exam-session/user/${userId}/incomplete`,
+        method: 'get'
+    })
+}

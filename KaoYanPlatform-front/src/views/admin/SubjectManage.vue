@@ -303,9 +303,10 @@ onMounted(() => loadTree())
     color: #909399;
 }
 
+/* 
 .tree-container {
-    /* padding: 5px 0; */
-}
+    padding: 5px 0;
+} */
 
 .tree-tip {
     display: flex;

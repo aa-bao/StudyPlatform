@@ -260,7 +260,7 @@ const loadData = async () => {
 
 // 打开编辑
 const handleEdit = (row) => {
-    editForm.value = { ...row } // 浅拷贝，防止直接修改表格显示
+    editForm.value = { ...row }
     editDialogVisible.value = true
 }
 

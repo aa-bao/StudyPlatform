@@ -19,6 +19,8 @@
 11. [开发规范](#11-开发规范)
 12. [已知问题与优化建议](#12-已知问题与优化建议)
 13. [附录](#13-附录)
+14. [首页数据接口](#14-首页数据接口-home-page-api)
+15. [未完成考试强制提醒功能](#15-未完成考试强制提醒功能-incomplete-exam-reminder)
 
 ---
 
@@ -109,6 +111,14 @@
 - **答题快照保存**: 定时自动保存答题进度到 localStorage，防止数据丢失
 - **切屏检测**: 记录考生切屏次数，防止作弊行为
 - **异常恢复**: 支持超时自动提交和刷新后状态恢复
+
+### 2.9 未完成考试强制提醒功能
+
+- **自动检测**: 用户登录后自动检测未完成考试，提升考试完成率
+- **强制弹窗**: 弹窗无法通过常规方式关闭，确保用户注意到未完成考试
+- **智能避让**: 在考试页面不会重复弹窗，优化用户体验
+- **二次确认**: 放弃考试需要二次确认，防止误操作
+- **美观设计**: 渐变色卡片和按钮，符合平台整体设计风格
 
 ---
 
@@ -1088,9 +1098,9 @@ const removeHistoryProtection = () => {
 5. **题目管理** - 题目 CRUD、错题本
 6. **答题记录** - 提交答案、统计查询
 7. **科目管理** - 科目树、层级管理
-8. **用户管理** - 登录注册、资料管理
+8. **用户管理** - 登录注册、资料管理、首页数据
 9. **试卷管理** - 试卷 CRUD、题目关联
-10. **套卷刷题管理** - 考试会话、AI批改
+10. **套卷刷题管理** - 考试会话、AI批改、未完成考试检测
 11. **答题明细管理** - 答题详情、统计查询
 
 ### 7.2 统一响应格式
@@ -2519,5 +2529,346 @@ test('should return error for non-existent user', async () => {
 
 ---
 
-**文档更新日期**: 2026-01-10  
-**更新内容**: 新增第14章 - 首页数据接口文档，包含DTO设计、API接口、前后端实现和扩展建议
+## 15. 未完成考试强制提醒功能 (Incomplete Exam Reminder)
+
+### 15.1 功能概述
+
+为提升用户考试完成率，系统实现了**未完成考试强制提醒功能**。当用户登录后进入平台任何页面时，如果检测到用户有未完成的模拟考试（status=0），系统会强制弹窗提醒用户继续考试。
+
+### 15.2 功能特性
+
+- ✅ **自动检测**：用户登录后自动检测未完成考试
+- ✅ **强制弹窗**：弹窗无法通过常规方式关闭（无法点击遮罩关闭、无法按ESC关闭、无关闭按钮）
+- ✅ **智能避让**：在考试页面不会重复弹窗
+- ✅ **二次确认**：放弃考试需要二次确认，防止误操作
+- ✅ **美观设计**：渐变色卡片和按钮，符合平台整体设计风格
+- ✅ **延迟显示**：延迟1秒显示，避免页面加载时突兀
+
+### 15.3 后端实现
+
+#### API 接口
+
+**接口地址**: `GET /exam-session/user/{userId}/incomplete`
+
+**功能说明**: 根据用户ID获取所有进行中的考试会话（status=0）
+
+**请求参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| userId | String | 是 | 用户ID |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "msg": "成功",
+  "data": [
+    {
+      "id": "uuid-string",
+      "userId": "user-uuid",
+      "paperId": "paper-uuid",
+      "status": 0,
+      "startTime": "2026-01-11 10:30:00",
+      "createTime": "2026-01-11 10:30:00"
+    }
+  ]
+}
+```
+
+#### ExamSessionController.java
+
+```java
+@GetMapping("/user/{userId}/incomplete")
+@Operation(summary = "获取用户未完成考试", description = "根据用户ID获取所有进行中的考试会话（status=0）")
+public Result<List<ExamSession>> getIncompleteSessions(
+        @Parameter(description = "用户ID", required = true) @PathVariable String userId) {
+    try {
+        LambdaQueryWrapper<ExamSession> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ExamSession::getUserId, userId)
+               .eq(ExamSession::getStatus, 0) // 0-进行中
+               .orderByDesc(ExamSession::getCreateTime);
+        List<ExamSession> sessions = examSessionService.list(wrapper);
+        return Result.success(sessions);
+    } catch (Exception e) {
+        return Result.error(e.getMessage());
+    }
+}
+```
+
+### 15.4 前端实现
+
+#### API 调用 (examSession.js)
+
+```javascript
+// 获取用户未完成考试列表
+export function getIncompleteSessions(userId) {
+    return request({
+        url: `/exam-session/user/${userId}/incomplete`,
+        method: 'get'
+    })
+}
+```
+
+#### UserLayout.vue 核心逻辑
+
+**1. 状态管理**
+```javascript
+// 未完成考试弹窗相关
+const showIncompleteExamDialog = ref(false)
+const incompleteExamInfo = ref({
+    paperTitle: '',
+    startTime: '',
+    sessionId: '',
+    paperId: '',
+    userId: ''
+})
+```
+
+**2. 检测未完成考试**
+```javascript
+const checkIncompleteExam = async () => {
+    try {
+        const userId = localStorage.getItem('userId') || userStore.userInfo?.id
+        if (!userId) return
+
+        // 检查当前是否已经在考试页面，避免重复弹窗
+        if (route.path === '/user/mock-exam') {
+            return
+        }
+
+        const res = await getIncompleteSessions(userId)
+        if (res.code === 200 && res.data && res.data.length > 0) {
+            // 有未完成的考试
+            const session = res.data[0] // 取最近的一个
+
+            // 获取试卷详情
+            const paperRes = await getPaperDetail(session.paperId)
+            if (paperRes.code === 200 && paperRes.data) {
+                incompleteExamInfo.value = {
+                    paperTitle: paperRes.data.title,
+                    startTime: formatTime(session.createTime),
+                    sessionId: session.id,
+                    paperId: session.paperId,
+                    userId: userId
+                }
+
+                // 显示强制弹窗
+                showIncompleteExamDialog.value = true
+            }
+        }
+    } catch (error) {
+        console.error('检测未完成考试失败:', error)
+    }
+}
+```
+
+**3. 时间格式化**
+```javascript
+const formatTime = (timeStr) => {
+    if (!timeStr) return ''
+    const date = new Date(timeStr)
+    const now = new Date()
+    const diff = Math.floor((now - date) / 1000 / 60) // 分钟差
+
+    if (diff < 1) return '刚刚开始'
+    if (diff < 60) return `${diff}分钟前开始`
+    const hours = Math.floor(diff / 60)
+    if (hours < 24) return `${hours}小时前开始`
+    const days = Math.floor(hours / 24)
+    return `${days}天前开始`
+}
+```
+
+**4. 继续考试**
+```javascript
+const continueExam = () => {
+    showIncompleteExamDialog.value = false
+    router.replace({
+        path: '/user/mock-exam',
+        query: {
+            paperId: incompleteExamInfo.value.paperId,
+            userId: incompleteExamInfo.value.userId
+        }
+    })
+}
+```
+
+**5. 放弃考试（带二次确认）**
+```javascript
+const abandonExam = () => {
+    ElMessageBox.confirm(
+        '确定要放弃当前考试吗？放弃后当前答题进度将不会保存，建议您继续完成考试。',
+        '警告',
+        {
+            confirmButtonText: '仍要放弃',
+            cancelButtonText: '继续考试',
+            type: 'warning',
+            distinguishCancelAndClose: true
+        }
+    ).then(() => {
+        showIncompleteExamDialog.value = false
+        ElMessage.warning('您已放弃考试，如需继续请从套卷列表重新进入')
+    }).catch(() => {
+        // 用户选择继续考试
+    })
+}
+```
+
+**6. 组件挂载时自动检测**
+```javascript
+onMounted(() => {
+    // 延迟1秒检测，避免页面加载时立即弹窗影响体验
+    setTimeout(() => {
+        checkIncompleteExam()
+    }, 1000)
+})
+```
+
+**7. 弹窗模板**
+```vue
+<!-- 未完成考试强制弹窗 -->
+<el-dialog
+    v-model="showIncompleteExamDialog"
+    title="⚠️ 检测到未完成的考试"
+    width="500px"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+    class="incomplete-exam-dialog"
+>
+    <div class="dialog-content">
+        <div class="exam-info-card">
+            <div class="exam-icon">📝</div>
+            <div class="exam-details">
+                <h3 class="exam-title">{{ incompleteExamInfo.paperTitle }}</h3>
+                <p class="exam-time">{{ incompleteExamInfo.startTime }}</p>
+            </div>
+        </div>
+        <div class="warning-text">
+            <p>您有一场考试尚未完成，为了您的考试成绩，请继续完成考试。</p>
+        </div>
+    </div>
+    <template #footer>
+        <div class="dialog-footer">
+            <el-button @click="abandonExam" class="abandon-btn">放弃考试</el-button>
+            <el-button type="primary" @click="continueExam" class="continue-btn">继续考试</el-button>
+        </div>
+    </template>
+</el-dialog>
+```
+
+### 15.5 交互流程
+
+```
+用户登录 → 进入任意页面 → UserLayout 组件挂载
+    ↓
+延迟1秒后自动检测未完成考试
+    ↓
+有未完成考试？
+    ├─ 是 → 显示强制弹窗
+    │     ├─ 点击"继续考试" → 跳转到 MockExam 页面
+    │     └─ 点击"放弃考试" → 二次确认弹窗
+    │           ├─ 确认放弃 → 关闭弹窗，显示警告消息
+    │           └─ 取消 → 返回强制弹窗
+    └─ 否 → 正常使用平台
+```
+
+### 15.6 弹窗样式设计
+
+**设计原则**:
+- 使用渐变色背景突出重要性
+- 警告色（橙色）标题引起注意
+- 考试信息卡片使用蓝色主题
+- "继续考试"按钮使用醒目的蓝色渐变
+- "放弃考试"按钮使用灰色，降低视觉权重
+
+**关键样式类**:
+```css
+.incomplete-exam-dialog :deep(.el-dialog__header) {
+    background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+    border-bottom: 2px solid #f97316;
+}
+
+.exam-info-card {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 2px solid #3b82f6;
+    border-radius: 12px;
+}
+
+.continue-btn {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.abandon-btn {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+```
+
+### 15.7 技术要点
+
+**1. 路由状态判断**
+- 检测 `route.path` 避免在考试页面重复弹窗
+- 使用 `router.replace` 替代 `router.push`，避免历史记录堆栈问题
+
+**2. 延迟检测**
+- 使用 `setTimeout` 延迟1秒，避免页面加载时立即弹窗
+- 提升用户体验，给用户一个缓冲时间
+
+**3. 强制弹窗实现**
+- `:close-on-click-modal="false"` - 禁止点击遮罩关闭
+- `:close-on-press-escape="false"` - 禁止ESC键关闭
+- `:show-close="false"` - 隐藏关闭按钮
+
+**4. 二次确认机制**
+- 使用 `ElMessageBox.confirm` 实现放弃考试的二次确认
+- `distinguishCancelAndClose: true` 区分取消和关闭操作
+- 防止用户误操作放弃考试
+
+### 15.8 扩展建议
+
+**1. 多考试提醒**
+- 当前只显示最近的一个未完成考试
+- 可扩展为列表展示所有未完成考试
+- 支持用户选择继续哪一场考试
+
+**2. 提醒频率控制**
+- 添加"今日不再提醒"选项
+- 使用 localStorage 记录用户选择
+- 避免频繁弹窗打扰用户
+
+**3. 智能提醒**
+- 根据考试剩余时间调整提示语
+- 临期考试显示更醒目的警告
+- 超时考试自动标记为放弃
+
+**4. 统计分析**
+- 记录用户对提醒的响应情况
+- 统计继续考试vs放弃考试的比例
+- 分析弹窗对考试完成率的影响
+
+**5. 通知增强**
+- 支持浏览器桌面通知
+- 邮件/短信提醒未完成考试
+- 设置考试截止时间提醒
+
+### 15.9 相关文件清单
+
+**后端文件**:
+- `KaoYanPlatform-back/src/main/java/org/example/kaoyanplatform/controller/ExamSessionController.java` - 新增获取未完成考试API
+
+**前端文件**:
+- `KaoYanPlatform-front/src/api/examSession.js` - 新增 `getIncompleteSessions` 方法
+- `KaoYanPlatform-front/src/views/layout/UserLayout.vue` - 添加检测逻辑和弹窗组件
+
+**测试建议**:
+1. 创建一个进行中的考试会话（status=0）
+2. 登录后进入任意页面，观察是否弹窗
+3. 测试"继续考试"按钮是否正常跳转
+4. 测试"放弃考试"按钮是否显示二次确认
+5. 测试在考试页面是否不会重复弹窗
+
+---
+
+**文档更新日期**: 2026-01-11
+**更新内容**: 新增第15章 - 未完成考试强制提醒功能文档，包含功能特性、API接口、前后端实现、交互流程和技术要点

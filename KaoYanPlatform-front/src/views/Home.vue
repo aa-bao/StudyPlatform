@@ -1,7 +1,7 @@
 <template>
     <div class="dashboard-container">
         <!-- 侧边栏 -->
-        <div class="sidebar" :class="{ 'sidebar-exiting': isSidebarExiting }">
+        <div class="sidebar" :class="{ 'sidebar-exiting': isSidebarExiting, 'sidebar-entering': isSidebarEntering }">
             <div class="logo-section">
                 <div class="logo-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -38,7 +38,7 @@
 
             <div class="nav-menu">
                 <h4>功能导航</h4>
-                <el-menu :default-active="$route.path" router class="el-menu-vertical">
+                <el-menu :default-active="$route.path" class="el-menu-vertical" @select="handleMenuNavigation">
                     <el-menu-item index="/user/dashboard">
                         <el-icon>
                             <PieChart />
@@ -65,7 +65,12 @@
                     </el-menu-item>
                     <el-menu-item index="/user/topic-drill?rootId=1">
                         <el-icon>
-                            <Operation />
+                            <svg class="icon" viewBox="0 0 1024 1024" version="1.1"
+                                xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+                                <path
+                                    d="M726.521506 0a35.929459 35.929459 0 0 1 35.677952 31.761642L762.450965 35.929459v74.841063h166.065959a35.929459 35.929459 0 0 1 4.203747 71.607412l-4.203747 0.251506h-193.695713l-167.036055 133.442011 31.114911 233.541483 128.016663-98.662295a35.139011 35.139011 0 0 1 17.21021-7.149962l4.70676-0.323365h131.861114a35.929459 35.929459 0 0 1 4.167817 71.607412l-4.167817 0.251506h-119.645098l-133.945023 103.297194a36.145036 36.145036 0 0 1-18.036589 7.257751l43.510575 326.239488H978.027718a35.929459 35.929459 0 0 1 4.203747 71.607411L978.027718 1023.98958H43.861785a35.929459 35.929459 0 0 1-4.203746-71.607411L43.861785 952.130663h324.910098l21.701393-222.51114-77.499843-59.714761-128.411886 0.03593a35.965388 35.965388 0 0 1-35.713883-31.761642l-0.215576-4.167817a35.929459 35.929459 0 0 1 31.725712-35.713882l4.203747-0.215577h140.699761a35.929459 35.929459 0 0 1 18.000659 4.814547l3.916311 2.65878 51.522844 39.702053 15.95268-163.622757-132.651563-53.031881a35.929459 35.929459 0 0 1-16.56348-13.509477l-2.227627-3.808522L201.268745 287.435672H79.791244a35.929459 35.929459 0 0 1-4.203746-71.607412L79.791244 215.576754h85.548042L119.493296 123.848845a35.929459 35.929459 0 0 1 62.193894-35.785741l2.119838 3.664805 137.573898 275.219655 100.530626 40.169136 16.276045-166.892337-134.879189-103.979855a35.929459 35.929459 0 0 1 40.133206-59.427325l3.736664 2.515062 99.237165 76.529748 12.036369-123.417692a35.929459 35.929459 0 0 1 70.529528-5.748713l0.826378 4.491182 26.875235 201.743912L690.592047 125.968683V35.929459a35.929459 35.929459 0 0 1 35.929459-35.929459"
+                                    fill="currentColor"></path>
+                            </svg>
                         </el-icon>
                         <span>知识体系树</span>
                     </el-menu-item>
@@ -101,7 +106,7 @@
         </div>
 
         <!-- 主内容区 -->
-        <div class="main-content">
+        <div class="main-content" :class="{ 'sidebar-exiting-content': isSidebarExiting, 'content-entering': isContentEntering }">
             <!-- 顶部欢迎区域 -->
             <div class="dashboard-header">
                 <div class="welcome-section">
@@ -371,6 +376,8 @@ const route = useRoute()
 
 // 侧边栏动画状态
 const isSidebarExiting = ref(false)
+const isSidebarEntering = ref(false)
+const isContentEntering = ref(false)
 
 const userInfo = ref({})
 
@@ -522,24 +529,44 @@ const getProgressColor = (percentage) => {
     return '#52c41a'
 }
 
-// 快捷操作
+// 快捷操作 - 包装导航函数,添加退出动画
+const navigateWithAnimation = (path) => {
+    // 如果不是 Home 页面,直接跳转
+    if (route.path !== '/user/home') {
+        router.push(path)
+        return
+    }
+
+    // 触发侧边栏退出动画
+    isSidebarExiting.value = true
+
+    // 等待动画完成后再跳转 (0.4s 与 CSS 动画时长一致)
+    setTimeout(() => {
+        router.push(path)
+    }, 400)
+}
+
 const startPractice = () => {
-    router.push('/user/subject')
+    navigateWithAnimation('/user/subject')
 }
+
 const ViewDashboard = () => {
-    router.push('/user/dashboard')
+    navigateWithAnimation('/user/dashboard')
 }
+
 const viewMistakes = () => {
-    router.push('/user/correction-notebook')
+    navigateWithAnimation('/user/correction-notebook')
 }
+
 const startMockExam = () => {
-    router.push('/user/paper-list')
+    navigateWithAnimation('/user/paper-list')
 }
+
 const goToPractice = (recommendation) => {
     if (recommendation) {
-        router.push(`/user/practice/${recommendation.id}`)
+        navigateWithAnimation(`/user/practice/${recommendation.id}`)
     } else {
-        router.push('/user/practice')
+        navigateWithAnimation('/user/practice')
     }
 }
 
@@ -809,12 +836,9 @@ const handleService = () => {
     ElMessage.info('客服功能开发中...')
 }
 
-// 监听路由变化，添加侧边栏退出动画
-const handleRouteChange = () => {
-    // 如果不是首页，触发退出动画
-    if (route.path !== '/user/home') {
-        isSidebarExiting.value = true
-    }
+// 监听菜单点击事件(针对菜单项的导航)
+const handleMenuNavigation = (path) => {
+    navigateWithAnimation(path)
 }
 
 // 组件挂载
@@ -830,10 +854,22 @@ onMounted(() => {
     // 初始化图表
     const cleanup = initCharts()
 
-    // 监听路由变化
-    router.afterEach(() => {
-        handleRouteChange()
-    })
+    // 检测是否从其他页面进入 Home,触发进入动画
+    const fromOtherPage = router.options.history.state?.back &&
+                         router.options.history.state.back !== '/user/home' &&
+                         router.options.history.state.back !== '/'
+
+    if (fromOtherPage) {
+        // 触发进入动画
+        isSidebarEntering.value = true
+        isContentEntering.value = true
+
+        // 动画完成后重置状态
+        setTimeout(() => {
+            isSidebarEntering.value = false
+            isContentEntering.value = false
+        }, 400)
+    }
 
     // 在组件卸载时清理
     onUnmounted(cleanup)
@@ -872,6 +908,11 @@ onMounted(() => {
     opacity: 0;
     transform: translateX(-20px);
     filter: blur(2px);
+}
+
+.sidebar-entering {
+    opacity: 0;
+    transform: translateX(-30px);
 }
 
 .logo-section {
@@ -918,7 +959,9 @@ onMounted(() => {
     font-weight: 700;
     background: linear-gradient(to right, #3b82f6, #60a5fa);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
+    color: transparent;
 }
 
 .user-profile-section {
@@ -1129,7 +1172,18 @@ onMounted(() => {
 .main-content {
     flex: 1;
     margin-left: 260px;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
     /* padding: 20px; */
+}
+
+.main-content.sidebar-exiting-content {
+    transform: translateX(100px);
+    opacity: 0;
+}
+
+.main-content.content-entering {
+    transform: translateX(50px);
+    opacity: 0;
 }
 
 .dashboard-header {
@@ -1151,7 +1205,8 @@ onMounted(() => {
     font-size: 28px;
     margin-bottom: 8px;
     background: linear-gradient(to right, #1f2937, #3b82f6);
-    -webkit-background-clip: text;
+    background-clip: text; /* 添加标准属性 */
+    -webkit-background-clip: text; /* WebKit兼容性属性 */
     -webkit-text-fill-color: transparent;
 }
 
@@ -1327,17 +1382,76 @@ onMounted(() => {
     display: flex;
     align-items: center;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 6px 15px rgba(0, 0, 0, 0.05);
     backdrop-filter: blur(5px);
     border: 1px solid rgba(209, 213, 219, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+/* 卡片进入动画 */
+.stat-card {
+    animation: slideInUp 0.6s ease-out backwards;
+}
+
+.stat-card:nth-child(1) { animation-delay: 0.1s; }
+.stat-card:nth-child(2) { animation-delay: 0.2s; }
+.stat-card:nth-child(3) { animation-delay: 0.3s; }
+.stat-card:nth-child(4) { animation-delay: 0.4s; }
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 卡片悬停效果 */
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.stat-card:hover::before {
+    opacity: 1;
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.15);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 15px 35px rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.4);
 }
 
+/* 不同卡片的悬停阴影颜色 */
+.primary-card:hover {
+    box-shadow: 0 15px 35px rgba(59, 130, 246, 0.25);
+}
+
+.success-card:hover {
+    box-shadow: 0 15px 35px rgba(16, 185, 129, 0.25);
+}
+
+.warning-card:hover {
+    box-shadow: 0 15px 35px rgba(245, 158, 11, 0.25);
+}
+
+.danger-card:hover {
+    box-shadow: 0 15px 35px rgba(239, 68, 68, 0.25);
+}
+
+/* 图标容器样式 */
 .stat-icon {
     width: 60px;
     height: 60px;
@@ -1347,41 +1461,138 @@ onMounted(() => {
     justify-content: center;
     margin-right: 15px;
     flex-shrink: 0;
-    /* z-index: 0; */
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* 图标背景渐变动画 */
 .bg-primary {
-    background: linear-gradient(45deg, #3b82f6, #60a5fa);
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+    animation: gradientShift1 3s ease infinite;
+    background-size: 200% 200%;
 }
 
 .bg-success {
-    background: linear-gradient(45deg, #10b981, #34d399);
+    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+    animation: gradientShift2 3s ease infinite;
+    background-size: 200% 200%;
 }
 
 .bg-warning {
-    background: linear-gradient(45deg, #f59e0b, #fbbf24);
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+    animation: gradientShift3 3s ease infinite;
+    background-size: 200% 200%;
 }
 
 .bg-danger {
-    background: linear-gradient(45deg, #ef4444, #f87171);
+    background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+    animation: gradientShift4 3s ease infinite;
+    background-size: 200% 200%;
+}
+
+@keyframes gradientShift1 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes gradientShift2 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes gradientShift3 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes gradientShift4 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+/* 图标脉冲动画 */
+.stat-icon::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border-radius: 18px;
+    background: inherit;
+    opacity: 0;
+    z-index: -1;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.3;
+    }
+}
+
+/* 图标悬停效果 */
+.stat-card:hover .stat-icon {
+    transform: rotate(10deg) scale(1.1);
 }
 
 .stat-icon .el-icon {
     color: white;
     font-size: 28px;
+    transition: all 0.3s ease;
+    animation: iconFloat 3s ease-in-out infinite;
 }
 
+@keyframes iconFloat {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-3px);
+    }
+}
+
+.stat-card:hover .stat-icon .el-icon {
+    transform: scale(1.1);
+    animation: none;
+}
+
+/* 数字动画 */
 .stat-content .stat-value {
     font-size: 28px;
     font-weight: 700;
     display: block;
     margin-bottom: 4px;
     color: #1f2937;
+    background: linear-gradient(135deg, #1f2937 0%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    transition: all 0.3s ease;
 }
 
+.stat-card:hover .stat-content .stat-value {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+/* 标签样式 */
 .stat-content .stat-label {
     color: #6b7280;
     font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.stat-card:hover .stat-content .stat-label {
+    color: #3b82f6;
+    transform: translateX(3px);
 }
 
 /* 图表区域 */
@@ -1661,6 +1872,7 @@ onMounted(() => {
     font-size: 26px;
     margin-bottom: 10px;
     background: linear-gradient(to right, #1f2937, #3b82f6);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }

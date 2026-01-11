@@ -350,11 +350,15 @@ const initExam = async () => {
     const storageKey = `exam_session_${paperId}_${userId}`;
     const savedSessionData = localStorage.getItem(storageKey);
 
-    let timeLimit = (paperInfo.value.timeLimit || 180) * 60; // 转换为秒
-    let isRestored = false;
+    // 获取试卷详情
+    const paperRes = await getPaperDetail(paperId);
+    if (paperRes.code !== 200 || !paperRes.data) {
+      throw new Error('试卷不存在');
+    }
+    paperInfo.value = paperRes.data;
 
+    // 如果本地有保存的结束时间,先使用本地值(用于刷新恢复)
     if (savedSessionData) {
-      // 从本地恢复结束时间
       try {
         const parsed = JSON.parse(savedSessionData);
         examEndTime.value = parsed.examEndTime;
@@ -367,25 +371,14 @@ const initExam = async () => {
           // 考试时间已到，清除本地数据
           localStorage.removeItem(storageKey);
           localStorage.removeItem(`exam_end_time_${parsed.sessionId}`);
-          isRestored = false;
-        } else {
-          // 时间还有剩余，标记为恢复状态
-          timeLimit = remaining;
-          isRestored = true;
+          examEndTime.value = null;
         }
       } catch (err) {
         console.error('恢复时间失败，重新开始考试:', err);
         localStorage.removeItem(storageKey);
-        isRestored = false;
+        examEndTime.value = null;
       }
     }
-
-    // 获取试卷详情
-    const paperRes = await getPaperDetail(paperId);
-    if (paperRes.code !== 200 || !paperRes.data) {
-      throw new Error('试卷不存在');
-    }
-    paperInfo.value = paperRes.data;
 
     // 开始考试 (无论是新开始还是刷新，都调用此接口获取题目)
     loadingText.value = '正在初始化考试...';
@@ -397,13 +390,19 @@ const initExam = async () => {
     const data = startRes.data;
     sessionId.value = data.session.id;
 
-    // 如果不是恢复状态，设置新的结束时间
-    if (!isRestored) {
-      timeLimit = (data.paper.timeLimit || 180) * 60;
-      examEndTime.value = Date.now() + timeLimit * 1000;
-      localStorage.setItem(`exam_end_time_${sessionId.value}`, examEndTime.value.toString());
+    // 使用后端返回的预期结束时间
+    // 后端逻辑: 如果有未完成会话(status=0)则复用，否则创建新会话
+    // expectedEndTime = startTime + paper.timeLimit
+    if (data.session.expectedEndTime) {
+      examEndTime.value = new Date(data.session.expectedEndTime).getTime();
 
-      // 保存session信息到本地
+      // 计算剩余时间(秒)
+      const now = Date.now();
+      const remaining = Math.max(0, Math.floor((examEndTime.value - now) / 1000));
+      secondsLeft.value = remaining;
+
+      // 保存到本地存储用于刷新恢复
+      localStorage.setItem(`exam_end_time_${sessionId.value}`, examEndTime.value.toString());
       localStorage.setItem(storageKey, JSON.stringify({
         sessionId: sessionId.value,
         examEndTime: examEndTime.value,
@@ -411,17 +410,8 @@ const initExam = async () => {
         userId
       }));
     } else {
-      // 恢复状态，更新localStorage中的sessionId
-      localStorage.setItem(`exam_end_time_${sessionId.value}`, examEndTime.value.toString());
-      localStorage.setItem(storageKey, JSON.stringify({
-        sessionId: sessionId.value,
-        examEndTime: examEndTime.value,
-        paperId,
-        userId
-      }));
+      throw new Error('后端未返回考试结束时间');
     }
-
-    secondsLeft.value = timeLimit;
 
     // 转换题目格式
     allQuestions.value = convertQuestions(data.questions).map((q, index) => ({
@@ -429,11 +419,23 @@ const initExam = async () => {
       index: index + 1
     }));
 
+    // 恢复后端保存的答题快照（如果有）
+    if (data.session.snapshotAnswers && data.session.snapshotAnswers !== '{}') {
+      try {
+        const snapshot = JSON.parse(data.session.snapshotAnswers);
+        // 将快照答案应用到题目
+        allQuestions.value.forEach(q => {
+          if (snapshot[q.id]) {
+            q.userAnswer = snapshot[q.id];
+          }
+        });
+      } catch (err) {
+        console.error('恢复答题快照失败:', err);
+      }
+    }
+
     // 初始化计时器
     initTimer();
-
-    // 尝试恢复本地答案
-    restoreLocalState();
 
     loading.value = false;
   } catch (err) {
@@ -615,25 +617,6 @@ const saveSnapshotToLocal = async () => {
     await saveSnapshot(sessionId.value, JSON.stringify(answersToSave));
   } catch (err) {
     console.error('保存快照失败:', err);
-  }
-};
-
-// 恢复本地状态
-const restoreLocalState = () => {
-  const savedState = localStorage.getItem('mock_exam_state');
-  if (savedState) {
-    try {
-      const parsed = JSON.parse(savedState);
-      if (parsed.sessionId === sessionId.value) {
-        Object.assign(answers, parsed.answers || {});
-        Object.keys(parsed.answers || {}).forEach(id => {
-          if (parsed.answers[id]) doneSet.add(id);
-        });
-        strokes.value = parsed.strokes || [];
-      }
-    } catch (err) {
-      console.error('恢复状态失败:', err);
-    }
   }
 };
 
@@ -1723,7 +1706,7 @@ button {
 .home-icon {
   width: 26px;
   height: 26px;
-  fill: white;
+  fill: rgb(255, 255, 255);
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4));
 }
 

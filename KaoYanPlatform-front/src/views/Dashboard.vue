@@ -1065,6 +1065,7 @@ onMounted(async () => {
     font-weight: 800;
     margin: 0 0 10px;
     background: linear-gradient(to right, #3a6197, #4a92da);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     position: relative;

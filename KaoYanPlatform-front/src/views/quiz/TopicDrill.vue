@@ -2,26 +2,73 @@
     <div class="knowledge-practice-container">
         <!-- 选择模式 -->
         <div v-if="mode === 'selection'" class="selection-container">
-            <div class="selection-header">
-                <h2>选择科目</h2>
-                <p>请选择你要练习的科目类别</p>
+            <!-- 页面标题 -->
+            <div class="page-header">
+                <div class="header-left">
+                    <h1>
+                        <el-icon :size="32" class="header-icon">
+                            <Reading />
+                        </el-icon>
+                        专项突破
+                    </h1>
+                    <p>按知识点系统化刷题，精准突破薄弱环节</p>
+                </div>
             </div>
-            <div class="subject-grid" v-loading="loading">
-                <div v-for="subject in subjectList" :key="subject.id" class="subject-card-item"
-                    @click="selectRootSubject(subject)">
-                    <div class="subject-icon">
-                        <!-- 尝试动态加载图标，失败则使用默认图标 -->
-                        <el-icon :size="40" color="#409eff">
+
+            <!-- 科目列表 -->
+            <div class="subjects-section" v-loading="loading">
+                <div v-for="(subject, index) in subjectList" :key="subject.id"
+                     class="subject-row"
+                     :style="{ 'animation-delay': index * 0.08 + 's' }"
+                     @click="selectRootSubject(subject)">
+
+                    <!-- 科目图标 -->
+                    <div class="subject-icon-box" :class="'bg-color-' + (index % 6)">
+                        <el-icon :size="36">
                             <Notebook />
                         </el-icon>
                     </div>
-                    <h3>{{ subject.name }}</h3>
-                    <div class="subject-stats">
-                        <span>共 {{ subject.questionCount }} 题</span>
-                        <el-progress
-                            :percentage="subject.questionCount ? Math.round((subject.finishedCount / subject.questionCount) * 100) : 0"
-                            :show-text="false" />
+
+                    <!-- 科目信息 -->
+                    <div class="subject-info">
+                        <h3>{{ subject.name }}</h3>
+                        <p class="subject-desc">点击开始该科目知识点练习</p>
                     </div>
+
+                    <!-- 统计数据 -->
+                    <div class="subject-metrics">
+                        <div class="metric-item">
+                            <span class="metric-value">{{ subject.questionCount }}</span>
+                            <span class="metric-label">题目数</span>
+                        </div>
+                        <div class="metric-divider"></div>
+                        <div class="metric-item">
+                            <span class="metric-value">{{ subject.finishedCount }}</span>
+                            <span class="metric-label">已完成</span>
+                        </div>
+                        <div class="metric-divider"></div>
+                        <div class="metric-item">
+                            <span class="metric-value accent">{{ Math.round((subject.finishedCount / subject.questionCount) * 100) }}%</span>
+                            <span class="metric-label">完成率</span>
+                        </div>
+                    </div>
+
+                    <!-- 进度条 -->
+                    <div class="progress-wrapper">
+                        <div class="progress-bar">
+                            <div class="progress-fill"
+                                 :style="{ width: Math.round((subject.finishedCount / subject.questionCount) * 100) + '%', background: getProgressGradient(index) }">
+                            </div>
+                        </div>
+                        <el-icon class="arrow-icon" :size="20">
+                            <ArrowRight />
+                        </el-icon>
+                    </div>
+                </div>
+
+                <!-- 空状态 -->
+                <div v-if="subjectList.length === 0 && !loading" class="empty-state">
+                    <el-empty description="暂无科目数据" />
                 </div>
             </div>
         </div>
@@ -163,7 +210,7 @@
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
-import { Files, Select, CloseBold, Reading, Notebook, ArrowLeft } from '@element-plus/icons-vue'
+import { Files, Select, CloseBold, Reading, Notebook, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { useRoute, useRouter } from 'vue-router'
@@ -378,6 +425,18 @@ const renderLatex = (content) => {
     })
 }
 
+const getProgressGradient = (index) => {
+    const gradients = [
+        'linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%)',
+        'linear-gradient(90deg, #67c23a 0%, #85ce61 100%)',
+        'linear-gradient(90deg, #e6a23c 0%, #ebb563 100%)',
+        'linear-gradient(90deg, #f56c6c 0%, #f78989 100%)',
+        'linear-gradient(90deg, #909399 0%, #a6a9ad 100%)',
+        'linear-gradient(90deg, #667eea 0%, #764ba2 100%)'
+    ]
+    return gradients[index % gradients.length]
+}
+
 onMounted(async () => {
     // Check for rootId in query
     const rootId = route.query.rootId
@@ -404,80 +463,285 @@ onMounted(async () => {
 
 <style scoped>
 .knowledge-practice-container {
-    background: #f5f7fa;
-    height: 100%;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+    min-height: 100vh;
 }
 
 /* Selection Mode Styles */
 .selection-container {
-    max-width: 1200px;
+    padding: 32px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 40px 20px;
+    animation: fadeIn 0.4s ease-out;
 }
 
-.selection-header {
-    text-align: center;
-    margin-bottom: 40px;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
-.selection-header h2 {
-    font-size: 28px;
+.page-header {
+    margin-bottom: 32px;
+    animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.header-left h1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 32px;
+    font-weight: 700;
     color: #303133;
-    margin-bottom: 10px;
+    margin: 0 0 8px 0;
 }
 
-.selection-header p {
-    color: #909399;
+.header-icon {
+    color: #409eff;
+}
+
+.header-left p {
     font-size: 16px;
+    color: #909399;
+    margin: 0;
 }
 
-.subject-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 30px;
+.subjects-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
-.subject-card-item {
+.subject-row {
     background: #fff;
     border-radius: 12px;
-    padding: 30px;
-    text-align: center;
+    padding: 24px 28px;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 24px;
+    align-items: center;
     cursor: pointer;
-    transition: all 0.3s;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     border: 1px solid transparent;
+    animation: slideUp 0.5s ease-out backwards;
 }
 
-.subject-card-item:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.subject-row:hover {
+    transform: translateX(8px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     border-color: #409eff;
 }
 
-.subject-icon {
-    width: 80px;
-    height: 80px;
-    background: #f0f7ff;
-    border-radius: 50%;
+.subject-icon-box {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 20px;
+    color: #fff;
+    transition: all 0.3s ease;
 }
 
-.subject-card-item h3 {
-    margin: 0 0 15px;
+.subject-row:hover .subject-icon-box {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.bg-color-0 {
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+    animation: gradientShift1 3s ease infinite;
+    background-size: 200% 200%;
+}
+
+.bg-color-1 {
+    background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+    animation: gradientShift2 3s ease infinite;
+    background-size: 200% 200%;
+}
+
+.bg-color-2 {
+    background: linear-gradient(135deg, #e6a23c 0%, #ebb563 100%);
+    animation: gradientShift3 3s ease infinite;
+    background-size: 200% 200%;
+}
+
+.bg-color-3 {
+    background: linear-gradient(135deg, #f56c6c 0%, #f78989 100%);
+    animation: gradientShift4 3s ease infinite;
+    background-size: 200% 200%;
+}
+
+.bg-color-4 {
+    background: linear-gradient(135deg, #909399 0%, #a6a9ad 100%);
+    animation: gradientShift5 3s ease infinite;
+    background-size: 200% 200%;
+}
+
+.bg-color-5 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    animation: gradientShift6 3s ease infinite;
+    background-size: 200% 200%;
+}
+
+@keyframes gradientShift1 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes gradientShift2 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes gradientShift3 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes gradientShift4 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes gradientShift5 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes gradientShift6 {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.subject-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.subject-info h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
     color: #303133;
-    font-size: 18px;
+    transition: color 0.3s;
 }
 
-.subject-stats {
-    color: #909399;
+.subject-row:hover .subject-info h3 {
+    color: #409eff;
+}
+
+.subject-desc {
+    margin: 0;
     font-size: 14px;
+    color: #909399;
 }
 
-.subject-stats .el-progress {
-    margin-top: 10px;
+.subject-metrics {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.metric-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.metric-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #303133;
+    line-height: 1;
+}
+
+.metric-value.accent {
+    color: #409eff;
+}
+
+.metric-label {
+    font-size: 12px;
+    color: #909399;
+}
+
+.metric-divider {
+    width: 1px;
+    height: 32px;
+    background: #e6e6e6;
+}
+
+.progress-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 200px;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: #f0f2f5;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    animation: progressShine 2s ease-in-out infinite;
+}
+
+@keyframes progressShine {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.arrow-icon {
+    color: #409eff;
+    transition: all 0.3s ease;
+}
+
+.subject-row:hover .arrow-icon {
+    transform: translateX(4px);
+    color: #66b1ff;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
 }
 
 /* Drill Mode Styles */

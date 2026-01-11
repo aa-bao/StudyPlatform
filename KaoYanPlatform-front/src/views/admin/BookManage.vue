@@ -619,9 +619,9 @@ onMounted(() => {
 .book-description {
     font-size: 12px;
     color: #909399;
-    /* 描述太长时显示省略号 */
     display: -webkit-box;
     -webkit-line-clamp: 1;
+    line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }

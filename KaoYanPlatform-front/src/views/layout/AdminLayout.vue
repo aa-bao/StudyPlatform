@@ -67,8 +67,7 @@
                     <div class="header-right">
                         <el-dropdown>
                             <span class="el-dropdown-link user-profile">
-                                <el-avatar :size="32"
-                                    src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" />
+                                <el-avatar :size="36" :src="userAvatar" />
                                 <span class="username">Admin</span>
                                 <el-icon class="el-icon--right"><arrow-down /></el-icon>
                             </span>
@@ -80,7 +79,7 @@
                         </el-dropdown>
                     </div>
                 </el-header>
-                <el-main class="content-main">
+                <el-main class="content-main" :class="{ 'from-home-enter': isTransitioningFromHome }">
                     <router-view v-slot="{ Component }">
                         <transition name="fade" mode="out-in">
                             <component :is="Component" />
@@ -94,11 +93,22 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { HomeFilled, Document, Monitor, Management, Reading, Files, User, Warning, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
+import { HomeFilled, Document, Monitor, Management, Reading, Files, User, Warning, SwitchButton } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { useTransitionStore } from '@/stores/transition'
+import { computed, onMounted } from 'vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const transitionStore = useTransitionStore()
+
+// 页面进入动画状态 - 从 store 获取
+const isTransitioningFromHome = computed(() => transitionStore.isEnteringLayout)
+
+// 计算属性：用户头像
+const userAvatar = computed(() => {
+    return userStore.userInfo.avatar || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
+})
 
 const handleLogout = () => {
     // 1. 调用 Store 的清理方法
@@ -113,6 +123,17 @@ const handleLogout = () => {
     // 3. 跳转回登录页
     router.push('/login')
 }
+
+// 组件挂载时检测是否从 Home 进入
+onMounted(() => {
+    // 检测是否从 Home 页面进入，触发偏移补偿动画
+    const fromHome = router.options.history.state?.back === '/user/home' ||
+                      document.referrer.includes('/user/home')
+
+    if (fromHome) {
+        transitionStore.startEnteringLayout()
+    }
+})
 </script>
 
 <style scoped>
@@ -249,6 +270,12 @@ const handleLogout = () => {
 .content-main {
     background-color: #f0f2f5;
     padding: 24px;
+    /* 从 Home 进入时的偏移补偿动画 */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.content-main.from-home-enter {
+    transform: translateX(-240px);
 }
 
 /* 路由切换动画 */

@@ -26,12 +26,12 @@ public class ExamSessionController {
     private ExamAnswerDetailService examAnswerDetailService;
 
     @PostMapping("/start")
-    @Operation(summary = "开始考试", description = "初始化考试会话，返回试卷完整内容和题目列表")
+    @Operation(summary = "开始或恢复考试", description = "初始化考试会话或恢复未完成的考试，返回试卷完整内容和题目列表。如果用户有未完成的会话则复用，否则创建新会话")
     public Result<ExamStartDTO> startExam(
             @Parameter(description = "用户ID", required = true) @RequestParam String userId,
             @Parameter(description = "试卷ID", required = true) @RequestParam String paperId) {
         try {
-            ExamStartDTO result = examSessionService.startExam(userId, paperId);
+            ExamStartDTO result = examSessionService.startOrResumeExam(userId, paperId);
             return Result.success(result);
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -111,6 +111,23 @@ public class ExamSessionController {
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ExamSession> wrapper =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
             wrapper.eq(ExamSession::getUserId, userId)
+                   .orderByDesc(ExamSession::getCreateTime);
+            List<ExamSession> sessions = examSessionService.list(wrapper);
+            return Result.success(sessions);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/user/{userId}/incomplete")
+    @Operation(summary = "获取用户未完成考试", description = "根据用户ID获取所有进行中的考试会话（status=0）")
+    public Result<List<ExamSession>> getIncompleteSessions(
+            @Parameter(description = "用户ID", required = true) @PathVariable String userId) {
+        try {
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ExamSession> wrapper =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            wrapper.eq(ExamSession::getUserId, userId)
+                   .eq(ExamSession::getStatus, 0) // 0-进行中
                    .orderByDesc(ExamSession::getCreateTime);
             List<ExamSession> sessions = examSessionService.list(wrapper);
             return Result.success(sessions);
