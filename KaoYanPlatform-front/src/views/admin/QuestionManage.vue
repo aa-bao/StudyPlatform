@@ -139,11 +139,12 @@
                                         :props="{ label: 'name', value: 'id', children: 'children' }"
                                         placeholder="请选择所属科目" check-strictly filterable multiple
                                         collapse-tags collapse-tags-tooltip style="width: 100%"
-                                        :render-after-expand="false" default-expand-all>
+                                        :render-after-expand="false" default-expand-all
+                                        @change="handleSubjectIdsChange">
                                         <template #default="{ node, data }">
                                             <span class="tree-node-label">
                                                 <span>{{ node.label }}</span>
-                                                <el-checkbox 
+                                                <el-checkbox
                                                     v-if="data.children && data.children.length > 0"
                                                     :model-value="isNodeFullySelected(data)"
                                                     :indeterminate="isNodePartiallySelected(data)"
@@ -167,10 +168,7 @@
                             <el-col :span="6">
                                 <el-form-item label="题目类型" prop="type">
                                     <el-select v-model="form.type" placeholder="选择类型" style="width: 100%">
-                                        <el-option label="单项选择题" :value="1" />
-                                        <el-option label="多项选择题" :value="2" />
-                                        <el-option label="填空题" :value="3" />
-                                        <el-option label="简答题" :value="4" />
+                                        <el-option v-for="type in questionTypesList" :key="type.code" :label="type.name" :value="type.code" />
                                     </el-select>
                                 </el-form-item>
                             </el-col>
@@ -342,11 +340,14 @@ import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import katex from 'katex'
+import { getQuestionTypesBySubject } from '@/api/subject'
+import { loadQuestionTypes } from '@/utils/questionTypes'
 
 // 数据定义
 const loading = ref(false)
 const saving = ref(false)
 const tableData = ref([])
+const questionTypesList = ref([]) // 题型列表（动态）
 
 const total = ref(0)
 const pageNum = ref(1)
@@ -606,6 +607,115 @@ const handleEdit = (row) => {
         tags: Array.isArray(row.tags) ? [...row.tags] : []
     }
     dialogVisible.value = true
+
+    // 加载该科目对应的题型
+    if (form.value.subjectIds && form.value.subjectIds.length > 0) {
+        loadQuestionTypesForSubjects(form.value.subjectIds)
+    }
+}
+
+// 处理科目变化，动态加载题型
+const handleSubjectIdsChange = async (subjectIds) => {
+    if (!subjectIds || subjectIds.length === 0) {
+        // 清空时，显示所有题型
+        questionTypesList.value = await loadQuestionTypes()
+        return
+    }
+
+    // 加载第一个选中科目对应的题型
+    await loadQuestionTypesForSubjects(subjectIds)
+}
+
+// 根据科目加载题型
+const loadQuestionTypesForSubjects = async (subjectIds) => {
+    if (!subjectIds || subjectIds.length === 0) {
+        questionTypesList.value = await loadQuestionTypes()
+        return
+    }
+
+    // 只取第一个 Level 1 科目
+    const firstSubjectId = subjectIds[0]
+    const subject = findSubjectById(subjects.value, firstSubjectId)
+
+    if (!subject) {
+        questionTypesList.value = await loadQuestionTypes()
+        return
+    }
+
+    // 如果是 Level 1 科目，直接加载其题型
+    if (subject.level === '1' || subject.level === 1) {
+        try {
+            const res = await getQuestionTypesBySubject(firstSubjectId)
+            if (res.code === 200 && res.data) {
+                questionTypesList.value = res.data
+                console.log(`科目 ${firstSubjectId} 支持的题型:`, res.data)
+            } else {
+                questionTypesList.value = await loadQuestionTypes()
+            }
+        } catch (e) {
+            console.error('获取题型列表失败:', e)
+            questionTypesList.value = await loadQuestionTypes()
+        }
+    } else {
+        // 如果是下级科目，查找其父级科目
+        const parentSubject = findParentLevel1Subject(subjects.value, firstSubjectId)
+        if (parentSubject) {
+            try {
+                const res = await getQuestionTypesBySubject(parentSubject.id)
+                if (res.code === 200 && res.data) {
+                    questionTypesList.value = res.data
+                    console.log(`父科目 ${parentSubject.id} 支持的题型:`, res.data)
+                } else {
+                    questionTypesList.value = await loadQuestionTypes()
+                }
+            } catch (e) {
+                console.error('获取题型列表失败:', e)
+                questionTypesList.value = await loadQuestionTypes()
+            }
+        } else {
+            questionTypesList.value = await loadQuestionTypes()
+        }
+    }
+}
+
+// 在科目树中查找科目
+const findSubjectById = (subjectList, id) => {
+    for (const subject of subjectList) {
+        if (subject.id === id) return subject
+        if (subject.children && subject.children.length > 0) {
+            const found = findSubjectById(subject.children, id)
+            if (found) return found
+        }
+    }
+    return null
+}
+
+// 查找 Level 1 父科目
+const findParentLevel1Subject = (subjectList, id) => {
+    for (const subject of subjectList) {
+        if (subject.level === '1' || subject.level === 1) {
+            // 检查是否是子孙节点
+            if (hasDescendant(subject, id)) {
+                return subject
+            }
+        }
+        if (subject.children && subject.children.length > 0) {
+            const found = findParentLevel1Subject(subject.children, id)
+            if (found) return found
+        }
+    }
+    return null
+}
+
+// 检查是否有某个子孙节点
+const hasDescendant = (subject, targetId) => {
+    if (subject.id === targetId) return true
+    if (subject.children && subject.children.length > 0) {
+        for (const child of subject.children) {
+            if (hasDescendant(child, targetId)) return true
+        }
+    }
+    return false
 }
 
 // 查看
@@ -737,11 +847,13 @@ const handleAiRecognize = async (file) => {
     }
 }
 
-onMounted(() => {
+onMounted(async () => {
     console.log('页面已挂载')
     loadSubjects()
     loadBooks()
     loadData()
+    // 初始化题型列表
+    questionTypesList.value = await loadQuestionTypes()
 })
 </script>
 

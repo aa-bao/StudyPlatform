@@ -51,4 +51,14 @@ public class Question {
 
     @TableField(exist = false)
     private List<String> subjectNames; // 科目名称列表
+
+    // 试卷相关字段（非数据库字段）
+    @TableField(exist = false)
+    private Integer sortOrder; // 题号（在试卷中的顺序）
+
+    @TableField(exist = false)
+    private java.math.BigDecimal scoreValue; // 分值（在试卷中的分值）
+
+    @TableField(exist = false)
+    private Integer paperType; // 题型（在试卷中的题型，可能覆盖原题型）
 }

@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "科目管理", description = "科目管理相关接口")
 @RestController
@@ -72,6 +73,54 @@ public class SubjectController {
     @Operation(summary = "获取管理用科目树", description = "后台管理使用的完整科目树结构。")
     public Result getManageTree() {
         return Result.success(subjectService.getManageTree());
+    }
+
+    // 6.5. 根据科目ID获取支持的题型列表
+    @GetMapping("/{subjectId}/question-types")
+    @Operation(summary = "获取科目支持的题型", description = "根据科目ID获取该科目支持的题型列表")
+    public Result getQuestionTypesBySubject(
+            @Parameter(description = "科目ID", required = true) @PathVariable Integer subjectId) {
+        try {
+            Subject subject = subjectService.getById(subjectId);
+            if (subject == null) {
+                return Result.error("科目不存在");
+            }
+
+            // 解析题型字符串
+            java.util.List<Integer> typeCodes = new java.util.ArrayList<>();
+            if (subject.getQuestionTypes() != null && !subject.getQuestionTypes().isEmpty()) {
+                String[] codes = subject.getQuestionTypes().split(",");
+                for (String code : codes) {
+                    try {
+                        typeCodes.add(Integer.parseInt(code.trim()));
+                    } catch (NumberFormatException e) {
+                        // 忽略无效的题型代码
+                    }
+                }
+            }
+
+            // 如果没有配置题型，返回所有题型
+            if (typeCodes.isEmpty()) {
+                return Result.success(org.example.kaoyanplatform.enums.QuestionType.getList());
+            }
+
+            // 返回配置的题型
+            java.util.List<Map<String, Object>> result = new java.util.ArrayList<>();
+            for (Integer code : typeCodes) {
+                org.example.kaoyanplatform.enums.QuestionType type =
+                    org.example.kaoyanplatform.enums.QuestionType.getByCode(code);
+                if (type != null) {
+                    Map<String, Object> typeMap = new java.util.HashMap<>();
+                    typeMap.put("code", type.getCode());
+                    typeMap.put("name", type.getName());
+                    result.add(typeMap);
+                }
+            }
+
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
     }
 
     // 7. 新增科目

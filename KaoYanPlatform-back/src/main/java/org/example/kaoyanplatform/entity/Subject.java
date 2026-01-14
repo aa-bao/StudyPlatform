@@ -17,27 +17,10 @@ import java.util.List;
 public class Subject {
     @TableId(type = IdType.AUTO)
     private Integer id;
-
-    /**
-     * 科目名称
-     */
     private String name;
-
-    /**
-     * 父级 ID，0 表示根节点
-     */
     private Integer parentId;
-
-    /**
-     * 图标
-     */
     private String icon;
-
-    /**
-     * 排序号（值越小越靠前）
-     */
     private Integer sort;
-
     /**
      * 层级
      * - 1: 考试大类（CATEGORY）- 如：政治、英语一、数学一、408
@@ -47,16 +30,8 @@ public class Subject {
      * - 5: 题型/解题方法（QUESTION_TYPE）- 如：泰勒公式
      */
     private String level;
-
-    /**
-     * 适用范围
-     * 格式：逗号分隔的考试规格ID，如 "2,3" 表示适用于英语一和英语二
-     */
     private String scope;
-
-    /**
-     * 该分类下的题目总数
-     */
+    private String questionTypes;
     private Integer questionCount;
 
     /**

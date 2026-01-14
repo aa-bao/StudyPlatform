@@ -135,4 +135,72 @@ public class ExamSessionController {
             return Result.error(e.getMessage());
         }
     }
+
+    // ==================== 管理员接口 ====================
+
+    @GetMapping("/admin/all")
+    @Operation(summary = "获取所有考试记录（管理员）", description = "分页获取所有用户的考试记录，支持按用户ID、试卷ID、状态筛选")
+    public Result<com.baomidou.mybatisplus.extension.plugins.pagination.Page<ExamSession>> getAllSessions(
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize,
+            @Parameter(description = "用户ID") @RequestParam(required = false) String userId,
+            @Parameter(description = "试卷ID") @RequestParam(required = false) String paperId,
+            @Parameter(description = "状态（0-进行中，1-已完成）") @RequestParam(required = false) Integer status) {
+        try {
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<ExamSession> page =
+                    new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNum, pageSize);
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ExamSession> wrapper =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+
+            if (userId != null && !userId.isEmpty()) {
+                wrapper.eq(ExamSession::getUserId, userId);
+            }
+            if (paperId != null && !paperId.isEmpty()) {
+                wrapper.eq(ExamSession::getPaperId, paperId);
+            }
+            if (status != null) {
+                wrapper.eq(ExamSession::getStatus, status);
+            }
+
+            wrapper.orderByDesc(ExamSession::getCreateTime);
+            examSessionService.page(page, wrapper);
+            return Result.success(page);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/admin/stats")
+    @Operation(summary = "获取考试统计数据（管理员）", description = "获取总体考试统计：总考试次数、完成率、平均分等")
+    public Result<java.util.Map<String, Object>> getExamStats() {
+        try {
+            java.util.Map<String, Object> stats = new java.util.HashMap<>();
+
+            long totalSessions = examSessionService.count();
+            long completedSessions = examSessionService.count(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ExamSession>()
+                            .eq(ExamSession::getStatus, 1)
+            );
+            long inProgressSessions = examSessionService.count(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ExamSession>()
+                            .eq(ExamSession::getStatus, 0)
+            );
+
+            stats.put("totalSessions", totalSessions);
+            stats.put("completedSessions", completedSessions);
+            stats.put("inProgressSessions", inProgressSessions);
+
+            // 计算平均分（只统计已完成的）
+            com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ExamSession> wrapper =
+                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
+            wrapper.select("IFNULL(AVG(total_score), 0) as avgScore")
+                   .eq("status", 1);
+            java.util.Map<String, Object> avgMap = examSessionService.getMap(wrapper);
+            stats.put("avgScore", avgMap != null ? avgMap.get("avgScore") : 0);
+
+            return Result.success(stats);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }

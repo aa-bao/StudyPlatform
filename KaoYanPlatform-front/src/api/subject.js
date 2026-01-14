@@ -26,6 +26,14 @@ export function getTreeByExamSpecApi(examSpecId, userId) {
     })
 }
 
+// 根据科目ID获取支持的题型列表
+export function getQuestionTypesBySubject(subjectId) {
+    return request({
+        url: `/subject/${subjectId}/question-types`,
+        method: 'get'
+    })
+}
+
 // 按层级获取科目树
 export function getTreeByLevelApi(level, userId) {
     return request({

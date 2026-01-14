@@ -13,5 +13,5 @@ public class MapPaperQuestion {
     private String questionId;
     private Integer sortOrder;
     private BigDecimal scoreValue;
-    private String parentSectionName;
+    private Integer type;
 }

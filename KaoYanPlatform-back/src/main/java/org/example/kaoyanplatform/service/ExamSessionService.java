@@ -18,4 +18,10 @@ public interface ExamSessionService extends IService<ExamSession> {
     boolean recordSwitch(String sessionId);
 
     void submitExam(String sessionId);
+
+    /**
+     * 异步批改主观题
+     * 在后台线程中执行，不会阻塞主流程
+     */
+    void gradeSubjectiveQuestionsAsync(String sessionId);
 }

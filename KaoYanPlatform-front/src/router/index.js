@@ -17,7 +17,7 @@ const routes = [
     component: () => import('@/views/layout/UserLayout.vue'),
     children: [
       {
-        // 首页
+      // 首页
         path: 'home',
         component: () => import('@/views/Home.vue'),
         meta: { hideLayout: true }
@@ -72,7 +72,7 @@ const routes = [
     path: '/admin',
     component: () => import('@/views/layout/AdminLayout.vue'),
     children: [{
-       // 后台首页
+        // 后台首页
         path: 'home',
         component: () => import('@/views/admin/AdminHome.vue')
       },
@@ -100,6 +100,21 @@ const routes = [
         // 题目管理
         path: 'questions-manage',
         component: () => import('@/views/admin/QuestionManage.vue')
+      },
+      {
+        // 试卷管理
+        path: 'papers-manage',
+        component: () => import('@/views/admin/PaperManage.vue')
+      },
+      {
+        // 考试记录管理
+        path: 'exam-record-manage',
+        component: () => import('@/views/admin/ExamRecordManage.vue')
+      },
+      {
+        // 学习进度监控
+        path: 'user-progress-monitor',
+        component: () => import('@/views/admin/UserProgressMonitor.vue')
       },
     ]
   }

@@ -51,6 +51,11 @@ public interface QuestionService extends IService<Question> {
      */
     Page<Question> questionPage(Page<Question> page, List<Integer> subjectIds, Integer bookId);
 
+    /**
+     * 识别图片中的题目和 LaTeX 公式，返回结构化 JSON
+     * @param file 图片文件
+     * @return 结构化 JSON
+     */
     LLMQuestionOutputDTO recognizeImageToText(MultipartFile file) throws Exception;
 
 

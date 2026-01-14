@@ -47,6 +47,24 @@
                         </el-icon>
                         <span>题库管理</span>
                     </el-menu-item>
+                    <el-menu-item index="/admin/papers-manage">
+                        <el-icon>
+                            <Tickets />
+                        </el-icon>
+                        <span>试卷管理</span>
+                    </el-menu-item>
+                    <el-menu-item index="/admin/exam-record-manage">
+                        <el-icon>
+                            <Notebook />
+                        </el-icon>
+                        <span>考试记录管理</span>
+                    </el-menu-item>
+                    <el-menu-item index="/admin/user-progress-monitor">
+                        <el-icon>
+                            <TrendCharts />
+                        </el-icon>
+                        <span>学习进度监控</span>
+                    </el-menu-item>
 
                     <div class="menu-divider"></div>
 
@@ -93,7 +111,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { HomeFilled, Document, Monitor, Management, Reading, Files, User, Warning, SwitchButton } from '@element-plus/icons-vue'
+import { HomeFilled, Document, Monitor, Management, Reading, Files, User, Warning, SwitchButton, Tickets, Notebook } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useTransitionStore } from '@/stores/transition'
 import { computed, onMounted } from 'vue'

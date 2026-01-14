@@ -225,8 +225,9 @@ public class QuestionController {
         return Result.success("错题已记录");
     }
 
+    // 11. LLM进行识别题目
     @PostMapping("/recognize")
-    @Operation(summary = "AI 图片识别题目", description = "利用多模态大模型识别图片中的题目和 LaTeX 公式，返回结构化 JSON")
+    @Operation(summary = "AI 图片识别题目", description = "利用LLM识别图片中的题目和 LaTeX 公式，返回结构化 JSON")
     public Result<LLMQuestionOutputDTO> recognize(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
             return Result.error("文件不能为空");

@@ -33,3 +33,60 @@ export function getPaperQuestions(paperId) {
         method: 'get'
     })
 }
+
+// 添加题目到试卷
+export function addQuestionToPaper(paperId, data) {
+    return request({
+        url: `/paper/${paperId}/add-question`,
+        method: 'post',
+        params: {
+            questionId: data.questionId,
+            sortOrder: data.sortOrder,
+            scoreValue: data.scoreValue,
+            parentSectionName: data.parentSectionName
+        }
+    })
+}
+
+// 从试卷中移除题目
+export function removeQuestionFromPaper(paperId, questionId) {
+    return request({
+        url: `/paper/${paperId}/remove-question/${questionId}`,
+        method: 'delete'
+    })
+}
+
+// 更新试卷中题目的顺序
+export function updateQuestionOrder(paperId, data) {
+    return request({
+        url: `/paper/${paperId}/update-question-order`,
+        method: 'post',
+        data
+    })
+}
+
+// 新增试卷
+export function addPaper(data) {
+    return request({
+        url: '/paper/add',
+        method: 'post',
+        data
+    })
+}
+
+// 更新试卷
+export function updatePaper(data) {
+    return request({
+        url: '/paper/update',
+        method: 'post',
+        data
+    })
+}
+
+// 删除试卷
+export function deletePaper(id) {
+    return request({
+        url: `/paper/delete/${id}`,
+        method: 'delete'
+    })
+}

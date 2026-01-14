@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "试卷管理", description = "试卷增删改查接口，包括试卷基本信息和题目关联管理")
 @RestController
@@ -161,21 +162,21 @@ public class PaperController {
     }
 
     @PostMapping("/{paperId}/add-question")
-    @Operation(summary = "添加题目到试卷", description = "将指定题目添加到试卷中，设置题目顺序和分值")
+    @Operation(summary = "添加题目到试卷", description = "将指定题目添加到试卷中，设置题目顺序、分值和类型")
     public Result<String> addQuestionToPaper(
             @Parameter(description = "试卷ID", required = true) @PathVariable String paperId,
             @Parameter(description = "题目ID", required = true) @RequestParam String questionId,
             @Parameter(description = "题目顺序") @RequestParam Integer sortOrder,
             @Parameter(description = "题目分值") @RequestParam java.math.BigDecimal scoreValue,
-            @Parameter(description = "所属大题名称") @RequestParam(required = false) String parentSectionName) {
+            @Parameter(description = "题目类型（可选，用于覆盖原题目类型）") @RequestParam(required = false) Integer type) {
         try {
             MapPaperQuestion mapping = new MapPaperQuestion();
             mapping.setPaperId(paperId);
             mapping.setQuestionId(questionId);
             mapping.setSortOrder(sortOrder);
             mapping.setScoreValue(scoreValue);
-            mapping.setParentSectionName(parentSectionName);
-            
+            mapping.setType(type);
+
             boolean success = mapPaperQuestionService.save(mapping);
             return success ? Result.success("题目添加成功") : Result.error("题目添加失败");
         } catch (Exception e) {
@@ -192,9 +193,37 @@ public class PaperController {
             LambdaQueryWrapper<MapPaperQuestion> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(MapPaperQuestion::getPaperId, paperId)
                    .eq(MapPaperQuestion::getQuestionId, questionId);
-            
+
             boolean success = mapPaperQuestionService.remove(wrapper);
             return success ? Result.success("题目移除成功") : Result.error("题目移除失败");
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{paperId}/update-question-order")
+    @Operation(summary = "更新试卷中题目的顺序", description = "批量更新试卷中题目的顺序")
+    public Result<String> updateQuestionOrder(
+            @Parameter(description = "试卷ID", required = true) @PathVariable String paperId,
+            @RequestBody Map<String, Integer> orderMap) {
+        try {
+            // orderMap: {questionId: sortOrder}
+            for (Map.Entry<String, Integer> entry : orderMap.entrySet()) {
+                String questionId = entry.getKey();
+                Integer sortOrder = entry.getValue();
+
+                LambdaQueryWrapper<MapPaperQuestion> wrapper = new LambdaQueryWrapper<>();
+                wrapper.eq(MapPaperQuestion::getPaperId, paperId)
+                       .eq(MapPaperQuestion::getQuestionId, questionId);
+
+                MapPaperQuestion mapping = mapPaperQuestionService.getOne(wrapper);
+                if (mapping != null) {
+                    mapping.setSortOrder(sortOrder);
+                    mapPaperQuestionService.updateById(mapping);
+                }
+            }
+
+            return Result.success("题目顺序更新成功");
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }

@@ -272,7 +272,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
                 "1. **清洗数据**：忽略水印、页码、手写笔记等无关信息。\n" +
                 "2. **公式处理**：所有数学符号、公式、科学表达式必须转换为标准的 LaTeX 语法，并统一用 $ 包裹（如 $x^2 + y^2 = r^2$）。\n" +
                 "3. **字段定义**：\n" +
-                "   - `content`: 题干内容。\n" +
+                "   - `content`: 只要题干内容，如有题号需删除。\n" +
                 "   - `options`: 选项列表，若无选项则返回空数组 []。\n" +
                 "   - `answer`: 正确答案（若图片中包含）。\n" +
                 "   - `analysis`: 题目解析（若图片中包含）。\n" +

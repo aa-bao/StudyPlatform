@@ -77,3 +77,22 @@ export function getIncompleteSessions(userId) {
         method: 'get'
     })
 }
+
+// ==================== 管理员接口 ====================
+
+// 获取所有考试记录（管理员）
+export function getAllExamSessions(params) {
+    return request({
+        url: '/exam-session/admin/all',
+        method: 'get',
+        params
+    })
+}
+
+// 获取考试统计数据（管理员）
+export function getExamStats() {
+    return request({
+        url: '/exam-session/admin/stats',
+        method: 'get'
+    })
+}

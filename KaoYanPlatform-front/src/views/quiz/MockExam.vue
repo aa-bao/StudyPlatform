@@ -28,7 +28,6 @@
         </div>
 
         <div class="nav-right">
-
           <div class="top-tools">
             <button @click="openDraft" class="nav-tool-btn">📝 草稿纸</button>
           </div>
@@ -79,31 +78,38 @@
                 <!-- 题型标题 -->
                 <div v-if="q.sectionTitle" class="section-banner">{{ q.sectionTitle }}</div>
 
-                <p class="question-title" v-html="renderLatex(q.content)"></p>
+                <!-- 题目内容（跳过sectionTitle对象） -->
+                <template v-else>
+                  <!-- 题号和题目内容 -->
+                  <p class="question-title">
+                    <span class="question-number">{{ q.index }}.</span>
+                    <span v-html="renderLatex(q.content)"></span>
+                  </p>
 
-                <!-- 选择题选项 -->
-                <div v-if="isChoiceQuestion(q.type)" class="options-grid">
-                  <label v-for="opt in Object.keys(q.options || {})" :key="opt" class="option-label">
-                    <input
-                      :type="q.type === 'single-choice' ? 'radio' : 'checkbox'"
-                      :name="'q' + q.id"
-                      :value="opt"
-                      :checked="isOptionSelected(q.id, opt)"
-                      @change="handleOptionChange(q.id, opt, q.type)"
-                    >
-                    <span class="option-text" v-html="'(' + opt + ') ' + renderLatex(q.options[opt])"></span>
-                  </label>
-                </div>
+                  <!-- 选择题选项 -->
+                  <div v-if="isChoiceQuestion(q.type)" class="options-grid">
+                    <label v-for="opt in Object.keys(q.options || {})" :key="opt" class="option-label">
+                      <input
+                        :type="q.type === 'single-choice' ? 'radio' : 'checkbox'"
+                        :name="'q' + q.id"
+                        :value="opt"
+                        :checked="isOptionSelected(q.id, opt)"
+                        @change="handleOptionChange(q.id, opt, q.type)"
+                      >
+                      <span class="option-text" v-html="'(' + opt + ') ' + renderLatex(q.options[opt])"></span>
+                    </label>
+                  </div>
 
-                <!-- 填空题/主观题输入框 -->
-                <textarea
-                  v-else
-                  v-model="answers[q.id]"
-                  @input="markDone(q.id)"
-                  class="answer-area"
-                  rows="4"
-                  placeholder="请输入你的答案..."
-                ></textarea>
+                  <!-- 填空题/主观题输入框 -->
+                  <textarea
+                    v-else
+                    v-model="answers[q.id]"
+                    @input="markDone(q.id)"
+                    class="answer-area"
+                    rows="4"
+                    placeholder="请输入你的答案..."
+                  ></textarea>
+                </template>
               </div>
 
               <footer class="paper-footer">第 {{ pageIndex + 1 }} 页（共 {{ paperPages.length }} 页）</footer>
@@ -233,7 +239,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { startExam, saveSnapshot, recordSwitch, submitExam as submitExamApi, getSessionDetail } from '@/api/examSession';
@@ -762,13 +768,13 @@ const confirmSubmit = async () => {
     // 先保存快照
     await saveSnapshotToLocal();
 
-    // 提交考试
+    // 提交考试（后端会立即返回客观题分数，并触发异步批改主观题）
     const submitRes = await submitExamApi(sessionId.value);
     if (submitRes.code !== 200) {
       throw new Error('提交失败');
     }
 
-    // 获取考试结果
+    // 获取考试结果（此时包含客观题分数）
     const resultRes = await getSessionDetail(sessionId.value);
     if (resultRes.code === 200 && resultRes.data) {
       examResult.value = {
@@ -791,8 +797,11 @@ const confirmSubmit = async () => {
     // 移除历史记录保护，允许用户正常返回
     removeHistoryProtection();
 
-    // 显示结果
+    // 显示结果（此时可能还在批改主观题）
     showResultModal.value = true;
+
+    // 开始轮询获取完整成绩
+    startPollingForResult();
   } catch (err) {
     console.error('提交考试失败:', err);
     ElMessage.error(err.message || '提交失败');
@@ -800,6 +809,55 @@ const confirmSubmit = async () => {
   } finally {
     submitting.value = false;
   }
+};
+
+// 轮询获取完整成绩
+let pollingInterval = null;
+const startPollingForResult = () => {
+  // 先清除之前的轮询
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
+
+  // 每5秒轮询一次，最多轮询20次（100秒）
+  let pollingCount = 0;
+  const maxPolling = 20;
+
+  pollingInterval = setInterval(async () => {
+    pollingCount++;
+
+    try {
+      const resultRes = await getSessionDetail(sessionId.value);
+      if (resultRes.code === 200 && resultRes.data) {
+        // 检查是否还在批改中（aiSummary包含"批改中"）
+        const isGrading = resultRes.data.aiSummary && resultRes.data.aiSummary.includes('批改中');
+
+        if (!isGrading || pollingCount >= maxPolling) {
+          // 批改完成或达到最大轮询次数，停止轮询
+          clearInterval(pollingInterval);
+          pollingInterval = null;
+
+          // 更新最终结果
+          examResult.value = {
+            totalScore: resultRes.data.totalScore || 0,
+            aiSummary: resultRes.data.aiSummary || ''
+          };
+
+          if (pollingCount >= maxPolling && isGrading) {
+            ElMessage.warning('主观题批改仍在进行中，请稍后刷新查看完整成绩');
+          }
+        } else {
+          // 还在批改中，更新当前进度
+          examResult.value = {
+            totalScore: resultRes.data.totalScore || 0,
+            aiSummary: resultRes.data.aiSummary || ''
+          };
+        }
+      }
+    } catch (err) {
+      console.error('轮询获取成绩失败:', err);
+    }
+  }, 5000); // 每5秒轮询一次
 };
 
 // 切屏检测
@@ -881,6 +939,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
+  if (pollingInterval) clearInterval(pollingInterval);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   // 移除历史记录保护
   removeHistoryProtection();
@@ -1252,6 +1311,15 @@ button {
   margin-bottom: 16px;
   font-weight: 500;
   display: flex;
+  align-items: flex-start;
+}
+
+.question-number {
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-right: 8px;
+  flex-shrink: 0;
+  font-size: 16px;
 }
 
 .options-grid {
