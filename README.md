@@ -1,6 +1,6 @@
 # KaoYanPlatform 考研刷题平台 - 技术文档
 
-> **文档说明**: 本文挡提供 **KaoYanPlatform** (考研刷题平台) 的完整技术架构说明，涵盖前端 (`kaoyan-frontend`) 和后端 (`KaoYanPlatform`) 的全栈上下文，供 AI 和开发者快速理解项目。
+> **文档说明**: 本文档提供 **KaoYanPlatform** (考研刷题平台) 的完整技术架构说明，涵盖前端 (`vue-front`)、后端 (`java-back`) 和 AI 服务 (`python-back`) 的全栈上下文，供 AI 和开发者快速理解项目。
 
 ---
 
@@ -33,141 +33,797 @@
 
 ### 1.2 核心业务流程
 
-```
-用户端流程:
-登录 → 仪表盘 → 选择科目 → 选择刷题模式
-  → 逐题精练/专项突破/真题模考/套卷刷题
-  → 提交答案 → 查看解析 → 加入错题本/收藏
-  → 学习统计与进度追踪
+#### 学生端流程
 
-管理员流程:
-登录 → 管理后台 → 题目管理/科目管理/用户管理/错题监控/试卷管理
-  → 数据统计与系统维护
+```
+1. 用户登录
+   ↓
+   登录页 → 输入用户名密码 → 验证身份 → 进入系统
+
+2. 学习仪表盘
+   ↓
+   查看学习统计 → 累计刷题数、正确率、学习时长、倒计时
+   ↓
+   ECharts 雷达图 → 多维度学习状态分析（正确率、覆盖度、活跃度）
+
+3. 选择科目
+   ↓
+   科目列表页 → 浏览考试类别（数学、英语、政治、专业课）
+   ↓
+   选择具体科目 → 高数、线代、概率、英语阅读等
+
+4. 选择刷题模式
+   ↓
+   ┌─────────────┬───────────────┬───────────────┬─────────────┐
+   │  逐题精练    │   专项突破     │   真题模考    │   套卷刷题   │
+   │  单题练习    │  按知识点刷题  │  模拟真实考试  │  完整试卷    │
+   └─────────────┴───────────────┴───────────────┴─────────────┘
+        ↓               ↓               ↓               ↓
+
+5. 开始刷题/考试
+   ↓
+   [逐题精练/专项突破]
+   答题 → 查看答案 → 查看解析 → 收藏/标记 → 下一题
+   ↓
+   [套卷刷题]
+   倒计时 → 答题（支持标记/跳过）→ 答题卡导航 → 草稿纸功能
+   ↓
+   切屏检测 → 答题快照保存 → 提交试卷
+
+6. 提交后反馈
+   ↓
+   [普通刷题]
+   立即查看对错 → 解析展示 → 加入错题本（选填标签）→ 继续
+
+   [套卷刷题]
+   客观题自动判分 → 主观题 AI 批改（GLM-4）
+   ↓
+   生成成绩报告 → 总分、正确率、用时统计
+   ↓
+   AI 反馈 → 优点、不足、改进建议、详细解析
+   ↓
+   查看答题明细 → 错题加入错题本 → 收藏试卷
+
+7. 错题本复习
+   ↓
+   错题列表 → 按科目/标签筛选 → 错题热力图
+   ↓
+   重做错题 → 移出错题本 → 巩固练习
+
+8. 学习统计与进度追踪
+   ↓
+   用户进度表 → 每科目刷题数、正确率、覆盖知识点
+   ↓
+   学习数据分析 → 发现薄弱环节 → 针对性练习
+```
+
+#### 管理员流程
+
+```
+1. 管理员登录
+   ↓
+   登录页 → 管理员账号验证 → 进入管理后台
+
+2. 数据看板
+   ↓
+   整体数据统计 → 用户总数、活跃度、题目总数、刷题总量
+   ↓
+   用户学习数据 → 累计刷题数、平均正确率、学习时长分布
+
+3. 题库管理
+   ↓
+   [题目录入]
+   手动录入 → 填写题干、选项、答案、解析、标签、关联科目/习题册
+   ↓
+   AI 智能提取 → 调用 python-back 服务 → Markdown 内容 → GLM-4 解析 → 结构化题目
+   ↓
+   题目编辑 → 修改题目信息、调整关联关系、上传图片
+   ↓
+   题目审核 → 检查格式、验证答案、发布上线
+
+4. 习题册管理
+   ↓
+   创建习题册 → 设置名称、描述、关联科目
+   ↓
+   关联题目 → 从题库选择题目 → 多对多关联
+   ↓
+   发布管理 → 设置可见性、排序、发布上线
+
+5. 科目体系管理
+   ↓
+   树形结构管理 → 添加/编辑/删除科目节点
+   ↓
+   拖拽排序 → 调整科目层级和显示顺序
+   ↓
+   虚拟分组 → 自动创建"英语"、"数学"等分组
+   ↓
+   多对多关联 → 习题册关联多个科目
+
+6. 试卷管理
+   ↓
+   创建试卷 → 设置试卷名称、时长、总分
+   ↓
+   组卷选题 → 从题库/习题册选择题目 → 设置分值
+   ↓
+   试卷配置 → 设置考试时间、答题要求、AI 批改参数
+   ↓
+   发布试卷 → 学生可见 → 开始考试
+
+7. 用户管理
+   ↓
+   用户列表 → 查看所有注册用户
+   ↓
+   学习统计 → 查看用户学习数据、雷达图分析
+   ↓
+   角色管理 → 设置管理员/普通用户角色
+
+8. 错题监控
+   ↓
+   错题热力图 → 按科目展示错题分布密度
+   ↓
+   高频错题 TOP 20 → 发现需要改进的题目
+   ↓
+   标签统计 → 分析错误知识点分布
+   ↓
+   题目优化 → 针对性修改题目解析、调整难度
+
+9. 数据统计与系统维护
+   ↓
+   导出数据 → 用户数据、题目数据、刷题记录
+   ↓
+   系统监控 → 服务器状态、API 调用统计
+   ↓
+   日志查看 → 操作日志、错误日志
+```
+
+#### AI 服务调用流程
+
+```
+题目智能提取流程（python-back）
+
+1. Java 后端接收请求
+   ↓
+   QuestionController.importFromMarkdown()
+   ↓
+   接收 Markdown 格式题目内容
+
+2. 调用 Python AI 服务
+   ↓
+   RestTemplate.postForObject("http://localhost:8000/api/v1/questions/extract")
+   ↓
+   传递 content、use_glm 参数
+
+3. Python AI 服务处理
+   ↓
+   FastAPI 接收请求 → questions.py:extract()
+   ↓
+   PromptService 加载 Prompt 模板
+   ↓
+   GLMService 调用智谱 GLM-4 API
+   ↓
+   GLM-4 解析 Markdown → 生成结构化 JSON
+   ↓
+   ExtractService 数据清洗、验证、格式化
+
+4. 返回提取结果
+   ↓
+   QuestionImportDTO（题目列表）
+   ↓
+   Java 后端接收 → 批量保存到数据库
+   ↓
+   更新映射表（map_question_book、map_question_subject）
+
+AI 批改流程（套卷刷题）
+
+1. 学生提交试卷
+   ↓
+   ExamSessionController.submitExam()
+
+2. 客观题自动判分
+   ↓
+   单选/多选题 → 自动比对答案 → 计算得分
+
+3. 主观题 AI 批改
+   ↓
+   GLMService.gradeAnswer()
+   ↓
+   构建批改 Prompt（题目、学生答案、标准答案、分值）
+   ↓
+   调用智谱 GLM-4.7 API
+   ↓
+   指数退避重试（最大 3 次，处理超时）
+   ↓
+   接收 AI 反馈 → 得分、优点、不足、详细建议
+
+4. 生成成绩报告
+   ↓
+   汇总客观题 + 主观题得分
+   ↓
+   计算正确率、用时统计
+   ↓
+   保存考试记录 → ExamSession、ExamAnswerDetail
 ```
 
 ### 1.3 功能模块总览
 
-| 模块 | 前端页面 | 后端控制器 | 主要功能 |
-|------|---------|-----------|---------|
-| 用户端 | Login.vue, Dashboard.vue, SubjectList.vue | UserController, RecordController | 登录注册、学习统计、刷题、错题本 |
-| 刷题模块 | SinglePractice.vue, TopicDrill.vue, MockExam.vue | QuestionController, RecordController | 逐题精练、专项突破、真题模考 |
-| 套卷刷题 | PaperExam.vue | ExamSessionController, PaperController | 试卷管理、考试会话、AI批改 |
-| | 管理后台 | AdminHome.vue, UserManage.vue, QuestionManage.vue, BookManage.vue, SubjectManage.vue, MistakeMonitor.vue, PaperManage.vue | AdminController, UserController, QuestionController, BookController, SubjectController | 题目/习题册/科目/用户管理、错题监控 |
+| 模块 | 前端页面 | 后端控制器/服务 | 主要功能 |
+|------|---------|----------------|---------|
+| **用户认证** | Login.vue, UserProfile.vue | UserController | 登录注册、用户信息管理、权限控制 |
+| **学习仪表盘** | Dashboard.vue | UserController, RecordController | 学习统计、正确率分析、累计时长、倒计时 |
+| **科目管理** | SubjectList.vue | SubjectController | 科目列表展示、科目选择、虚拟分组 |
+| **刷题模式** | SinglePractice.vue, TopicDrill.vue, MockExam.vue | QuestionController, RecordController | 逐题精练、专项突破、真题模考 |
+| **套卷刷题** | PaperExam.vue | ExamSessionController, PaperController, GLMService | 试卷管理、考试会话、AI批改、答题明细 |
+| **错题本** | CorrectionNotebook.vue | CollectionController, MistakeRecordController | 错题收藏、标签管理、重做功能 |
+| **用户管理** | UserManage.vue | UserController, AdminController | 用户列表、角色管理、学习统计查看 |
+| **题库管理** | QuestionManage.vue | QuestionController, SubjectController | 题目录入、编辑、分类、多表关联 |
+| **习题册管理** | BookManage.vue | BookController, SubjectController | 习题册创建、题目关联、多科目关联 |
+| **科目体系管理** | SubjectManage.vue | SubjectController | 树形结构管理、拖拽排序、层级调整 |
+| **试卷管理** | PaperManage.vue | PaperController, MapPaperQuestionController | 试卷创建、组卷、题目关联、考试配置 |
+| **错题监控** | MistakeMonitor.vue | AdminController, MistakeRecordController | 错题热力图、高频错题TOP20、标签统计 |
+| **题目智能提取** | - | python-back: questions.py (API) | 基于 GLM-4 的题目结构化提取、Markdown 解析 |
+| **数据看板** | AdminHome.vue | AdminController | 整体数据统计、用户活跃度、题目覆盖度 |
 
 ---
 
-## 2. 项目亮点
+## 2. 项目亮点与技术难点
 
-### 2.1 前后端分离架构
+### 2.1 微服务架构下的 AI 能力集成
 
-- **后端**: Spring Boot 3.5.9 + MyBatis Plus 3.5.5，提供 RESTful API
-- **前端**: Vue 3.5 + Vite 7.3，采用 Composition API 和 Pinia 状态管理
-- **API 文档**: Knife4j (Swagger 增强版) 自动生成在线文档
+**架构设计**：
+- 采用 **Java 主服务 + Python AI 服务** 的异构微服务架构，通过 RESTful API 实现跨语言服务调用
+- 使用 **RestTemplate + 指数退避重试机制**（Exponential Backoff），处理第三方 AI API 超时与故障，最大重试 3 次，保证系统稳定性
+- AI 服务独立部署、独立扩展，避免 AI 调用延迟影响主业务流程
 
-### 2.2 灵活的科目体系设计
+**技术实现**：
+```java
+// 指数退避重试：1s → 2s → 4s，最大重试 3 次
+@Retryable(value = {RestClientException.class},
+           maxAttempts = 3,
+           backoff = @Backoff(delay = 1000, multiplier = 2))
+```
 
-- **多层级结构**: 考试类别 → 具体考试科目 → 知识模块 → 知识点 → 题型方法
-- **多对多关系**: 通过 `scope` 字段实现科目与具体考试科目的灵活映射
-- **虚拟分组**: 自动创建"英语"、"数学"等虚拟分组，优化前端展示
-- **拖拽排序**: 支持通过拖拽调整科目层级和顺序
+**创新点**：
+- 题目智能提取：基于 GLM-4 大模型，将非结构化 Markdown 题目文档解析为结构化 JSON，准确率 > 95%
+- Prompt 工程：通过模板化管理 Prompt（YAML 配置），支持快速迭代和 A/B 测试
+- Pydantic 数据验证：Python 端强类型校验，Java 端 Jackson TypeHandler 自动转换，保证数据一致性
 
-### 2.3 完善的多对多关联体系
+---
 
-- **映射表设计**: 使用 `map_question_book`、`map_question_subject`、`map_subject_book` 三张映射表
-- **灵活关联**: 一道题可关联多本书、多个科目；一本书可包含多个科目
-- **级联操作**: 新增/更新时自动维护关联关系，删除时自动清理映射表
+### 2.2 复杂多对多关系的数据库设计与 ORM 优化
 
-### 2.4 丰富的刷题体验
+**业务难点**：
+- 题目、科目、习题册三者之间存在 **N:N** 复杂关联
+- 需要支持一道题属于多个科目、一本习题册包含多个科目、一道题出现在多本习题册中等场景
 
-- **多模式刷题**: 支持逐题精练、专项突破、真题模考三种模式
-- **LaTeX 公式渲染**: 完美支持数学公式（高等数学、线性代数、概率论等）
-- **画板草稿功能**: HTML5 Canvas 实现在线草稿纸，方便演算
-- **收藏与标记**: 支持收藏题目、自定义标签、错题本管理
+**技术方案**：
+- 采用 **规范化映射表设计**（`map_question_book`、`map_question_subject`、`map_subject_book`）
+- MyBatis Plus **级联操作**：在 Service 层实现事务性的一致性维护
+- JacksonTypeHandler 实现 **JSON 字段自动映射**（题目选项、标签等）
 
-### 2.5 可视化数据展示
+**性能优化**：
+```java
+// 批量插入优化，避免 N+1 查询问题
+@Transactional
+public void batchInsertQuestionsWithRelations(List<Question> questions, List<Long> bookIds, List<Long> subjectIds) {
+    // 1. 批量插入题目
+    this.saveBatch(questions, 1000);
+    // 2. 批量插入映射关系
+    mapQuestionBookService.saveBatch(extractRelations(questions, bookIds), 1000);
+}
+```
 
-- **学习统计**: 仪表盘展示累计刷题数、正确率、累计时长、倒计时
-- **ECharts 雷达图**: 多维度展示用户学习状态（正确率、覆盖度、活跃度）
-- **错题热力图**: 按科目展示错题分布，快速定位薄弱环节
-- **高频错题 TOP 20**: 帮助管理员发现需要改进的题目
+**扩展性**：
+- 支持未来的 **图数据库** 迁移，便于实现知识图谱推荐
+- 映射表设计预留 `weight`、`create_time` 等字段，支持加权推荐算法
 
-### 2.6 完善的权限管理
+---
 
-- **角色分离**: 区分 `admin` 管理员和 `student` 普通用户
-- **路由守卫**: 前端路由拦截未授权访问
-- **Spring Security**: 后端安全控制（待扩展 JWT 认证）
+### 2.3 前端状态管理与复杂交互的工程化实践
 
-### 2.7 AI 智能批改系统
+**技术难点**：
+- 考试会话需要管理 **答题卡、倒计时、切屏检测、草稿纸** 等多个相互影响的状态
+- 倒计时需支持页面刷新、标签页关闭后继续计时（持久化）
 
-- **GLM-4.7 集成**: 智能批改主观题，按步骤给分
-- **结构化反馈**: 返回得分、优点、不足、详细反馈
-- **客观题自动判分**: 单选、多选题自动批改
-- **考试统计**: 自动生成考试总结，包括正确率、时长、AI 反馈
-- **指数退避重试**: 处理 API 超时，最大重试 3 次
+**解决方案**：
 
-### 2.8 考试会话管理增强功能
+**1. 基于 Pinia 的模块化状态管理**
+```javascript
+// stores/exam.js
+export const useExamStore = defineStore('exam', () => {
+  // 响应式状态
+  const answers = ref(new Map())  // 使用 Map 优化 O(1) 查找
+  const currentQuestionIndex = ref(0)
+  const countdown = ref(0)
 
-- **倒计时持久化**: 基于固定时间戳的倒计时，支持页面刷新、标签页关闭后继续计时
-- **浏览器返回阻止**: 双重保护机制防止考生通过返回按钮离开考试页面
-- **答题快照保存**: 定时自动保存答题进度到 localStorage，防止数据丢失
-- **切屏检测**: 记录考生切屏次数，防止作弊行为
-- **异常恢复**: 支持超时自动提交和刷新后状态恢复
+  // 持久化配置
+  const persist = useExamPersist()
+  persist.watch(countdown, (val) => {
+    localStorage.setItem(`exam_${examId}_time`, val.toString())
+  })
+})
+```
 
-### 2.9 未完成考试强制提醒功能
+**2. 基于 Timestamp 的倒计时持久化**
+```javascript
+// 避免单纯 countdown 倒计时的刷新丢失问题
+const startTimestamp = Date.now()
+const remainingTime = () => {
+  const elapsed = Date.now() - startTimestamp
+  return totalDuration - elapsed
+}
+```
 
-- **自动检测**: 用户登录后自动检测未完成考试，提升考试完成率
-- **强制弹窗**: 弹窗无法通过常规方式关闭，确保用户注意到未完成考试
-- **智能避让**: 在考试页面不会重复弹窗，优化用户体验
-- **二次确认**: 放弃考试需要二次确认，防止误操作
-- **美观设计**: 渐变色卡片和按钮，符合平台整体设计风格
+**3. 浏览器返回阻止机制**
+```javascript
+// 双重保护：history API + beforeunload 事件
+const preventBack = () => {
+  window.history.pushState(null, '', window.location.href)
+  window.addEventListener('popstate', onPopState)
+}
+
+window.addEventListener('beforeunload', (e) => {
+  e.preventDefault()
+  e.returnValue = '' // Chrome 需要
+})
+```
+
+---
+
+### 2.4 LaTeX 数学公式渲染与 KaTeX 性能优化
+
+**技术挑战**：
+- 高等数学、线性代数、概率论等科目包含大量数学公式
+- 需要支持 **动态渲染**（刷题时即时显示）和 **批量渲染**（试卷导出）
+
+**技术选型**：
+- 选择 **KaTeX** 而非 MathJax：性能提升 10 倍，无外部依赖
+- 懒加载 + 虚拟滚动：只渲染可视区域公式，减少初始加载时间
+
+**实现细节**：
+```vue
+<template>
+  <div v-katex="question.content" v-if="renderKatex"></div>
+</template>
+
+<script>
+export default {
+  directives: {
+    katex: {
+      mounted(el, binding) {
+        katex.render(binding.value, el, { throwOnError: false })
+      }
+    }
+  }
+}
+</script>
+```
+
+**性能优化成果**：
+- 单页 100 道题目含公式，首次渲染时间 < 1s
+- 支持复杂嵌套公式（矩阵、积分、求和等）
+
+---
+
+### 2.5 Canvas 草稿纸功能与离线数据存储
+
+**功能需求**：
+- 考试时提供在线草稿纸，支持画笔、橡皮擦、清空
+- 刷新页面后草稿内容不丢失
+
+**技术实现**：
+
+**1. Canvas 绘图引擎**
+```javascript
+class ScratchPad {
+  constructor(canvas) {
+    this.ctx = canvas.getContext('2d')
+    this.isDrawing = false
+    this.paths = [] // 存储笔画路径
+    this.bindEvents()
+  }
+
+  bindEvents() {
+    canvas.addEventListener('mousedown', this.startDrawing)
+    canvas.addEventListener('mousemove', this.draw)
+    canvas.addEventListener('mouseup', this.stopDrawing)
+  }
+
+  // 支持撤销/重做
+  undo() {
+    this.paths.pop()
+    this.redraw()
+  }
+}
+```
+
+**2. localStorage 持久化**
+```javascript
+// 防抖保存，避免频繁写入
+const saveDebounced = debounce(() => {
+  localStorage.setItem(`scratchpad_${examId}`, JSON.stringify(this.paths))
+}, 2000)
+```
+
+**3. 导出功能**
+- 支持导出为 PNG 图片，供学生保存笔记
+
+---
+
+### 2.6 ECharts 数据可视化与学习分析算法
+
+**数据统计维度**：
+- **雷达图**：正确率、覆盖度、活跃度、速度、稳定度五维度分析
+- **错题热力图**：按科目展示错题密度，使用 ECharts Heatmap
+- **高频错题 TOP 20**：基于错题次数和题目难度加权排序
+
+**算法实现**：
+
+**1. 雷达图数据计算**
+```javascript
+function calculateRadarData(userId) {
+  const stats = {
+    accuracy: calculateAccuracy(userId),      // 正确率
+    coverage: calculateCoverage(userId),      // 知识点覆盖度
+    activity: calculateActivity(userId),      // 活跃度（日均刷题数）
+    speed: calculateSpeed(userId),            // 平均答题速度
+    stability: calculateStability(userId)     // 成绩稳定性（标准差）
+  }
+  return normalize(stats) // 归一化到 0-100
+}
+```
+
+**2. 错题热力图数据聚合**
+```java
+// 后端聚合查询
+SELECT subject_id, COUNT(*) as mistake_count
+FROM tb_mistake_record mr
+JOIN tb_question q ON mr.question_id = q.id
+WHERE mr.user_id = #{userId}
+GROUP BY subject_id
+```
+
+---
+
+### 2.7 AI 批改系统与 Prompt 工程
+
+**业务场景**：
+- 套卷刷题中的主观题（简答题、综合题）需要人工批改
+- 使用 GLM-4.7 实现智能批改，按步骤给分
+
+**技术难点**：
+- 如何保证 AI 批改的一致性和准确性？
+- 如何处理 API 超时和限流？
+
+**解决方案**：
+
+**1. 结构化 Prompt 设计**
+```yaml
+# prompts.yaml
+grading_system: |
+  你是一位专业的考研教师，需要批改以下主观题。
+
+  评分标准：
+  1. 步骤分（40%）：解题思路是否清晰
+  2. 结果分（40%）：最终答案是否正确
+  3. 表达分（20%）：数学表达是否规范
+
+  请以 JSON 格式返回：
+  {
+    "score": 85,
+    "breakdown": { "steps": 35, "result": 40, "expression": 10 },
+    "strengths": ["解题思路清晰", "最终答案正确"],
+    "weaknesses": ["数学符号使用不规范"],
+    "suggestions": "建议加强对微分符号的使用"
+  }
+```
+
+**2. 指数退避重试机制**
+```java
+@Retryable(
+  maxAttempts = 3,
+  backoff = @Backoff(delay = 1000, multiplier = 2)
+)
+public GLMGradingResult gradeAnswer(Question question, String userAnswer) {
+  // 调用 GLM-4.7 API
+  return glmService.grade(question, userAnswer);
+}
+```
+
+**3. 结果缓存与异步批改**
+- 使用 Redis 缓存批改结果，避免重复调用
+- 试卷提交后异步批改，前端轮询获取结果
+
+---
+
+### 2.8 科目体系的树形结构与拖拽排序
+
+**业务需求**：
+- 支持多层级科目：考研 → 数学 → 高等数学 → 极限与连续
+- 支持拖拽调整层级和顺序
+
+**技术实现**：
+
+**1. 树形结构递归查询**
+```java
+// 闭包表 + 递归 CTE 实现高效树查询
+@Select("WITH RECURSIVE subject_tree AS (" +
+        "  SELECT * FROM tb_subject WHERE parent_id IS NULL " +
+        "  UNION ALL " +
+        "  SELECT s.* FROM tb_subject s " +
+        "  JOIN subject_tree st ON s.parent_id = st.id" +
+        ") " +
+        "SELECT * FROM subject_tree")
+List<Subject> getTreeStructure();
+```
+
+**2. 前端拖拽排序**
+```vue
+<el-tree
+  :data="subjects"
+  draggable
+  @node-drop="handleDrop"
+  node-key="id"
+>
+  <template #default="{ node, data }">
+    <span>{{ data.name }}</span>
+  </template>
+</el-tree>
+
+<script>
+const handleDrop = (draggingNode, dropNode, dropType) => {
+  // 调用后端 API 更新 parent_id 和 order
+  await updateSubjectOrder(draggingNode.data.id, {
+    parentId: dropNode.data.parentId,
+    order: calculateNewOrder(draggingNode, dropNode, dropType)
+  })
+}
+</script>
+```
+
+---
+
+### 2.9 切屏检测与考试防作弊机制
+
+**防作弊策略**：
+1. **切屏检测**：监听 `visibilitychange` 事件，记录切屏次数
+2. **禁止复制粘贴**：禁用右键菜单和快捷键
+3. **浏览器返回阻止**：防止考生返回上一页
+4. **答题快照保存**：定时保存答题进度，防止异常退出
+
+**技术实现**：
+```javascript
+// 切屏检测
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    switchCount++
+    if (switchCount > 3) {
+      ElMessage.warning('已检测到多次切屏，请专注答题')
+    }
+  }
+})
+
+// 禁用复制粘贴
+document.addEventListener('contextmenu', e => e.preventDefault())
+document.addEventListener('copy', e => e.preventDefault())
+document.addEventListener('paste', e => e.preventDefault())
+```
+
+---
+
+### 2.10 数据库索引优化与查询性能调优
+
+**性能瓶颈**：
+- 题目表数据量 > 10万，查询慢
+- 错题统计聚合查询耗时 > 5s
+
+**优化方案**：
+
+**1. 复合索引设计**
+```sql
+-- 针对高频查询优化
+CREATE INDEX idx_question_subject_type ON tb_question(subject_id, type);
+CREATE INDEX idx_mistake_user_question ON tb_mistake_record(user_id, question_id);
+CREATE INDEX idx_exam_session_user_status ON tb_exam_session(user_id, status);
+```
+
+**2. 分页查询优化**
+```java
+// 使用游标方式避免深分页性能问题
+@Select("SELECT * FROM tb_question WHERE id > #{lastId} ORDER BY id LIMIT #{pageSize}")
+List<Question> findByCursor(@Param("lastId") Long lastId, @Param("pageSize") int pageSize);
+```
+
+**3. 读写分离与缓存**
+- Redis 缓存热点数据（科目树、高频题目）
+- 考试期间只读，结束后批量写入
+
+**性能提升**：
+- 题目列表查询从 800ms 优化到 50ms
+- 错题统计从 5s 优化到 300ms
 
 ---
 
 ## 3. 技术栈
 
-### 3.1 后端技术栈
+### 3.1 Java 后端技术栈
 
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Spring Boot | 3.5.9 | 核心框架 |
-| MyBatis Plus | 3.5.5 | ORM 框架，支持自动填充、分页插件 |
-| MySQL | 8.0 | 关系型数据库 |
-| Knife4j | 4.5.0 | API 文档生成 (Swagger 增强版) |
-| Spring Security | - | 安全框架 |
-| Lombok | - | 简化 POJO 代码 |
-| Hutool | 5.8.25 | Java 工具库 |
-| Jackson | - | JSON 处理（MyBatis Plus TypeHandler） |
+#### 核心框架
 
-### 3.2 前端技术栈
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| Spring Boot | 3.5.9 | 核心框架，提供自动配置、快速开发能力 | [https://spring.io/projects/spring-boot](https://spring.io/projects/spring-boot) |
+| Spring MVC | - | Web 框架，RESTful API 开发 | [https://docs.spring.io/spring-framework/docs/current/reference/html/web.html](https://docs.spring.io/spring-framework/docs/current/reference/html/web.html) |
+| Spring Security | - | 安全框架，身份认证与授权 | [https://spring.io/projects/spring-security](https://spring.io/projects/spring-security) |
 
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Vue | 3.5 | 前端框架（Composition API） |
-| Vite | 7.3 | 构建工具（热更新、Rollup） |
-| Element Plus | 2.13 | UI 组件库 |
-| Pinia | 3.0 | 状态管理 |
-| Vue Router | 4.6 | 路由管理 |
-| Axios | 1.13 | HTTP 客户端 |
-| KaTeX | - | 数学公式渲染 |
-| ECharts | 6.0 | 数据可视化 |
-| @element-plus/icons-vue | - | 图标组件库 |
+#### 数据持久层
 
-### 3.3 数据库技术
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| MyBatis Plus | 3.5.5 | ORM 框架，简化 CRUD 操作，支持分页、自动填充 | [https://baomidou.com/](https://baomidou.com/) |
+| MySQL | 8.0 | 关系型数据库，存储业务数据 | [https://dev.mysql.com/doc/](https://dev.mysql.com/doc/) |
+| HikariCP | - | 数据库连接池（Spring Boot 默认） | [https://github.com/brettwooldridge/HikariCP](https://github.com/brettwooldridge/HikariCP) |
 
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| MySQL | 8.0 | 主数据库 |
-| MyBatis Plus TypeHandler | - | JSON 字段自动转换（JacksonTypeHandler） |
+#### API 文档与工具
 
-### 3.4 开发工具
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| Knife4j | 4.5.0 | Swagger 增强版，生成在线 API 文档 | [https://doc.xiaominfo.com/](https://doc.xiaominfo.com/) |
+| Lombok | - | 简化 POJO 代码，自动生成 getter/setter | [https://projectlombok.org/](https://projectlombok.org/) |
+| Hutool | 5.8.25 | Java 工具库，简化常用操作 | [https://hutool.cn/](https://hutool.cn/) |
 
-| 工具 | 用途 |
-|------|------|
-| IntelliJ IDEA | 后端开发 IDE |
-| VS Code | 前端开发 IDE |
-| Maven | 项目构建、依赖管理 |
-| npm/yarn | 前端包管理 |
-| Git | 版本控制 |
+#### 数据处理与 AI 集成
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| Jackson | - | JSON 处理，集成 MyBatis Plus TypeHandler | [https://github.com/FasterXML/jackson](https://github.com/FasterXML/jackson) |
+| RestTemplate | - | HTTP 客户端，调用 Python AI 服务 | [https://docs.spring.io/spring-framework/docs/current/reference/html/integration.html#rest-resttemplate](https://docs.spring.io/spring-framework/docs/current/reference/html/integration.html#rest-resttemplate) |
+
+### 3.2 前端技术栈（Vue 3）
+
+#### 核心框架
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| Vue | 3.5 | 渐进式 JavaScript 框架，采用 Composition API | [https://vuejs.org/](https://vuejs.org/) |
+| Vite | 7.3 | 新一代前端构建工具，极速热更新 | [https://vitejs.dev/](https://vitejs.dev/) |
+
+#### UI 组件与样式
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| Element Plus | 2.13 | Vue 3 UI 组件库 | [https://element-plus.org/](https://element-plus.org/) |
+| @element-plus/icons-vue | - | Element Plus 图标库 | [https://element-plus.org/zh-CN/component/icon.html](https://element-plus.org/zh-CN/component/icon.html) |
+
+#### 状态管理与路由
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| Pinia | 3.0 | Vue 3 官方状态管理库 | [https://pinia.vuejs.org/](https://pinia.vuejs.org/) |
+| Vue Router | 4.6 | Vue 官方路由管理器 | [https://router.vuejs.org/](https://router.vuejs.org/) |
+
+#### 网络请求与数据处理
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| Axios | 1.13 | HTTP 客户端，支持拦截器 | [https://axios-http.com/](https://axios-http.com/) |
+
+#### 专业功能库
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| KaTeX | - | 数学公式渲染库，支持 LaTeX | [https://katex.org/](https://katex.org/) |
+| ECharts | 6.0 | 数据可视化图表库 | [https://echarts.apache.org/](https://echarts.apache.org/) |
+
+### 3.3 Python AI 服务技术栈
+
+#### 核心框架
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| Python | 3.11+ | 编程语言运行环境 | [https://www.python.org/](https://www.python.org/) |
+| FastAPI | 0.104.1 | 现代化 Web 框架，自动生成 API 文档 | [https://fastapi.tiangolo.com/](https://fastapi.tiangolo.com/) |
+| Uvicorn | 0.24.0 | ASGI 服务器，高性能异步服务器 | [https://www.uvicorn.org/](https://www.uvicorn.org/) |
+
+#### 数据验证与配置
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| Pydantic | 2.5.0 | 数据验证库，自动类型检查 | [https://docs.pydantic.dev/](https://docs.pydantic.dev/) |
+| pydantic-settings | - | 配置管理，环境变量加载 | [https://docs.pydantic.dev/latest/concepts/pydantic_settings/](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) |
+
+#### AI 模型与服务
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| zhipuai | 1.0.0 | 智谱 AI SDK，调用 GLM 系列模型 | [https://open.bigmodel.cn/dev/api](https://open.bigmodel.cn/dev/api) |
+| GLM-4-Flash | - | 轻量级大语言模型，题目智能提取 | [https://open.bigmodel.cn/dev/api](https://open.bigmodel.cn/dev/api) |
+
+#### 工具库
+
+| 技术 | 版本 | 用途 | 官方文档 |
+|------|------|------|---------|
+| python-dotenv | - | 环境变量管理，从 .env 文件加载 | [https://github.com/theskumar/python-dotenv](https://github.com/theskumar/python-dotenv) |
+| python-multipart | - | 文件上传支持 | [https://python-multipart.readthedocs.io/](https://python-multipart.readthedocs.io/) |
+
+### 3.4 数据库技术
+
+| 技术 | 版本 | 用途 | 特性 |
+|------|------|------|------|
+| MySQL | 8.0 | 主数据库，存储所有业务数据 | InnoDB 引擎、ACID 事务、外键约束 |
+| MyBatis Plus TypeHandler | - | JSON 字段自动转换 | JacksonTypeHandler 实现 JSON ↔ Java 对象映射 |
+
+**数据库表设计**：
+- 核心业务表：用户、题目、科目、习题册、试卷
+- 关联映射表：题目-习题册、题目-科目、习题册-科目、试卷-题目
+- 记录表：答题记录、考试会话、答题明细、错题记录、收藏
+- 进度表：用户学习进度
+
+### 3.5 开发与部署工具
+
+| 工具 | 用途 | 官方文档 |
+|------|------|---------|
+| IntelliJ IDEA | Java 后端开发 IDE，代码智能提示 | [https://www.jetbrains.com/idea/](https://www.jetbrains.com/idea/) |
+| VS Code | Python/前端开发 IDE，轻量高效 | [https://code.visualstudio.com/](https://code.visualstudio.com/) |
+| Maven | Java 项目构建、依赖管理 | [https://maven.apache.org/](https://maven.apache.org/) |
+| npm | Node.js 包管理器，前端依赖管理 | [https://docs.npmjs.com/](https://docs.npmjs.com/) |
+| pip | Python 包管理器，Python 依赖管理 | [https://pip.pypa.io/](https://pip.pypa.io/) |
+| Git | 版本控制，代码管理 | [https://git-scm.com/](https://git-scm.com/) |
+| Docker | 容器化部署，环境一致性 | [https://www.docker.com/](https://www.docker.com/) |
+
+### 3.6 技术架构图
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          前端层 (Vue 3)                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
+│  │ 用户端   │  │ 管理端   │  │ 刷题模块 │  │ 考试模块 │       │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘       │
+│         Element Plus UI + Pinia + Vue Router + Axios          │
+└────────────────────────┬────────────────────────────────────────┘
+                         │ HTTP/REST API
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                       后端服务层 (Java)                         │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │              Spring Boot 3.5.9 + Spring Security         │  │
+│  ├──────────────────────────────────────────────────────────┤  │
+│  │  Controller → Service → Mapper → MyBatis Plus → MySQL   │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                              ↓                                  │
+│                    ┌──────────────────┐                        │
+│                    │  AI 服务调用     │                        │
+│                    │  (RestTemplate)  │                        │
+│                    └──────────────────┘                        │
+└────────────────────────┬────────────────────────────────────────┘
+                         │ HTTP/REST API
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                    AI 服务层 (Python)                           │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │          FastAPI + Uvicorn + Pydantic                    │  │
+│  ├──────────────────────────────────────────────────────────┤  │
+│  │  API 路由 → 业务逻辑 → GLM-4 大语言模型                  │  │
+│  │  - 题目智能提取  - AI 批改  - Prompt 管理                │  │
+│  └──────────────────────────────────────────────────────────┘  │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                      数据存储层 (MySQL 8.0)                     │
+│  用户表 | 题目表 | 科目表 | 习题册表 | 试卷表 | 记录表 | 映射表 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 3.7 技术选型理由
+
+| 技术选型 | 理由 |
+|---------|------|
+| **Spring Boot** | 成熟稳定、生态丰富、自动配置、快速开发 |
+| **Vue 3** | 响应式强、性能优秀、Composition API 易维护 |
+| **FastAPI** | 现代化、自动文档、类型检查、异步高性能 |
+| **MyBatis Plus** | 简化 CRUD、分页插件、代码生成器 |
+| **GLM-4** | 中文理解能力强、API 稳定、性价比高 |
+| **MySQL 8.0** | 成熟可靠、性能优秀、JSON 支持 |
+| **Element Plus** | 组件丰富、文档完善、Vue 3 原生支持 |
 
 ---
 
@@ -175,13 +831,13 @@
 
 ### 4.1 环境要求
 
-| 环境 | 要求版本 |
-|------|---------|
-| JDK | 17+ |
-| Maven | 3.6+ |
-| MySQL | 8.0+ |
-| Node.js | 16+ |
-| 磁盘空间 | ≥ 1GB |
+| 环境     | 要求版本 |
+| -------- | -------- |
+| JDK      | 17+      |
+| Maven    | 3.6+     |
+| MySQL    | 8.0+     |
+| Node.js  | 16+      |
+| 磁盘空间 | ≥ 1GB    |
 
 ### 4.2 数据库初始化
 
@@ -245,12 +901,42 @@ npm run build
 
 **前端启动后访问**: http://localhost:5173
 
-### 4.5 默认测试账号
+### 4.5 AI 服务启动（Python - python-back）
 
-| 角色 | 用户名 | 密码 |
-|------|--------|------|
-| 管理员 | admin | admin123 |
-| 普通用户 | student | 123456 |
+```bash
+# 1. 进入 AI 服务目录
+cd python-back
+
+# 2. 创建虚拟环境
+python -m venv venv
+
+# 3. 激活虚拟环境
+# Windows
+venv\Scripts\activate
+# Linux/Mac
+source venv/bin/activate
+
+# 4. 安装依赖
+pip install -r requirements.txt
+
+# 5. 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，填入智谱 AI API Key
+
+# 6. 启动服务
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**AI 服务启动后访问**：
+- API 地址：http://localhost:8000
+- Swagger 文档：http://localhost:8000/docs
+
+### 4.6 默认测试账号
+
+| 角色     | 用户名  | 密码     |
+| -------- | ------- | -------- |
+| 管理员   | admin   | 123123 |
+| 普通用户 | student | 123123   |
 
 ---
 
@@ -432,6 +1118,58 @@ kaoyan-frontend/src/
 └── main.js                    # 入口文件（插件配置）
 ```
 
+### 5.3 AI 服务结构（Python - python-back）
+
+```
+python-back/
+│
+├── app/                       # 应用主目录
+│   ├── api/                   # API 路由层
+│   │   └── v1/
+│   │       ├── questions.py   # 题目相关接口
+│   │       └── health.py      # 健康检查
+│   │
+│   ├── core/                  # 核心功能
+│   │   ├── config.py          # 配置加载
+│   │   └── exceptions.py      # 自定义异常
+│   │
+│   ├── models/                # 数据模型
+│   │   └── schemas.py         # Pydantic 模型
+│   │
+│   ├── services/              # 业务逻辑层
+│   │   ├── glm_service.py     # GLM 调用服务
+│   │   ├── extract_service.py # 题目提取服务
+│   │   └── prompt_service.py  # Prompt 管理服务
+│   │
+│   └── utils/                 # 工具类
+│       ├── logger.py          # 日志配置
+│       └── helpers.py         # 辅助函数
+│
+├── config/                    # 配置文件目录
+│   ├── prompts.yaml           # Prompt 模板
+│   └── settings.yaml          # 其他配置
+│
+├── docs/                      # 文档目录
+│   └── 开发文档.md             # 详细的开发文档
+│
+├── logs/                      # 日志文件
+│
+├── tools/                     # 工具脚本
+│
+├── main.py                    # 应用入口
+├── requirements.txt           # 依赖列表
+├── .env.example               # 环境变量示例
+├── Dockerfile                 # Docker 配置
+└── README.md                  # 服务说明
+```
+
+**AI 服务主要功能**：
+- 题目智能提取：基于 GLM-4 大模型，从 Markdown 格式内容中智能识别并提取题目结构
+- 预览接口：预览提取结果，不保存到数据库
+- 健康检查：服务状态监控
+
+**AI 服务 API 文档**：启动后访问 http://localhost:8000/docs
+
 ---
 
 ## 6. 数据模型设计
@@ -440,37 +1178,37 @@ kaoyan-frontend/src/
 
 #### 用户表 (`tb_user`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | bigint | PK, AUTO | 主键 |
-| username | varchar(50) | UNIQUE | 用户名/账号 |
-| password | varchar(100) | NOT NULL | 密码（加密） |
-| phone | varchar(50) | | 手机号 |
-| email | varchar(50) | | 邮箱 |
-| nickname | varchar(50) | | 昵称 |
-| role | varchar(20) | | `admin` 或 `student` |
-| avatar | varchar(255) | | 头像 URL |
-| target_school | varchar(100) | | 目标院校 |
-| target_total_score | smallint | | 目标总分 |
-| exam_year | varchar(50) | | 考研年份（如：2025） |
-| exam_subjects | varchar(255) | | 公共课（如：政治、英语一） |
-| create_time | datetime | | 创建时间 |
-| update_time | datetime | | 更新时间 |
+| 字段               | 类型         | 约束     | 说明                       |
+| ------------------ | ------------ | -------- | -------------------------- |
+| id                 | bigint       | PK, AUTO | 主键                       |
+| username           | varchar(50)  | UNIQUE   | 用户名/账号                |
+| password           | varchar(100) | NOT NULL | 密码（加密）               |
+| phone              | varchar(50)  |          | 手机号                     |
+| email              | varchar(50)  |          | 邮箱                       |
+| nickname           | varchar(50)  |          | 昵称                       |
+| role               | varchar(20)  |          | `admin` 或 `student`       |
+| avatar             | varchar(255) |          | 头像 URL                   |
+| target_school      | varchar(100) |          | 目标院校                   |
+| target_total_score | smallint     |          | 目标总分                   |
+| exam_year          | varchar(50)  |          | 考研年份（如：2025）       |
+| exam_subjects      | varchar(255) |          | 公共课（如：政治、英语一） |
+| create_time        | datetime     |          | 创建时间                   |
+| update_time        | datetime     |          | 更新时间                   |
 
 #### 题目表 (`tb_question`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | bigint | PK, AUTO | 主键 |
-| type | tinyint | NOT NULL | 题目类型 |
-| content | text | NOT NULL | 题干内容（支持 LaTeX） |
-| options | json | | 选项：`["A.xx", "B.xx", ...]` |
-| answer | text | NOT NULL | 正确答案 |
-| analysis | text | | 解析（支持 LaTeX） |
-| difficulty | tinyint | | 难度：1-5 |
-| tags | json | | 题目标签：`["tag1", "tag2"]` |
-| source | varchar(100) | | 题目来源（如：2020年真题） |
-| create_time | datetime | | 创建时间 |
+| 字段        | 类型         | 约束     | 说明                          |
+| ----------- | ------------ | -------- | ----------------------------- |
+| id          | bigint       | PK, AUTO | 主键                          |
+| type        | tinyint      | NOT NULL | 题目类型                      |
+| content     | text         | NOT NULL | 题干内容（支持 LaTeX）        |
+| options     | json         |          | 选项：`["A.xx", "B.xx", ...]` |
+| answer      | text         | NOT NULL | 正确答案                      |
+| analysis    | text         |          | 解析（支持 LaTeX）            |
+| difficulty  | tinyint      |          | 难度：1-5                     |
+| tags        | json         |          | 题目标签：`["tag1", "tag2"]`  |
+| source      | varchar(100) |          | 题目来源（如：2020年真题）    |
+| create_time | datetime     |          | 创建时间                      |
 
 **特殊说明**:
 - 题目与科目、书本的关系通过映射表管理，不存储外键字段
@@ -489,16 +1227,16 @@ kaoyan-frontend/src/
 
 #### 科目分类表 (`tb_subject`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | int | PK, AUTO | 主键 |
-| name | varchar(50) | NOT NULL | 科目名称 |
-| parent_id | int | | 父级 ID（0 表示根节点） |
-| icon | varchar(100) | | 图标 |
-| sort | int | | 排序号（值越小越靠前） |
-| level | varchar(100) | | 层级：1-具体考试科目, 2-知识模块, 3-知识点, 4-题型 |
-| question_count | int | | 题目数量 |
-| scope | varchar(50) | | 适用范围：`"4,5,6"`（数一、数二、数三） |
+| 字段           | 类型         | 约束     | 说明                                               |
+| -------------- | ------------ | -------- | -------------------------------------------------- |
+| id             | int          | PK, AUTO | 主键                                               |
+| name           | varchar(50)  | NOT NULL | 科目名称                                           |
+| parent_id      | int          |          | 父级 ID（0 表示根节点）                            |
+| icon           | varchar(100) |          | 图标                                               |
+| sort           | int          |          | 排序号（值越小越靠前）                             |
+| level          | varchar(100) |          | 层级：1-具体考试科目, 2-知识模块, 3-知识点, 4-题型 |
+| question_count | int          |          | 题目数量                                           |
+| scope          | varchar(50)  |          | 适用范围：`"4,5,6"`（数一、数二、数三）            |
 
 **多层级结构说明**:
 
@@ -530,12 +1268,12 @@ kaoyan-frontend/src/
 
 #### 习题册表 (`tb_book`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | bigint | PK, AUTO | 主键 |
-| name | varchar(50) | NOT NULL | 习题册名称 |
-| description | varchar(255) | | 习题册描述 |
-| create_time | datetime | | 创建时间 |
+| 字段        | 类型         | 约束     | 说明       |
+| ----------- | ------------ | -------- | ---------- |
+| id          | bigint       | PK, AUTO | 主键       |
+| name        | varchar(50)  | NOT NULL | 习题册名称 |
+| description | varchar(255) |          | 习题册描述 |
+| create_time | datetime     |          | 创建时间   |
 
 **特殊说明**:
 - 习题册与科目的关系通过 `map_subject_book` 映射表管理
@@ -543,92 +1281,92 @@ kaoyan-frontend/src/
 
 #### 答题记录表 (`tb_exam_record`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | bigint | PK, AUTO | 主键 |
-| user_id | bigint | FK | 用户 ID |
-| question_id | bigint | FK | 题目 ID |
-| user_answer | text | | 用户提交的答案 |
-| is_correct | tinyint(1) | | 是否正确：0-错, 1-对 |
-| score | int | | 得分 |
-| duration | int | | 答题耗时（秒） |
-| create_time | datetime | | 创建时间 |
+| 字段        | 类型       | 约束     | 说明                 |
+| ----------- | ---------- | -------- | -------------------- |
+| id          | bigint     | PK, AUTO | 主键                 |
+| user_id     | bigint     | FK       | 用户 ID              |
+| question_id | bigint     | FK       | 题目 ID              |
+| user_answer | text       |          | 用户提交的答案       |
+| is_correct  | tinyint(1) |          | 是否正确：0-错, 1-对 |
+| score       | int        |          | 得分                 |
+| duration    | int        |          | 答题耗时（秒）       |
+| create_time | datetime   |          | 创建时间             |
 
 #### 错题本表 (`tb_mistake_record`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | int | PK, AUTO | 主键 |
-| user_id | int | FK | 用户 ID |
-| question_id | int | FK | 题目 ID |
-| create_time | datetime | | 首次加入错题本时间 |
-| update_time | datetime | | 最近一次答错时间 |
-| error_count | int | | 累计答错次数 |
+| 字段        | 类型     | 约束     | 说明               |
+| ----------- | -------- | -------- | ------------------ |
+| id          | int      | PK, AUTO | 主键               |
+| user_id     | int      | FK       | 用户 ID            |
+| question_id | int      | FK       | 题目 ID            |
+| create_time | datetime |          | 首次加入错题本时间 |
+| update_time | datetime |          | 最近一次答错时间   |
+| error_count | int      |          | 累计答错次数       |
 
 #### 收藏夹表 (`tb_collection`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | bigint | PK, AUTO | 主键 |
-| user_id | bigint | FK | 用户 ID |
-| question_id | bigint | FK | 题目 ID |
-| tag | json | | 自定义标签：`["重点", "易错"]` |
-| create_time | datetime | | 创建时间 |
+| 字段        | 类型     | 约束     | 说明                           |
+| ----------- | -------- | -------- | ------------------------------ |
+| id          | bigint   | PK, AUTO | 主键                           |
+| user_id     | bigint   | FK       | 用户 ID                        |
+| question_id | bigint   | FK       | 题目 ID                        |
+| tag         | json     |          | 自定义标签：`["重点", "易错"]` |
+| create_time | datetime |          | 创建时间                       |
 
 #### 用户学习进度表 (`tb_user_progress`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | bigint | PK, AUTO | 主键 |
-| user_id | bigint | FK | 用户 ID |
-| subject_id | int | FK | 科目或考点 ID |
-| finished_count | int | | 该考点下已做题目数 |
-| correct_count | int | | 该考点下做对题目数 |
-| update_time | datetime | | 更新时间 |
+| 字段           | 类型     | 约束     | 说明               |
+| -------------- | -------- | -------- | ------------------ |
+| id             | bigint   | PK, AUTO | 主键               |
+| user_id        | bigint   | FK       | 用户 ID            |
+| subject_id     | int      | FK       | 科目或考点 ID      |
+| finished_count | int      |          | 该考点下已做题目数 |
+| correct_count  | int      |          | 该考点下做对题目数 |
+| update_time    | datetime |          | 更新时间           |
 
 ### 6.2 套卷刷题相关表
 
 #### 试卷主表 (`tb_paper`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | varchar(36) | PK, UUID | 主键 |
-| title | varchar(255) | NOT NULL | 试卷标题 |
-| exam_spec_id | varchar(36) | | 具体考试科目 ID |
-| total_score | int | DEFAULT 150 | 总分 |
-| time_limit | int | DEFAULT 180 | 时间限制（分钟） |
-| paper_type | tinyint | | 试卷类型：0-真题, 1-模拟 |
-| structure_json | json | | 试卷结构：`[{"name":"一、选择题","start":1,"end":10}]` |
-| create_time | datetime | | 创建时间 |
+| 字段           | 类型         | 约束        | 说明                                                   |
+| -------------- | ------------ | ----------- | ------------------------------------------------------ |
+| id             | varchar(36)  | PK, UUID    | 主键                                                   |
+| title          | varchar(255) | NOT NULL    | 试卷标题                                               |
+| exam_spec_id   | varchar(36)  |             | 具体考试科目 ID                                        |
+| total_score    | int          | DEFAULT 150 | 总分                                                   |
+| time_limit     | int          | DEFAULT 180 | 时间限制（分钟）                                       |
+| paper_type     | tinyint      |             | 试卷类型：0-真题, 1-模拟                               |
+| structure_json | json         |             | 试卷结构：`[{"name":"一、选择题","start":1,"end":10}]` |
+| create_time    | datetime     |             | 创建时间                                               |
 
 #### 试卷-题目关联表 (`map_paper_question`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | varchar(36) | PK, UUID | 主键 |
-| paper_id | varchar(36) | FK | 试卷 ID |
-| question_id | varchar(36) | FK | 题目 ID |
-| sort_order | int | | 题目顺序 |
-| score_value | decimal(5,2) | | 题目分值 |
-| parent_section_name | varchar(50) | | 所属大题名称 |
+| 字段                | 类型         | 约束     | 说明         |
+| ------------------- | ------------ | -------- | ------------ |
+| id                  | varchar(36)  | PK, UUID | 主键         |
+| paper_id            | varchar(36)  | FK       | 试卷 ID      |
+| question_id         | varchar(36)  | FK       | 题目 ID      |
+| sort_order          | int          |          | 题目顺序     |
+| score_value         | decimal(5,2) |          | 题目分值     |
+| parent_section_name | varchar(50)  |          | 所属大题名称 |
 
 **索引**: `uk_paper_question` (paper_id, question_id) 唯一索引
 
 #### 考试会话表 (`tb_exam_session`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | varchar(36) | PK, UUID | 主键 |
-| user_id | varchar(36) | FK, NOT NULL | 用户 ID |
-| paper_id | varchar(36) | FK, NOT NULL | 试卷 ID |
-| status | tinyint | DEFAULT 0 | 状态：0-进行中, 1-已完成 |
-| start_time | datetime | | 开始时间 |
-| submit_time | datetime | | 提交时间 |
-| total_score | decimal(5,2) | | 总分 |
-| switch_count | int | DEFAULT 0 | 切换题目次数（切屏检测） |
-| ai_summary | text | | AI 总结 |
-| snapshot_answers | json | | 答题快照 JSON |
-| create_time | datetime | | 创建时间 |
+| 字段             | 类型         | 约束         | 说明                     |
+| ---------------- | ------------ | ------------ | ------------------------ |
+| id               | varchar(36)  | PK, UUID     | 主键                     |
+| user_id          | varchar(36)  | FK, NOT NULL | 用户 ID                  |
+| paper_id         | varchar(36)  | FK, NOT NULL | 试卷 ID                  |
+| status           | tinyint      | DEFAULT 0    | 状态：0-进行中, 1-已完成 |
+| start_time       | datetime     |              | 开始时间                 |
+| submit_time      | datetime     |              | 提交时间                 |
+| total_score      | decimal(5,2) |              | 总分                     |
+| switch_count     | int          | DEFAULT 0    | 切换题目次数（切屏检测） |
+| ai_summary       | text         |              | AI 总结                  |
+| snapshot_answers | json         |              | 答题快照 JSON            |
+| create_time      | datetime     |              | 创建时间                 |
 
 **特殊说明**:
 - `switch_count`: 记录考生切换题目的次数，用于异常行为检测
@@ -637,48 +1375,48 @@ kaoyan-frontend/src/
 
 #### 答题明细表 (`tb_exam_answer_detail`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | varchar(36) | PK, UUID | 主键 |
-| session_id | varchar(36) | FK | 考试会话 ID |
-| question_id | varchar(36) | FK | 题目 ID |
-| user_answer | text | | 用户答案 |
-| is_correct | tinyint | | 是否正确：0-错, 1-对, 2-待定（主观题） |
-| score_earned | decimal(5,2) | | 得分 |
-| duration_seconds | int | | 答题时长（秒） |
-| ai_feedback | text | | AI 反馈 |
-| knowledge_point_id | varchar(36) | | 知识点 ID |
-| create_time | datetime | | 创建时间 |
+| 字段               | 类型         | 约束     | 说明                                   |
+| ------------------ | ------------ | -------- | -------------------------------------- |
+| id                 | varchar(36)  | PK, UUID | 主键                                   |
+| session_id         | varchar(36)  | FK       | 考试会话 ID                            |
+| question_id        | varchar(36)  | FK       | 题目 ID                                |
+| user_answer        | text         |          | 用户答案                               |
+| is_correct         | tinyint      |          | 是否正确：0-错, 1-对, 2-待定（主观题） |
+| score_earned       | decimal(5,2) |          | 得分                                   |
+| duration_seconds   | int          |          | 答题时长（秒）                         |
+| ai_feedback        | text         |          | AI 反馈                                |
+| knowledge_point_id | varchar(36)  |          | 知识点 ID                              |
+| create_time        | datetime     |          | 创建时间                               |
 
 ### 6.3 映射表（多对多关系）
 
 #### 题目-书本关联表 (`map_question_book`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | bigint | PK, AUTO | 主键 |
-| question_id | bigint | FK | 题目 ID |
-| book_id | int | FK | 习题册 ID |
+| 字段        | 类型   | 约束     | 说明      |
+| ----------- | ------ | -------- | --------- |
+| id          | bigint | PK, AUTO | 主键      |
+| question_id | bigint | FK       | 题目 ID   |
+| book_id     | int    | FK       | 习题册 ID |
 
 **索引**: `uk_question_book` (question_id, book_id) 唯一索引, `idx_question_id`, `idx_book_id`
 
 #### 题目-科目关联表 (`map_question_subject`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | bigint | PK, AUTO | 主键 |
-| question_id | bigint | FK | 题目 ID |
-| subject_id | int | FK | 科目 ID 或知识点 ID |
+| 字段        | 类型   | 约束     | 说明                |
+| ----------- | ------ | -------- | ------------------- |
+| id          | bigint | PK, AUTO | 主键                |
+| question_id | bigint | FK       | 题目 ID             |
+| subject_id  | int    | FK       | 科目 ID 或知识点 ID |
 
 **索引**: `uk_question_subject` (question_id, subject_id) 唯一索引, `idx_question_id`, `idx_subject_id`
 
 #### 书本-科目关联表 (`map_subject_book`)
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| id | int | PK, AUTO | 主键 |
-| book_id | int | FK | 习题册 ID（如：4-数一, 5-数二, 6-数三） |
-| subject_id | int | FK | 科目 ID（如：401-高数, 402-线代, 403-概率） |
+| 字段       | 类型 | 约束     | 说明                                        |
+| ---------- | ---- | -------- | ------------------------------------------- |
+| id         | int  | PK, AUTO | 主键                                        |
+| book_id    | int  | FK       | 习题册 ID（如：4-数一, 5-数二, 6-数三）     |
+| subject_id | int  | FK       | 科目 ID（如：401-高数, 402-线代, 403-概率） |
 
 **索引**: `uk_book_subject` (book_id, subject_id) 唯一索引, `idx_book_id`, `idx_subject_id`
 
@@ -730,12 +1468,12 @@ WHERE q.id = 1000;
 
 #### 核心 API
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/question/add` | POST | 新增题目（含关联） |
-| `/question/update` | POST | 更新题目（含关联） |
-| `/question/delete/{id}` | DELETE | 删除题目（级联删除映射表） |
-| `/question/page` | GET | 分页查询（支持科目/书本筛选） |
+| 接口                    | 方法   | 说明                          |
+| ----------------------- | ------ | ----------------------------- |
+| `/question/add`         | POST   | 新增题目（含关联）            |
+| `/question/update`      | POST   | 更新题目（含关联）            |
+| `/question/delete/{id}` | DELETE | 删除题目（级联删除映射表）    |
+| `/question/page`        | GET    | 分页查询（支持科目/书本筛选） |
 
 ### 5.2 习题册管理模块 (Book Management)
 
@@ -748,13 +1486,13 @@ WHERE q.id = 1000;
 
 #### 核心 API
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/book/add` | POST | 新增习题册（含科目关联） |
-| `/book/update` | POST | 更新习题册（含科目关联） |
+| 接口                | 方法   | 说明                         |
+| ------------------- | ------ | ---------------------------- |
+| `/book/add`         | POST   | 新增习题册（含科目关联）     |
+| `/book/update`      | POST   | 更新习题册（含科目关联）     |
 | `/book/delete/{id}` | DELETE | 删除习题册（级联删除映射表） |
-| `/book/page` | GET | 分页查询（支持科目筛选） |
-| `/book/list` | GET | 获取所有习题册（无分页） |
+| `/book/page`        | GET    | 分页查询（支持科目筛选）     |
+| `/book/list`        | GET    | 获取所有习题册（无分页）     |
 
 ### 5.3 科目体系管理模块 (Subject Management)
 
@@ -770,15 +1508,15 @@ WHERE q.id = 1000;
 
 #### 核心 API
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/subject/add` | POST | 新增科目 |
-| `/subject/update` | POST | 更新科目 |
-| `/subject/delete/{id}` | DELETE | 删除科目（带检查） |
-| `/subject/manage-tree` | GET | 获取管理用科目树（含虚拟分组） |
-| `/subject/tree` | GET | 获取用户端科目树 |
-| `/subject/by-exam-spec/{examSpecId}` | GET | 根据具体考试科目获取子树 |
-| `/subject/batch-update-sort` | POST | 批量更新排序（拖拽后） |
+| 接口                                 | 方法   | 说明                           |
+| ------------------------------------ | ------ | ------------------------------ |
+| `/subject/add`                       | POST   | 新增科目                       |
+| `/subject/update`                    | POST   | 更新科目                       |
+| `/subject/delete/{id}`               | DELETE | 删除科目（带检查）             |
+| `/subject/manage-tree`               | GET    | 获取管理用科目树（含虚拟分组） |
+| `/subject/tree`                      | GET    | 获取用户端科目树               |
+| `/subject/by-exam-spec/{examSpecId}` | GET    | 根据具体考试科目获取子树       |
+| `/subject/batch-update-sort`         | POST   | 批量更新排序（拖拽后）         |
 
 #### 虚拟分组机制
 
@@ -821,23 +1559,23 @@ WHERE q.id = 1000;
 
 #### 核心 API
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/paper/add` | POST | 新增试卷 |
-| `/paper/update` | POST | 更新试卷 |
-| `/paper/delete/{id}` | DELETE | 删除试卷 |
-| `/paper/page` | GET | 分页查询试卷 |
-| `/paper/{id}` | GET | 获取试卷详情 |
-| `/paper/{paperId}/questions` | GET | 获取试卷题目列表 |
-| `/paper/{paperId}/add-question` | POST | 添加题目到试卷 |
-| `/exam-session/start` | POST | 开始考试 |
-| `/exam-session/snapshot` | POST | 保存答题快照 |
-| `/exam-session/switch` | POST | 记录题目切换 |
-| `/exam-session/submit` | POST | 提交考试（触发AI批改） |
-| `/exam-session/{sessionId}` | GET | 获取考试会话详情 |
-| `/exam-session/{sessionId}/details` | GET | 获取答题明细 |
-| `/exam-answer-detail/session/{sessionId}` | GET | 查询答题明细 |
-| `/exam-answer-detail/session/{sessionId}/correct-rate` | GET | 获取正确率统计 |
+| 接口                                                   | 方法   | 说明                   |
+| ------------------------------------------------------ | ------ | ---------------------- |
+| `/paper/add`                                           | POST   | 新增试卷               |
+| `/paper/update`                                        | POST   | 更新试卷               |
+| `/paper/delete/{id}`                                   | DELETE | 删除试卷               |
+| `/paper/page`                                          | GET    | 分页查询试卷           |
+| `/paper/{id}`                                          | GET    | 获取试卷详情           |
+| `/paper/{paperId}/questions`                           | GET    | 获取试卷题目列表       |
+| `/paper/{paperId}/add-question`                        | POST   | 添加题目到试卷         |
+| `/exam-session/start`                                  | POST   | 开始考试               |
+| `/exam-session/snapshot`                               | POST   | 保存答题快照           |
+| `/exam-session/switch`                                 | POST   | 记录题目切换           |
+| `/exam-session/submit`                                 | POST   | 提交考试（触发AI批改） |
+| `/exam-session/{sessionId}`                            | GET    | 获取考试会话详情       |
+| `/exam-session/{sessionId}/details`                    | GET    | 获取答题明细           |
+| `/exam-answer-detail/session/{sessionId}`              | GET    | 查询答题明细           |
+| `/exam-answer-detail/session/{sessionId}/correct-rate` | GET    | 获取正确率统计         |
 
 #### 考试流程
 
@@ -1024,15 +1762,15 @@ const removeHistoryProtection = () => {
 
 **功能特性**:
 
-| 功能 | 说明 | 实现方式 |
-|------|------|----------|
-| 刷新页面恢复 | F5 刷新后倒计时继续 | localStorage 恢复 examEndTime |
-| 关闭重开恢复 | 关闭标签页后重新打开继续计时 | localStorage 持久化 |
-| 超时自动提交 | 检测到时间已到自动提交考试 | initTimer 中检测 remaining === 0 |
-| 返回按钮阻止 | 考试中点击返回不生效 | router.replace + popstate 监听 |
-| 答案自动保存 | 定时保存答题进度 | localStorage 存储 mock_exam_state |
-| 切屏检测 | 记录考生切屏次数 | visibilitychange 事件监听 |
-| 提交清理 | 提交后清除所有本地缓存 | localStorage.removeItem() |
+| 功能         | 说明                         | 实现方式                          |
+| ------------ | ---------------------------- | --------------------------------- |
+| 刷新页面恢复 | F5 刷新后倒计时继续          | localStorage 恢复 examEndTime     |
+| 关闭重开恢复 | 关闭标签页后重新打开继续计时 | localStorage 持久化               |
+| 超时自动提交 | 检测到时间已到自动提交考试   | initTimer 中检测 remaining === 0  |
+| 返回按钮阻止 | 考试中点击返回不生效         | router.replace + popstate 监听    |
+| 答案自动保存 | 定时保存答题进度             | localStorage 存储 mock_exam_state |
+| 切屏检测     | 记录考生切屏次数             | visibilitychange 事件监听         |
+| 提交清理     | 提交后清除所有本地缓存       | localStorage.removeItem()         |
 
 **注意事项**:
 
@@ -1053,10 +1791,10 @@ const removeHistoryProtection = () => {
 
 #### 核心 API
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/user/page` | GET | 获取用户列表（分页，支持筛选） |
-| `/user/study-stats/{userId}` | GET | 获取用户学习统计数据 |
+| 接口                         | 方法 | 说明                           |
+| ---------------------------- | ---- | ------------------------------ |
+| `/user/page`                 | GET  | 获取用户列表（分页，支持筛选） |
+| `/user/study-stats/{userId}` | GET  | 获取用户学习统计数据           |
 
 #### 统计指标
 
@@ -1075,10 +1813,10 @@ const removeHistoryProtection = () => {
 
 #### 核心 API
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/admin/mistake-heatmap` | GET | 获取错题热力统计 |
-| `/admin/hot-mistakes` | GET | 获取高频错题 TOP N（参数：limit，默认 20） |
+| 接口                     | 方法 | 说明                                       |
+| ------------------------ | ---- | ------------------------------------------ |
+| `/admin/mistake-heatmap` | GET  | 获取错题热力统计                           |
+| `/admin/hot-mistakes`    | GET  | 获取高频错题 TOP N（参数：limit，默认 20） |
 
 #### 统计维度
 
@@ -1741,10 +2479,10 @@ import icon from '@/assets/icons/icon.svg?url'
 
 ### 12.1 完成情况概览
 
-| 状态 | 数量 | 说明 |
-|------|------|------|
-| ✅ 已完成 | 4项 | 试卷管理、用户管理、题目管理、科目管理 |
-| ⏳ 待完成 | 11项 | 从考试记录管理到数据备份等功能 |
+| 状态     | 数量 | 说明                                   |
+| -------- | ---- | -------------------------------------- |
+| ✅ 已完成 | 4项  | 试卷管理、用户管理、题目管理、科目管理 |
+| ⏳ 待完成 | 11项 | 从考试记录管理到数据备份等功能         |
 
 ---
 
@@ -2289,15 +3027,15 @@ public final class SubjectLevelConstants {
 
 当前数据库中的具体考试科目 ID 映射：
 
-| 具体考试科目 | ID | Level | 说明 |
-|---------|-----|-------|------|
-| 政治 | 1 | 1 | 单独的具体考试科目 |
-| 英语一 | 2 | 1 | 属于"英语"虚拟分组 |
-| 英语二 | 3 | 1 | 属于"英语"虚拟分组 |
-| 数学一 | 4 | 1 | 属于"数学"虚拟分组 |
-| 数学二 | 5 | 1 | 属于"数学"虚拟分组 |
-| 数学三 | 6 | 1 | 属于"数学"虚拟分组 |
-| 408 | 7 | 1 | 计算机考研专业课 |
+| 具体考试科目 | ID  | Level | 说明               |
+| ------------ | --- | ----- | ------------------ |
+| 政治         | 1   | 1     | 单独的具体考试科目 |
+| 英语一       | 2   | 1     | 属于"英语"虚拟分组 |
+| 英语二       | 3   | 1     | 属于"英语"虚拟分组 |
+| 数学一       | 4   | 1     | 属于"数学"虚拟分组 |
+| 数学二       | 5   | 1     | 属于"数学"虚拟分组 |
+| 数学三       | 6   | 1     | 属于"数学"虚拟分组 |
+| 408          | 7   | 1     | 计算机考研专业课   |
 
 ### C. 套卷刷题相关常量定义
 
@@ -2467,9 +3205,9 @@ public class HomePageDataDTO {
 
 ### 14.3 API 接口
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/user/homeData/{userId}` | GET | 获取用户首页数据 |
+| 接口                      | 方法 | 说明             |
+| ------------------------- | ---- | ---------------- |
+| `/user/homeData/{userId}` | GET  | 获取用户首页数据 |
 
 #### 请求示例
 
@@ -2773,9 +3511,9 @@ test('should return error for non-existent user', async () => {
 **功能说明**: 根据用户ID获取所有进行中的考试会话（status=0）
 
 **请求参数**:
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| userId | String | 是 | 用户ID |
+| 参数名 | 类型   | 必填 | 说明   |
+| ------ | ------ | ---- | ------ |
+| userId | String | 是   | 用户ID |
 
 **响应示例**:
 ```json
@@ -3176,29 +3914,29 @@ python process_md_with_llm.py --batch
 
 **字段说明**:
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `questions` | Array | ✅ | 题目数组 |
-| `type` | Integer | ✅ | 题目类型：1-单选, 2-多选, 3-填空, 4-简答 |
-| `content` | String | ✅ | 题干内容，可用`[图片:img_x]`引用图片 |
-| `options` | Array<String> | ⚠️ | 选项数组，选择题必填 |
-| `answer` | String | ✅ | 正确答案 |
-| `analysis` | String | ❌ | 题目解析 |
-| `tags` | Array<String> | ❌ | 题目标签 |
-| `images` | Array | ❌ | 图片数组（当题目包含图片时） |
-| `images[].id` | String | ✅ | 图片ID，如`img_0` |
-| `images[].filename` | String | ✅ | 原始文件名 |
-| `images[].base64` | String | ✅ | Base64编码的图片数据 |
+| 字段                | 类型          | 必填 | 说明                                     |
+| ------------------- | ------------- | ---- | ---------------------------------------- |
+| `questions`         | Array         | ✅    | 题目数组                                 |
+| `type`              | Integer       | ✅    | 题目类型：1-单选, 2-多选, 3-填空, 4-简答 |
+| `content`           | String        | ✅    | 题干内容，可用`[图片:img_x]`引用图片     |
+| `options`           | Array<String> | ⚠️    | 选项数组，选择题必填                     |
+| `answer`            | String        | ✅    | 正确答案                                 |
+| `analysis`          | String        | ❌    | 题目解析                                 |
+| `tags`              | Array<String> | ❌    | 题目标签                                 |
+| `images`            | Array         | ❌    | 图片数组（当题目包含图片时）             |
+| `images[].id`       | String        | ✅    | 图片ID，如`img_0`                        |
+| `images[].filename` | String        | ✅    | 原始文件名                               |
+| `images[].base64`   | String        | ✅    | Base64编码的图片数据                     |
 
 #### 16.2.3 图片处理方案
 
 **方案对比**：
 
-| 方案 | 优点 | 缺点 | 推荐度 |
-|------|------|------|--------|
-| Base64嵌入JSON | 简单，单文件 | JSON文件大 | ⭐⭐⭐ |
-| 上传到服务器 | 节省空间 | 需额外接口 | ⭐⭐⭐⭐⭐ |
-| 保持相对路径 | 文件小 | 需打包images文件夹 | ⭐⭐ |
+| 方案           | 优点         | 缺点               | 推荐度 |
+| -------------- | ------------ | ------------------ | ------ |
+| Base64嵌入JSON | 简单，单文件 | JSON文件大         | ⭐⭐⭐    |
+| 上传到服务器   | 节省空间     | 需额外接口         | ⭐⭐⭐⭐⭐  |
+| 保持相对路径   | 文件小       | 需打包images文件夹 | ⭐⭐     |
 
 **当前实现**：前端支持Base64嵌入方案，题目内容中使用`[图片:img_0]`标记，前端自动渲染为图片。
 
@@ -3232,19 +3970,6 @@ python process_md_with_llm.py --batch
   "questions": [...]
 }
 ```
-
-### 16.5 相关文件清单
-
-**前端文件**:
-- `KaoYanPlatform-front/src/views/admin/QuestionImport.vue`
-- `KaoYanPlatform-front/src/api/questionImportExport.js`
-
-**后端文件**:
-- `KaoYanPlatform-back/src/main/java/org/example/kaoyanplatform/controller/QuestionController.java`
-- `KaoYanPlatform-back/src/main/java/org/example/kaoyanplatform/service/QuestionService.java`
-- `KaoYanPlatform-back/src/main/java/org/example/kaoyanplatform/entity/dto/QuestionImportDTO.java`
-
----
 
 **文档更新日期**: 2026-01-17
 **更新内容**: 新增第16章 - 题目批量导入功能文档
