@@ -9,15 +9,6 @@ export function importQuestions(data) {
     })
 }
 
-// 导出题目为PDF
-export function exportToPDF(data) {
-    return request({
-        url: '/question/export/pdf',
-        method: 'post',
-        data
-    })
-}
-
 // 获取所有科目（树形结构）
 export function getSubjectTree() {
     return request({
@@ -40,5 +31,32 @@ export function getQuestionsBySubject(subjectId, bookId) {
         url: '/question/list-by-subject',
         method: 'get',
         params: { subjectId, bookId }
+    })
+}
+
+// 获取所有试卷
+export function getAllPapers() {
+    return request({
+        url: '/paper/all',
+        method: 'get'
+    })
+}
+
+// 预览要导出的题目
+export function previewExportQuestions(data) {
+    return request({
+        url: '/question/export/preview',
+        method: 'post',
+        data
+    })
+}
+
+// 导出题目为PDF
+export function exportQuestionsToPdf(data) {
+    return request({
+        url: '/question/export/pdf',
+        method: 'post',
+        data,
+        responseType: 'blob'
     })
 }

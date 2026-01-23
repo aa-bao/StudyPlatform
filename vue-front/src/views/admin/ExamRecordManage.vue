@@ -99,7 +99,7 @@
             <el-table :data="tableData" v-loading="loading" class="modern-table" stripe>
                 <el-table-column prop="id" label="会话ID" width="200" show-overflow-tooltip />
                 <el-table-column prop="userId" label="用户ID" width="120" align="center" />
-                <el-table-column prop="paperId" label="试卷ID" width="200" show-overflow-tooltip />
+                <el-table-column prop="paperId" label="试卷ID" min-width="200" show-overflow-tooltip />
                 <el-table-column label="考试状态" width="100" align="center">
                     <template #default="scope">
                         <el-tag v-if="scope.row.status === 0" type="warning">进行中</el-tag>
@@ -473,7 +473,8 @@ onMounted(() => {
 /* ==================== 表格样式 ==================== */
 .table-card {
     border-radius: 12px;
-    border: 1px solid #e8ecef;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
 }
 
 .modern-table {

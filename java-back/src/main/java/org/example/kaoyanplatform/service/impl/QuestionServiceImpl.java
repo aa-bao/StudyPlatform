@@ -9,7 +9,6 @@ import org.example.kaoyanplatform.entity.Question;
 import org.example.kaoyanplatform.entity.Subject;
 import org.example.kaoyanplatform.entity.Book;
 import org.example.kaoyanplatform.entity.dto.QuestionDTO;
-import org.example.kaoyanplatform.entity.dto.LLMQuestionOutputDTO;
 import org.example.kaoyanplatform.mapper.MapQuestionBookMapper;
 import org.example.kaoyanplatform.mapper.MapQuestionSubjectMapper;
 import org.example.kaoyanplatform.mapper.QuestionMapper;
@@ -23,21 +22,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.zhipu.oapi.ClientV4;
-import com.zhipu.oapi.service.v4.model.*;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.multipart.MultipartFile;
-
-
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.codec.digest.DigestUtils;
-
-import java.nio.charset.StandardCharsets;
 
 /**
  * 题目Service实现类
@@ -63,9 +50,6 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
 
     @Autowired
     private BookService bookService;
-
-    @Value("${zhipu.api.key}")
-    private String apiKey;
 
     @Override
     public List<Question> getQuestionsBySubjectIds(List<Integer> subjectIds) {
@@ -254,81 +238,6 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         }
 
         return resultPage;
-    }
-
-    @Override
-    public LLMQuestionOutputDTO recognizeImageToText(MultipartFile file) throws Exception {
-        // 1. 初始化客户端 (使用 ClientV4)
-        ClientV4 client = new ClientV4.Builder(apiKey).build();
-
-        // 2. 图片转 Base64
-        String base64Image = Base64.getEncoder().encodeToString(file.getBytes());
-
-        // 3. 构造多模态内容列表
-        List<Map<String, Object>> contentList = new ArrayList<>();
-
-        // 3.1 文本提示
-        Map<String, Object> textMap = new HashMap<>();
-        textMap.put("type", "text");
-        textMap.put("text", "你是一个考研题目解析专家。请识别图片中的题目内容，并严格按照 JSON 格式返回。要求：\n" +
-                "1. **清洗数据**：忽略水印、页码、手写笔记等无关信息。\n" +
-                "2. **公式处理**：所有数学符号、公式、科学表达式必须转换为标准的 LaTeX 语法，并统一用 $ 包裹（如 $x^2 + y^2 = r^2$）。\n" +
-                "3. **字段定义**：\n" +
-                "   - `content`: 只要题干内容，如有题号需删除。\n" +
-                "   - `options`: 选项列表，若无选项则返回空数组 []。\n" +
-                "   - `answer`: 正确答案（若图片中包含）。\n" +
-                "   - `analysis`: 题目解析（若图片中包含）。\n" +
-                "4. **输出约束**：只输出 JSON 字符串本身，不得包含 Markdown 代码块标记（如 ```json）或任何解释性文字。");
-        contentList.add(textMap);
-
-        // 3.2 图片内容
-        Map<String, Object> imageMap = new HashMap<>();
-        imageMap.put("type", "image_url");
-        
-        Map<String, Object> imageUrl = new HashMap<>();
-        imageUrl.put("url", base64Image); // V4 SDK 自动识别 Base64，无需 url 前缀，或者根据文档加前缀
-        imageMap.put("image_url", imageUrl);
-        
-        contentList.add(imageMap);
-
-        // 4. 构造消息列表
-        List<ChatMessage> messages = new ArrayList<>();
-        ChatMessage chatMessage = new ChatMessage(ChatMessageRole.USER.value(), contentList);
-        messages.add(chatMessage);
-
-        // 5. 构造请求 ID
-        String requestId = String.format("req-%d", System.currentTimeMillis());
-
-        // 6. 构造请求参数
-        ChatCompletionRequest request = ChatCompletionRequest.builder()
-                .model("glm-4.6v")
-                .stream(Boolean.FALSE)
-                .invokeMethod("invoke")
-                .messages(messages)
-                .requestId(requestId)
-                .build();
-
-        // 7. 调用接口
-        ModelApiResponse response = client.invokeModelApi(request);
-
-        if (response.isSuccess()) {
-            String jsonString = response.getData().getChoices().get(0).getMessage().getContent().toString().trim();
-            // 解析 JSON 到 DTO
-            try {
-                ObjectMapper objectMapper = new ObjectMapper();
-                return objectMapper.readValue(jsonString, LLMQuestionOutputDTO.class);
-            } catch (Exception e) {
-                // 如果解析失败，创建一个兜底对象
-                LLMQuestionOutputDTO dto = new LLMQuestionOutputDTO();
-                dto.setContent(jsonString); // 直接作为内容
-                dto.setOptions(new ArrayList<>());
-                dto.setAnswer("");
-                dto.setAnalysis("");
-                return dto;
-            }
-        } else {
-            throw new RuntimeException("GLM 识别失败: " + response.getMsg());
-        }
     }
 
     @Override

@@ -1,442 +1,580 @@
 <template>
     <div class="admin-container">
-        <el-card shadow="never" class="export-card">
+        <el-card shadow="never" class="table-card">
             <template #header>
                 <div class="card-header">
                     <div class="text-header">
-                        <span class="title-text">题目导出为 PDF</span>
-                        <div class="header-desc">选择题目并导出为 PDF 文件</div>
+                        <span class="title-text">题目批量导出</span>
+                        <div class="header-desc">选择条件导出题目为PDF格式</div>
+                    </div>
+                    <div class="header-btns">
+                        <el-button type="primary" :icon="View" @click="handlePreview" :loading="previewLoading">
+                            预览题目
+                        </el-button>
+                        <el-button type="success" :icon="Download" @click="handleExport" :loading="exportLoading">
+                            导出PDF
+                        </el-button>
                     </div>
                 </div>
             </template>
 
-            <!-- 选择条件 -->
-            <div class="filter-section">
-                <h3>第一步：选择导出条件</h3>
+            <div v-if="dataLoading" v-loading="true" class="loading-container"></div>
 
-                <el-form :model="filterForm" label-width="100px" class="filter-form">
-                    <el-form-item label="导出方式">
-                        <el-radio-group v-model="exportMode" @change="handleModeChange">
-                            <el-radio value="subject">按科目导出</el-radio>
-                            <el-radio value="book">按习题册导出</el-radio>
-                            <el-radio value="custom">自定义选择</el-radio>
-                        </el-radio-group>
-                    </el-form-item>
+            <el-form v-else :model="exportForm" label-width="120px" label-position="left" class="export-form">
+                <!-- 导出方式选择 -->
+                <el-form-item label="导出方式">
+                    <el-radio-group v-model="exportForm.exportType" @change="handleExportTypeChange">
+                        <el-radio-button value="book">按习题册导出</el-radio-button>
+                        <el-radio-button value="paper">按试卷导出</el-radio-button>
+                        <el-radio-button value="custom">自定义题目</el-radio-button>
+                    </el-radio-group>
+                </el-form-item>
 
-                    <!-- 按科目导出 -->
-                    <el-form-item v-if="exportMode === 'subject'" label="选择科目">
-                        <el-cascader
-                            v-model="filterForm.subjectId"
-                            :options="subjectTree"
-                            :props="cascaderProps"
-                            placeholder="请选择科目"
-                            style="width: 100%"
-                            clearable
-                            filterable
-                            @change="loadSubjectQuestions"
+                <!-- 习题册选择 -->
+                <el-form-item v-if="exportForm.exportType === 'book'" label="选择习题册">
+                    <el-select
+                        v-model="exportForm.bookId"
+                        placeholder="请选择习题册"
+                        style="width: 100%"
+                        filterable
+                        @change="handlePreview"
+                    >
+                        <el-option
+                            v-for="book in books"
+                            :key="book.id"
+                            :label="book.name"
+                            :value="book.id"
                         />
-                    </el-form-item>
+                    </el-select>
+                </el-form-item>
 
-                    <!-- 按习题册导出 -->
-                    <el-form-item v-if="exportMode === 'book'" label="选择习题册">
-                        <el-select
-                            v-model="filterForm.bookId"
-                            placeholder="请选择习题册"
-                            style="width: 100%"
-                            filterable
-                            @change="loadBookQuestions"
+                <!-- 试卷选择 -->
+                <el-form-item v-if="exportForm.exportType === 'paper'" label="选择试卷">
+                    <el-select
+                        v-model="exportForm.paperId"
+                        placeholder="请选择试卷"
+                        style="width: 100%"
+                        filterable
+                        @change="handlePreview"
+                    >
+                        <el-option
+                            v-for="paper in papers"
+                            :key="paper.id"
+                            :label="paper.title"
+                            :value="paper.id"
+                        />
+                    </el-select>
+                </el-form-item>
+
+                <!-- 自定义题目 -->
+                <el-form-item v-if="exportForm.exportType === 'custom'" label="选择科目">
+                    <el-cascader
+                        v-model="exportForm.subjectId"
+                        :options="subjectTree"
+                        :props="{ value: 'id', label: 'name', children: 'children', checkStrictly: true }"
+                        placeholder="请选择科目（可选）"
+                        clearable
+                        filterable
+                        style="width: 100%"
+                        @change="handleSubjectChange"
+                    />
+                </el-form-item>
+
+                <el-form-item v-if="exportForm.exportType === 'custom' && exportForm.subjectId" label="选择题目">
+                    <el-select
+                        v-model="exportForm.questionIds"
+                        placeholder="请选择要导出的题目"
+                        style="width: 100%"
+                        multiple
+                        filterable
+                        collapse-tags
+                        collapse-tags-tooltip
+                        @change="handlePreview"
+                    >
+                        <el-option
+                            v-for="question in subjectQuestions"
+                            :key="question.id"
+                            :value="question.id"
                         >
-                            <el-option
-                                v-for="book in allBooks"
-                                :key="book.id"
-                                :label="book.name"
-                                :value="book.id"
-                            />
-                        </el-select>
-                    </el-form-item>
-
-                    <!-- 自定义选择 -->
-                    <el-form-item v-if="exportMode === 'custom'" label="搜索题目">
-                        <div class="custom-search">
-                            <el-input
-                                v-model="searchKeyword"
-                                placeholder="输入题目关键词搜索..."
-                                clearable
-                                style="width: 300px; margin-right: 10px"
-                                @keyup.enter="searchQuestions"
-                            >
-                                <template #append>
-                                    <el-button icon="Search" @click="searchQuestions" />
-                                </template>
-                            </el-input>
-                        </div>
-                    </el-form-item>
-
-                    <el-form-item label="包含答案">
-                        <el-switch v-model="filterForm.includeAnswers" />
-                        <span class="form-tip">⚠️ 开启后将在 PDF 中显示答案和解析</span>
-                    </el-form-item>
-                </el-form>
-            </div>
-
-            <el-divider />
-
-            <!-- 题目列表 -->
-            <div class="questions-section">
-                <div class="section-header">
-                    <h3>第二步：选择题目 ({{ selectedQuestions.length }} 道题)</h3>
-                    <div class="header-actions">
-                        <el-button size="small" @click="selectAll">全选</el-button>
-                        <el-button size="small" @click="unselectAll">取消全选</el-button>
-                        <el-tag type="info">已选 {{ selectedQuestions.length }} / {{ filteredQuestions.length }} 题</el-tag>
+                            <template #default>
+                                <span>[{{ question.id }}]</span>
+                                <span v-html="renderLatex(question.content?.substring(0, 50))"></span>
+                                <span>...</span>
+                            </template>
+                        </el-option>
+                    </el-select>
+                    <div class="selected-count">
+                        已选择 {{ exportForm.questionIds?.length || 0 }} 道题目
                     </div>
-                </div>
+                </el-form-item>
 
-                <div v-loading="loading" class="questions-list">
-                    <el-checkbox-group v-model="selectedQuestions">
-                        <div class="question-cards">
-                            <el-card
-                                v-for="question in paginatedQuestions"
-                                :key="question.id"
-                                shadow="hover"
-                                class="question-card"
-                                :class="{ 'is-selected': selectedQuestions.includes(question.id) }"
-                            >
-                                <div class="question-header">
-                                    <el-checkbox :label="question.id" class="question-checkbox">
-                                        <span class="question-number">题号: {{ question.id }}</span>
-                                    </el-checkbox>
-                                    <el-tag :type="getTypeColor(question.type)" size="small">
+                <!-- PDF模式 -->
+                <el-form-item label="PDF模式">
+                    <el-radio-group v-model="exportForm.mode">
+                        <el-radio-button :value="1">
+                            <el-icon><Hide /></el-icon>
+                            仅题目（刷题版）
+                        </el-radio-button>
+                        <el-radio-button :value="2">
+                            <el-icon><View /></el-icon>
+                            题目+答案解析
+                        </el-radio-button>
+                    </el-radio-group>
+                </el-form-item>
+
+                <!-- 附加选项 -->
+                <el-form-item label="附加信息">
+                    <el-checkbox-group v-model="additionalOptions">
+                        <el-checkbox value="difficulty">显示难度</el-checkbox>
+                        <el-checkbox value="tags">显示标签</el-checkbox>
+                        <el-checkbox value="source">显示来源</el-checkbox>
+                    </el-checkbox-group>
+                </el-form-item>
+            </el-form>
+        </el-card>
+
+        <!-- 预览区域 -->
+        <el-card v-if="previewQuestions.length > 0" shadow="never" class="preview-card">
+            <template #header>
+                <div class="preview-header">
+                    <span class="preview-title">预览题目（共 {{ previewQuestions.length }} 道）</span>
+                    <el-button text type="primary" @click="toggleExpandAll">
+                        {{ allExpanded ? '收起全部' : '展开全部' }}
+                    </el-button>
+                </div>
+            </template>
+
+            <div class="preview-container">
+                <el-collapse v-model="activeQuestions" accordion>
+                    <el-collapse-item v-for="(question, index) in currentPageQuestions" :key="question.id" :name="index">
+                            <template #title>
+                                <div class="question-title">
+                                    <span class="question-number">第 {{ (currentPage - 1) * pageSize + index + 1 }} 题</span>
+                                    <el-tag :type="getTypeTagColor(question.type)" size="small" :style="getTypeTagStyle(question.type)">
                                         {{ getTypeName(question.type) }}
                                     </el-tag>
+                                    <span class="question-brief" v-html="renderLatex(question.content?.substring(0, 60)) + '...'"></span>
                                 </div>
+                            </template>
 
-                                <div class="question-content">
-                                    <div class="question-text">{{ question.content }}</div>
+                        <div class="question-detail">
+                            <!-- 题干 -->
+                            <div class="detail-section">
+                                <div class="detail-label">
+                                    <el-icon><Document /></el-icon>
+                                    题干
+                                </div>
+                                <div class="detail-content" v-html="renderLatex(question.content)"></div>
+                            </div>
 
-                                    <div v-if="question.options && question.options.length > 0" class="question-options">
-                                        <div v-for="(opt, idx) in question.options" :key="idx" class="option-item">
-                                            {{ opt }}
-                                        </div>
+                            <!-- 选项（仅选择题显示） -->
+                            <div v-if="(question.type === 1 || question.type === 2) && question.options && question.options.length > 0" class="detail-section">
+                                <div class="detail-label">
+                                    <el-icon><List /></el-icon>
+                                    选项
+                                </div>
+                                <div class="options-container">
+                                    <div
+                                        v-for="(option, optIdx) in question.options"
+                                        :key="optIdx"
+                                        class="option-item"
+                                        :data-index="String.fromCharCode(65 + optIdx)"
+                                    >
+                                        <span class="option-text" v-html="renderLatex(option)"></span>
                                     </div>
                                 </div>
-                            </el-card>
+                            </div>
+
+                            <!-- 答案 -->
+                            <div v-if="exportForm.mode === 2 && question.answer" class="detail-section">
+                                <div class="detail-label answer-label">
+                                    <el-icon><CircleCheck /></el-icon>
+                                    答案
+                                </div>
+                                <div class="detail-content answer-content" v-html="renderLatex(question.answer)"></div>
+                            </div>
+
+                            <!-- 解析 -->
+                            <div v-if="exportForm.mode === 2 && question.analysis" class="detail-section">
+                                <div class="detail-label analysis-label">
+                                    <el-icon><ChatLineSquare /></el-icon>
+                                    解析
+                                </div>
+                                <div class="detail-content analysis-content" v-html="renderLatex(question.analysis)"></div>
+                            </div>
+
+                            <!-- 难度 -->
+                            <div v-if="additionalOptions.includes('difficulty') && question.difficulty" class="detail-section inline">
+                                <span class="inline-label">难度：</span>
+                                <el-tag :type="getDifficultyTagColor(question.difficulty)" size="small">
+                                    {{ getDifficultyName(question.difficulty) }}
+                                </el-tag>
+                            </div>
+
+                            <!-- 标签 -->
+                            <div v-if="additionalOptions.includes('tags') && question.tags && question.tags.length > 0" class="detail-section inline">
+                                <span class="inline-label">标签：</span>
+                                <el-tag
+                                    v-for="(tag, tagIdx) in question.tags"
+                                    :key="tagIdx"
+                                    size="small"
+                                    style="margin-right: 5px"
+                                >
+                                    {{ tag }}
+                                </el-tag>
+                            </div>
+
+                            <!-- 来源 -->
+                            <div v-if="additionalOptions.includes('source') && question.source" class="detail-section inline">
+                                <span class="inline-label">来源：{{ question.source }}</span>
+                            </div>
                         </div>
-                    </el-checkbox-group>
+                    </el-collapse-item>
+                </el-collapse>
 
-                    <!-- 分页 -->
-                    <div v-if="filteredQuestions.length > pageSize" class="pagination-container">
-                        <el-pagination
-                            :current-page="currentPage"
-                            :page-size="pageSize"
-                            :total="filteredQuestions.length"
-                            layout="prev, pager, next, jumper"
-                            @current-change="handlePageChange"
-                        />
-                    </div>
-
-                    <el-empty v-if="!loading && filteredQuestions.length === 0" description="暂无题目数据">
-                        <el-button type="primary" @click="resetFilters">重置条件</el-button>
-                    </el-empty>
-                </div>
-            </div>
-
-            <el-divider />
-
-            <!-- 预览和导出 -->
-            <div class="preview-section">
-                <h3>第三步：预览和导出</h3>
-
-                <div class="preview-info">
-                    <el-descriptions :column="3" border>
-                        <el-descriptions-item label="导出题目数量">
-                            <el-tag type="primary" size="large">{{ selectedQuestions.length }} 题</el-tag>
-                        </el-descriptions-item>
-                        <el-descriptions-item label="包含答案">
-                            <el-tag :type="filterForm.includeAnswers ? 'success' : 'info'" size="large">
-                                {{ filterForm.includeAnswers ? '是' : '否' }}
-                            </el-tag>
-                        </el-descriptions-item>
-                        <el-descriptions-item label="预计页数">
-                            约 {{ estimatedPages }} 页
-                        </el-descriptions-item>
-                    </el-descriptions>
-                </div>
-
-                <div class="export-actions">
-                    <el-button
-                        type="primary"
-                        size="large"
-                        icon="Download"
-                        :disabled="selectedQuestions.length === 0"
-                        :loading="exporting"
-                        @click="handleExport"
-                    >
-                        导出 PDF
-                    </el-button>
-                    <el-button size="large" icon="Refresh" @click="resetFilters">
-                        重置
-                    </el-button>
-                </div>
+                <!-- 分页 -->
+                <el-pagination
+                    v-if="previewQuestions.length > pageSize"
+                    :current-page="currentPage"
+                    :page-size="pageSize"
+                    :total="previewQuestions.length"
+                    layout="prev, pager, next"
+                    @current-change="handlePageChange"
+                    class="pagination"
+                />
             </div>
         </el-card>
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { exportToPDF, getSubjectTree, getAllBooks, getQuestionsBySubject } from '@/api/questionImportExport'
-import request from '@/utils/request'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Download, View, Hide, Document, List, CircleCheck, ChatLineSquare } from '@element-plus/icons-vue'
+import katex from 'katex'
+import { getSubjectTree, getAllBooks, getAllPapers, getQuestionsBySubject, previewExportQuestions, exportQuestionsToPdf } from '@/api/questionImportExport'
+
+// 表单数据
+const exportForm = reactive({
+    exportType: 'book', // book, paper, custom
+    bookId: null,
+    paperId: null,
+    subjectId: null,
+    questionIds: [],
+    mode: 1, // 1-仅题目, 2-题目+答案
+    includeDifficulty: false,
+    includeTags: false,
+    includeSource: false
+})
+
+// 附加选项（用于checkbox-group双向绑定）
+const additionalOptions = ref([])
 
 // 数据
-const loading = ref(false)
-const exporting = ref(false)
-const exportMode = ref('subject')
 const subjectTree = ref([])
-const allBooks = ref([])
-const filteredQuestions = ref([])
-const selectedQuestions = ref([])
+const books = ref([])
+const papers = ref([])
+const subjectQuestions = ref([])
+const previewQuestions = ref([])
+const previewLoading = ref(false)
+const exportLoading = ref(false)
+const dataLoading = ref(true)
 
-// 表单
-const filterForm = ref({
-    subjectId: null,
-    bookId: null,
-    includeAnswers: false
+// 预览相关
+const activeQuestions = ref([])
+const allExpanded = ref(false)
+const currentPage = ref(1)
+const pageSize = 5
+
+const currentPageQuestions = computed(() => {
+    const start = (currentPage.value - 1) * pageSize
+    const end = start + pageSize
+    return previewQuestions.value.slice(start, end)
 })
 
-// 搜索
-const searchKeyword = ref('')
+// 监听附加选项变化
+watch(additionalOptions, (newVal) => {
+    exportForm.includeDifficulty = newVal.includes('difficulty')
+    exportForm.includeTags = newVal.includes('tags')
+    exportForm.includeSource = newVal.includes('source')
+})
 
-// 分页
-const currentPage = ref(1)
-const pageSize = ref(10)
+// LaTeX 渲染函数
+const renderLatex = (content) => {
+    if (!content) return ''
+    // 确保在渲染前，先将 \\ 替换成 \，防止 KaTeX 错误解析转义字符
+    let processedContent = content.replace(/\\\\/g, '\\')
 
-// 级联选择器配置
-const cascaderProps = {
-    value: 'id',
-    label: 'name',
-    children: 'children',
-    checkStrictly: false,
-    emitPath: false
+    return processedContent.replace(/\$([^\$]+)\$/g, (match, tex) => {
+        try {
+            return katex.renderToString(tex, {
+                throwOnError: false,
+                displayMode: false
+            })
+        } catch (err) {
+            return match
+        }
+    }).replace(/\$\$([^\$]+)\$\$/g, (match, tex) => { // 块级公式
+        try {
+            return katex.renderToString(tex, {
+                throwOnError: false,
+                displayMode: true
+            })
+        } catch (err) {
+            return match
+        }
+    })
 }
 
-// 当前页的题目
-const paginatedQuestions = computed(() => {
-    const start = (currentPage.value - 1) * pageSize.value
-    const end = start + pageSize.value
-    return filteredQuestions.value.slice(start, end)
+// 初始化
+onMounted(async () => {
+    await loadData()
+    previewLoading.value = false
 })
 
-// 预计页数
-const estimatedPages = computed(() => {
-    return Math.ceil(selectedQuestions.value.length / 5)
-})
-
-// 加载初始数据
-const loadData = async () => {
+// 加载数据
+async function loadData() {
+    dataLoading.value = true
     try {
-        const [booksRes, subjectsRes] = await Promise.all([
+        const [subjectsRes, booksRes, papersRes] = await Promise.allSettled([
+            getSubjectTree(),
             getAllBooks(),
-            getSubjectTree()
+            getAllPapers()
         ])
 
-        if (booksRes.code === 200) {
-            allBooks.value = booksRes.data || []
-        }
-
-        if (subjectsRes.code === 200) {
-            subjectTree.value = subjectsRes.data || []
-        }
-    } catch (e) {
-        console.error('加载数据失败', e)
-        ElMessage.error('加载数据失败')
-    }
-}
-
-// 导出模式变更
-const handleModeChange = () => {
-    filteredQuestions.value = []
-    selectedQuestions.value = []
-    filterForm.value = {
-        subjectId: null,
-        bookId: null,
-        includeAnswers: filterForm.value.includeAnswers
-    }
-    currentPage.value = 1
-}
-
-// 按科目加载题目
-const loadSubjectQuestions = async () => {
-    if (!filterForm.value.subjectId) {
-        filteredQuestions.value = []
-        return
-    }
-
-    loading.value = true
-    try {
-        const res = await getQuestionsBySubject(filterForm.value.subjectId, null)
-        if (res.code === 200) {
-            filteredQuestions.value = res.data || []
-            selectedQuestions.value = []
-        }
-    } catch (e) {
-        console.error('加载题目失败', e)
-        ElMessage.error('加载题目失败')
-    } finally {
-        loading.value = false
-    }
-}
-
-// 按习题册加载题目
-const loadBookQuestions = async () => {
-    if (!filterForm.value.bookId) {
-        filteredQuestions.value = []
-        return
-    }
-
-    loading.value = true
-    try {
-        const res = await getQuestionsBySubject(null, filterForm.value.bookId)
-        if (res.code === 200) {
-            filteredQuestions.value = res.data || []
-            selectedQuestions.value = []
-        }
-    } catch (e) {
-        console.error('加载题目失败', e)
-        ElMessage.error('加载题目失败')
-    } finally {
-        loading.value = false
-    }
-}
-
-// 搜索题目
-const searchQuestions = async () => {
-    if (!searchKeyword.value.trim()) {
-        ElMessage.warning('请输入搜索关键词')
-        return
-    }
-
-    loading.value = true
-    try {
-        const res = await request.get('/question/search', {
-            params: { keyword: searchKeyword.value }
-        })
-
-        if (res.code === 200) {
-            filteredQuestions.value = res.data || []
-            selectedQuestions.value = []
-        }
-    } catch (e) {
-        console.error('搜索失败', e)
-        ElMessage.error('搜索失败')
-    } finally {
-        loading.value = false
-    }
-}
-
-// 全选
-const selectAll = () => {
-    selectedQuestions.value = filteredQuestions.value.map(q => q.id)
-}
-
-// 取消全选
-const unselectAll = () => {
-    selectedQuestions.value = []
-}
-
-// 分页变更
-const handlePageChange = (page) => {
-    currentPage.value = page
-}
-
-// 重置条件
-const resetFilters = () => {
-    exportMode.value = 'subject'
-    filterForm.value = {
-        subjectId: null,
-        bookId: null,
-        includeAnswers: false
-    }
-    searchKeyword.value = ''
-    filteredQuestions.value = []
-    selectedQuestions.value = []
-    currentPage.value = 1
-}
-
-// 导出 PDF
-const handleExport = async () => {
-    if (selectedQuestions.value.length === 0) {
-        ElMessage.warning('请至少选择一道题目')
-        return
-    }
-
-    await ElMessageBox.confirm(
-        `确定要导出 ${selectedQuestions.value.length} 道题目为 PDF 吗？`,
-        '确认导出',
-        {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning'
-        }
-    )
-
-    exporting.value = true
-    try {
-        const res = await exportToPDF({
-            questionIds: selectedQuestions.value,
-            includeAnswers: filterForm.value.includeAnswers
-        })
-
-        if (res.code === 200) {
-            // 下载 PDF
-            const link = document.createElement('a')
-            link.href = `/${res.data}`
-            link.download = `questions_${Date.now()}.pdf`
-            link.click()
-            ElMessage.success('PDF 导出成功')
+        if (subjectsRes.status === 'fulfilled') {
+            subjectTree.value = subjectsRes.value.data || []
         } else {
-            ElMessage.error(res.msg || '导出失败')
+            console.error('加载科目树失败:', subjectsRes.reason)
         }
-    } catch (e) {
-        console.error('导出失败', e)
-        ElMessage.error('导出失败：' + e.message)
+
+        if (booksRes.status === 'fulfilled') {
+            books.value = booksRes.value.data || []
+        } else {
+            console.error('加载习题册失败:', booksRes.reason)
+        }
+
+        if (papersRes.status === 'fulfilled') {
+            papers.value = papersRes.value.data || []
+        } else {
+            console.error('加载试卷失败:', papersRes.reason)
+        }
+
+        console.log('数据加载完成:', { subjects: subjectTree.value.length, books: books.value.length, papers: papers.value.length })
+    } catch (error) {
+        ElMessage.error('加载数据失败: ' + (error.message || '未知错误'))
+        console.error('加载数据失败:', error)
     } finally {
-        exporting.value = false
+        dataLoading.value = false
     }
+}
+
+// 导出类型切换
+function handleExportTypeChange() {
+    // 清空选择
+    exportForm.bookId = null
+    exportForm.paperId = null
+    exportForm.subjectId = null
+    exportForm.questionIds = []
+    subjectQuestions.value = []
+    previewQuestions.value = []
+    activeQuestions.value = []
+}
+
+// 科目切换
+async function handleSubjectChange() {
+    if (!exportForm.subjectId) {
+        subjectQuestions.value = []
+        return
+    }
+
+    try {
+        const subjectId = Array.isArray(exportForm.subjectId) ? exportForm.subjectId[exportForm.subjectId.length - 1] : exportForm.subjectId
+        const res = await getQuestionsBySubject(subjectId)
+        subjectQuestions.value = res.data || []
+        exportForm.questionIds = []
+        previewQuestions.value = []
+    } catch (error) {
+        ElMessage.error('加载题目失败')
+        console.error(error)
+    }
+}
+
+// 预览
+async function handlePreview() {
+    // 验证
+    if (exportForm.exportType === 'book' && !exportForm.bookId) {
+        ElMessage.warning('请选择习题册')
+        return
+    }
+    if (exportForm.exportType === 'paper' && !exportForm.paperId) {
+        ElMessage.warning('请选择试卷')
+        return
+    }
+    if (exportForm.exportType === 'custom' && exportForm.questionIds.length === 0) {
+        ElMessage.warning('请选择要导出的题目')
+        return
+    }
+
+    previewLoading.value = true
+    try {
+        const data = buildExportData()
+        const res = await previewExportQuestions(data)
+        previewQuestions.value = res.data || []
+        currentPage.value = 1
+        activeQuestions.value = []
+        ElMessage.success(`找到 ${previewQuestions.value.length} 道题目`)
+    } catch (error) {
+        ElMessage.error('预览失败')
+        console.error(error)
+    } finally {
+        previewLoading.value = false
+    }
+}
+
+// 导出
+async function handleExport() {
+    // 验证
+    if (exportForm.exportType === 'book' && !exportForm.bookId) {
+        ElMessage.warning('请选择习题册')
+        return
+    }
+    if (exportForm.exportType === 'paper' && !exportForm.paperId) {
+        ElMessage.warning('请选择试卷')
+        return
+    }
+    if (exportForm.exportType === 'custom' && exportForm.questionIds.length === 0) {
+        ElMessage.warning('请选择要导出的题目')
+        return
+    }
+
+    exportLoading.value = true
+    try {
+        const data = buildExportData()
+        const res = await exportQuestionsToPdf(data)
+
+        if (!res || res.size === 0) {
+            ElMessage.error('导出失败：PDF数据为空')
+            return
+        }
+
+        // 下载PDF
+        const blob = new Blob([res], { type: 'application/pdf' })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `题目导出_${new Date().getTime()}.pdf`
+        link.click()
+        window.URL.revokeObjectURL(url)
+
+        ElMessage.success('导出成功')
+    } catch (error) {
+        console.error('导出错误:', error)
+        let msg = '导出失败'
+        if (error.message) {
+            msg = error.message
+        }
+        ElMessage.error(msg)
+    } finally {
+        exportLoading.value = false
+    }
+}
+
+// 构建导出数据
+function buildExportData() {
+    const data = {
+        mode: exportForm.mode,
+        includeDifficulty: exportForm.includeDifficulty,
+        includeTags: exportForm.includeTags,
+        includeSource: exportForm.includeSource
+    }
+
+    if (exportForm.exportType === 'book') {
+        data.bookId = exportForm.bookId
+    } else if (exportForm.exportType === 'paper') {
+        // paperId 可能是字符串（UUID）或数字，保持原样传递
+        data.paperId = exportForm.paperId
+    } else if (exportForm.exportType === 'custom') {
+        data.questionIds = exportForm.questionIds
+        if (exportForm.subjectId) {
+            const subjectId = Array.isArray(exportForm.subjectId) ? exportForm.subjectId[exportForm.subjectId.length - 1] : exportForm.subjectId
+            data.subjectId = subjectId
+        }
+    }
+
+    return data
+}
+
+// 展开/收起全部
+function toggleExpandAll() {
+    allExpanded.value = !allExpanded.value
+    if (allExpanded.value) {
+        activeQuestions.value = currentPageQuestions.value.map((_, i) => i)
+    } else {
+        activeQuestions.value = []
+    }
+}
+
+// 分页切换
+function handlePageChange(page) {
+    activeQuestions.value = []
 }
 
 // 获取题目类型名称
-const getTypeName = (type) => {
-    const types = {
-        1: '单选题',
-        2: '多选题',
-        3: '填空题',
-        4: '简答题'
-    }
-    return types[type] || '未知'
+function getTypeName(type) {
+    const typeMap = { 1: '单选题', 2: '多选题', 3: '填空题', 4: '简答题' }
+    return typeMap[type] || '未知'
 }
 
-// 获取题目类型颜色
-const getTypeColor = (type) => {
-    const colors = {
-        1: 'primary',
-        2: 'success',
-        3: 'warning',
-        4: 'danger'
-    }
-    return colors[type] || 'info'
+// 获取题目类型标签颜色
+function getTypeTagColor(type) {
+    const colorMap = { 1: 'success', 2: 'warning', 3: 'primary', 4: 'info' }
+    return colorMap[type] || ''
 }
 
-onMounted(() => {
-    loadData()
-})
+// 获取难度名称
+function getDifficultyName(difficulty) {
+    const difficultyMap = { 1: '简单', 2: '中等', 3: '困难' }
+    return difficultyMap[difficulty] || '未知'
+}
+
+// 获取难度标签颜色
+function getDifficultyTagColor(difficulty) {
+    const colorMap = { 1: 'success', 2: 'warning', 3: 'danger' }
+    return colorMap[difficulty] || ''
+}
+
+// 获取题型标签自定义样式（用于简答题等需要自定义颜色的题型）
+function getTypeTagStyle(type) {
+    if (type === 4) {
+        return { backgroundColor: '#722ed1', borderColor: '#722ed1', color: 'white' }
+    }
+    return {}
+}
 </script>
 
-<style scoped>
-.export-card {
+<style scoped lang="scss">
+.admin-container {
+    min-height: calc(100vh - 84px);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.table-card {
     border-radius: 12px;
-    border: 1px solid #e8ecef;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+
+    :deep(.el-card__header) {
+        padding: 16px 20px;
+        background: #fff;
+        border-bottom: 1px solid #ebeef5;
+    }
+
+    :deep(.el-card__body) {
+        padding: 20px;
+    }
 }
 
 .card-header {
@@ -446,8 +584,9 @@ onMounted(() => {
 }
 
 .text-header {
-    position: relative;
-    padding-left: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .title-text {
@@ -456,133 +595,278 @@ onMounted(() => {
     color: #1f2f3d;
     position: relative;
     padding-left: 12px;
-}
 
-.title-text::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 18px;
-    background: #409eff;
-    border-radius: 2px;
+    &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 4px;
+        height: 18px;
+        background: #409eff;
+        border-radius: 2px;
+    }
 }
 
 .header-desc {
     font-size: 13px;
     color: #909399;
-    margin-top: 4px;
 }
 
-.filter-section,
-.questions-section,
-.preview-section {
-    padding: 20px 0;
+.header-btns {
+    display: flex;
+    gap: 10px;
 }
 
-.filter-section h3,
-.questions-section h3,
-.preview-section h3 {
-    font-size: 16px;
-    font-weight: 600;
-    color: #303133;
-    margin-bottom: 20px;
+.loading-container {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.filter-form {
-    max-width: 600px;
+.export-form {
+    background: #fcfcfd;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #ebeef5;
 }
 
-.form-tip {
-    margin-left: 15px;
-    font-size: 13px;
+.selected-count {
+    margin-top: 8px;
+    font-size: 12px;
     color: #909399;
 }
 
-.section-header {
+.preview-card {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+
+    :deep(.el-card__header) {
+        padding: 16px 20px;
+        background: #fff;
+        border-bottom: 1px solid #ebeef5;
+    }
+
+    :deep(.el-card__body) {
+        padding: 20px;
+    }
+}
+
+.preview-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+
+    .preview-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1f2f3d;
+        padding-left: 12px;
+        position: relative;
+
+        &::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 18px;
+            background: #67c23a;
+            border-radius: 2px;
+        }
+    }
 }
 
-.header-actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
-
-.questions-list {
-    min-height: 300px;
-}
-
-.question-cards {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.question-card {
+.preview-container {
+    background: #f8f9fa;
     border-radius: 8px;
-    transition: all 0.3s;
+    padding: 20px;
 }
 
-.question-card.is-selected {
-    border-color: #409eff;
-    box-shadow: 0 0 0 1px #409eff;
-}
-
-.question-header {
+.question-title {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-}
-
-.question-checkbox {
+    gap: 12px;
     width: 100%;
+
+    .question-number {
+        font-weight: 700;
+        font-size: 14px;
+        color: #409eff;
+        min-width: 80px;
+    }
+
+    .question-brief {
+        color: #606266;
+        font-size: 14px;
+        flex: 1;
+
+        :deep(.katex) {
+            font-size: 1em;
+        }
+
+        :deep(.katex-display) {
+            display: inline;
+            margin: 0;
+        }
+    }
 }
 
-.question-number {
+.question-detail {
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.detail-section {
+    &.inline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+    }
+}
+
+.detail-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-weight: 600;
+    color: #409eff;
+    margin-bottom: 8px;
+    font-size: 14px;
+
+    &.answer-label {
+        color: #67c23a;
+    }
+
+    &.analysis-label {
+        color: #e6a23c;
+    }
+}
+
+.detail-content {
+    padding: 12px 16px;
+    background: #f8f9fa;
+    border-radius: 6px;
     color: #303133;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    :deep(.katex) {
+        font-size: 1em;
+    }
+
+    :deep(.katex-display) {
+        margin: 1em 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    &.answer-content {
+        background: #f0f9ff;
+        border-left: 3px solid #67c23a;
+        color: #67c23a;
+        font-weight: 600;
+    }
+
+    &.analysis-content {
+        background: #fffbf0;
+        border-left: 3px solid #e6a23c;
+        font-style: italic;
+    }
 }
 
-.question-content {
-    padding-left: 24px;
-}
-
-.question-text {
-    color: #606266;
-    line-height: 1.6;
-    margin-bottom: 10px;
-}
-
-.question-options {
-    padding-left: 15px;
+.options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .option-item {
-    color: #909399;
-    line-height: 1.8;
-    font-size: 14px;
+    padding: 10px 16px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    position: relative;
+    padding-left: 45px;
+    transition: all 0.3s ease;
+
+    &:hover {
+        border-color: #409eff;
+        background: #ecf5ff;
+        transform: translateX(4px);
+        box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+    }
+
+    &::before {
+        content: attr(data-index);
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #409eff;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    .option-text {
+        color: #303133;
+        line-height: 1.6;
+
+        :deep(.katex) {
+            font-size: 1em;
+        }
+
+        :deep(.katex-display) {
+            margin: 0.5em 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+    }
 }
 
-.pagination-container {
+.inline-label {
+    color: #606266;
+    font-weight: 500;
+}
+
+.pagination {
+    margin-top: 20px;
     display: flex;
     justify-content: center;
-    padding: 20px 0;
-}
 
-.preview-info {
-    margin-bottom: 20px;
-}
+    :deep(.el-pagination) {
+        .btn-prev,
+        .btn-next,
+        .el-pager li {
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
 
-.export-actions {
-    display: flex;
-    gap: 15px;
+            &:hover {
+                color: #409eff;
+                border-color: #409eff;
+            }
+
+            &.is-active {
+                background: #409eff;
+                color: white;
+                border-color: #409eff;
+            }
+        }
+    }
 }
 </style>

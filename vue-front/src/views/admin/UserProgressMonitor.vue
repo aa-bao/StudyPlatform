@@ -90,7 +90,7 @@
                     </template>
                 </el-table-column>
                 <el-table-column prop="user_id" label="用户ID" width="150" align="center" />
-                <el-table-column label="用户昵称" width="180" align="center">
+                <el-table-column label="用户昵称" min-width="180" align="center">
                     <template #default="scope">
                         <span class="user-name">{{ getUserName(scope.row.user_id) }}</span>
                     </template>

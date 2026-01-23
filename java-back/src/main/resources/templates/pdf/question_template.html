@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm 1.5cm 2cm 1.5cm;
+        }
+        body {
+            font-family: "SimSun", "宋体", serif;
+            font-size: 12pt;
+            line-height: 1.8;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #409eff;
+            padding-bottom: 20px;
+        }
+        .title {
+            font-size: 20pt;
+            font-weight: bold;
+            color: #409eff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            font-size: 12pt;
+            color: #666;
+        }
+        .info {
+            margin: 10px 0;
+            font-size: 11pt;
+            color: #666;
+        }
+        .question-card {
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            page-break-inside: avoid;
+        }
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .question-number {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #409eff;
+        }
+        .question-type {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10pt;
+            font-weight: 500;
+        }
+        .type-1 { background: #67c23a; color: white; }
+        .type-2 { background: #e6a23c; color: white; }
+        .type-3 { background: #409eff; color: white; }
+        .type-4 { background: #722ed1; color: white; }
+        .question-content {
+            margin: 12px 0;
+            font-size: 12pt;
+            line-height: 1.8;
+        }
+        .options-list {
+            margin: 12px 0;
+            padding-left: 20px;
+        }
+        .option {
+            margin: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        .option::before {
+            content: attr(data-index);
+            position: absolute;
+            left: 0;
+            width: 20px;
+            font-weight: bold;
+            color: #409eff;
+        }
+        .option-text {
+            display: inline-block;
+            margin-left: 8px;
+        }
+        .difficulty {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 2px 8px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            font-size: 10pt;
+        }
+        .tags {
+            margin: 8px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .tag {
+            padding: 2px 8px;
+            background: #ecf5ff;
+            border: 1px solid #b3d8ff;
+            border-radius: 3px;
+            font-size: 10pt;
+            color: #409eff;
+        }
+        .source {
+            margin-top: 8px;
+            font-style: italic;
+            color: #999;
+            font-size: 10pt;
+        }
+        .page-number {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 10pt;
+            color: #999;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            font-size: 10pt;
+            color: #999;
+        }
+        .answer-section {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f0f9ff;
+            border-left: 3px solid #409eff;
+            border-radius: 4px;
+        }
+        .answer-label {
+            font-weight: bold;
+            color: #409eff;
+            margin-right: 8px;
+        }
+        .answer-content {
+            color: #67c23a;
+            font-weight: 600;
+        }
+        .analysis-section {
+            margin-top: 12px;
+            padding: 12px;
+            background: #fffbf0;
+            border-left: 3px solid #e6a23c;
+            border-radius: 4px;
+        }
+        .analysis-label {
+            font-weight: bold;
+            color: #e6a23c;
+            margin-right: 8px;
+        }
+        .analysis-content {
+            color: #666;
+            font-style: italic;
+        }
+        .latex-formula {
+            font-family: "Times New Roman", serif;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <!-- 头部 -->
+    <div class="header">
+        <div class="title" th:text="${title}">考研题目</div>
+        <div class="subtitle" th:if="${subtitle}" th:text="${subtitle}"></div>
+        <div class="info" th:if="${bookName}">习题册：<span th:text="${bookName}"></span></div>
+        <div class="info" th:if="${subjectName}">科目：<span th:text="${subjectName}"></span></div>
+        <div class="info">导出时间：<span th:text="${exportTime}"></span></div>
+        <div class="info" th:if="${totalQuestions != null}">题目总数：<span th:text="${totalQuestions}"></span> 题</div>
+    </div>
+
+    <!-- 题目列表 -->
+    <div th:each="question, stat : ${questions}">
+        <div class="question-card">
+            <!-- 题目头部 -->
+            <div class="question-header">
+                <span class="question-number" th:text="'第' + (${stat.index + 1}) + '题'">第1题</span>
+                <span class="question-type type-1" th:if="${question.type == 1}">单选题</span>
+                <span class="question-type type-2" th:if="${question.type == 2}">多选题</span>
+                <span class="question-type type-3" th:if="${question.type == 3}">填空题</span>
+                <span class="question-type type-4" th:if="${question.type == 4}">简答题</span>
+            </div>
+
+            <!-- 题干 -->
+            <div class="question-content" th:utext="${question.content}"></div>
+
+            <!-- 选项（仅选择题显示） -->
+            <div class="options-list" th:if="${(question.type == 1 || question.type == 2) && question.options != null && !question.options.isEmpty()}">
+                <div class="option" th:each="option, optStat : ${question.options}" th:data-index="${optStat.index + 1}">
+                    <span class="option-text" th:utext="${option}"></span>
+                </div>
+            </div>
+
+            <!-- 答案（仅在答案模式下显示） -->
+            <div class="answer-section" th:if="${mode == 2 && question.answer != null && !question.answer.isEmpty()}">
+                <span class="answer-label">参考答案：</span>
+                <span class="answer-content" th:utext="${question.answer}"></span>
+            </div>
+
+            <!-- 解析（仅在答案模式下显示） -->
+            <div class="analysis-section" th:if="${mode == 2 && question.analysis != null && !question.analysis.isEmpty()}">
+                <span class="analysis-label">题目解析：</span>
+                <span class="analysis-content" th:utext="${question.analysis}"></span>
+            </div>
+
+            <!-- 难度（可选） -->
+            <div class="difficulty" th:if="${includeDifficulty && question.difficulty != null}">
+                难度：
+                <span th:if="${question.difficulty == 1}">简单</span>
+                <span th:if="${question.difficulty == 2}">中等</span>
+                <span th:if="${question.difficulty == 3}">困难</span>
+            </div>
+
+            <!-- 标签（可选） -->
+            <div class="tags" th:if="${includeTags && question.tags != null && !question.tags.isEmpty()}">
+                <span class="tag" th:each="tag : ${question.tags}" th:text="${tag}"></span>
+            </div>
+
+            <!-- 来源（可选） -->
+            <div class="source" th:if="${includeSource && question.source != null && !question.source.isEmpty()}">
+                来源：<span th:text="${question.source}"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页码 -->
+    <div class="page-number" th:if="${currentPage != null && totalPages != null}">
+        第 <span th:text="${currentPage}"></span> 页 / 共 <span th:text="${totalPages}"></span> 页
+    </div>
+
+    <!-- 页脚 -->
+    <div class="footer">
+        <div>由考研平台自动生成</div>
+        <div th:text="${exportTime}"></div>
+    </div>
+</body>
+</html>

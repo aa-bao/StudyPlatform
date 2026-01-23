@@ -11,7 +11,7 @@
                             <circle cx="24" cy="38" r="2" fill="white" fill-opacity="0.6"/>
                         </svg>
                     </div>
-                    <span class="logo-text">考研平台管理</span>
+                    <span class="logo-text">后台管理系统</span>
                 </div>
 
                 <el-menu :default-active="$route.path" router
@@ -80,7 +80,7 @@
                         <el-icon>
                             <Download />
                         </el-icon>
-                        <span>题目导出PDF</span>
+                        <span>题目批量导出</span>
                     </el-menu-item>
 
                 </el-menu>
@@ -114,28 +114,6 @@
                         </div>
                     </div>
                     <div class="header-right">
-                        <div class="header-actions">
-                            <div class="action-item">
-                                <el-tooltip content="通知" placement="bottom">
-                                    <el-badge :value="3" :max="99" class="notification-badge">
-                                        <el-icon :size="20">
-                                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M12 2C13.1 2 14 2.9 14 4V5H10V4C10 2.9 10.9 2 12 2ZM21 19V20H3V19L5 17V11C5 7.93 7.05 5.36 10 4.35V4C10 2.9 10.9 2 12 2C13.1 2 14 2.9 14 4V4.35C16.95 5.36 19 7.93 19 11V17L21 19ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" fill="currentColor"/>
-                                            </svg>
-                                        </el-icon>
-                                    </el-badge>
-                                </el-tooltip>
-                            </div>
-                            <div class="action-item">
-                                <el-tooltip content="设置" placement="bottom">
-                                    <el-icon :size="20">
-                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M12 1L9 9H1L7.5 14L5 22L12 17L19 22L16.5 14L23 9H15L12 1Z" fill="currentColor"/>
-                                        </svg>
-                                    </el-icon>
-                                </el-tooltip>
-                            </div>
-                        </div>
                         <el-dropdown class="user-dropdown">
                             <span class="el-dropdown-link user-profile">
                                 <el-avatar :size="38" :src="userAvatar" />

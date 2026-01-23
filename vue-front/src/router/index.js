@@ -122,7 +122,7 @@ const routes = [
         component: () => import('@/views/admin/QuestionImport.vue')
       },
       {
-        // 题目导出
+        // 题目批量导出（PDF）
         path: 'question-export',
         component: () => import('@/views/admin/QuestionExport.vue')
       },

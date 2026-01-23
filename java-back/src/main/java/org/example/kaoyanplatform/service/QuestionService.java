@@ -3,9 +3,7 @@ package org.example.kaoyanplatform.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.example.kaoyanplatform.entity.Question;
-import org.example.kaoyanplatform.entity.dto.LLMQuestionOutputDTO;
 import org.example.kaoyanplatform.entity.dto.QuestionDTO;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -50,13 +48,6 @@ public interface QuestionService extends IService<Question> {
      * @return 分页结果
      */
     Page<Question> questionPage(Page<Question> page, List<Integer> subjectIds, Integer bookId);
-
-    /**
-     * 识别图片中的题目和 LaTeX 公式，返回结构化 JSON
-     * @param file 图片文件
-     * @return 结构化 JSON
-     */
-    LLMQuestionOutputDTO recognizeImageToText(MultipartFile file) throws Exception;
 
     /**
      * 检查题目是否已存在（基于内容MD5去重）

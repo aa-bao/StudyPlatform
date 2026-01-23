@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        @page {
+            size: A4;
+            margin: 2.5cm 2cm 2.5cm 2cm;
+        }
+        body {
+            font-family: "SimSun", "Songti SC", serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }
+
+        .secret-header {
+            color: #ff0000;
+            font-weight: bold;
+            font-size: 12pt;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .paper-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .paper-title {
+            font-size: 20pt;
+            font-weight: bold;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+        .paper-subtitle {
+            font-size: 11pt;
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 50px;
+        }
+
+        .notice-box {
+            border: 1.5px solid #000;
+            padding: 15px 20px;
+            margin: 20px 0 40px 0;
+            text-align: left;
+            font-size: 10.5pt;
+        }
+        .notice-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .notice-item {
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+
+        .section-header {
+            background-color: #f2f2f2;
+            padding: 8px 15px;
+            font-weight: bold;
+            font-size: 12pt;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+        }
+        .question-item {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+        .question-content {
+            font-size: 11pt;
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        .question-number {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .options-grid {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+        .option-item {
+            width: 50%;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .option-circle {
+            width: 14px;
+            height: 14px;
+            border: 1px solid #000;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .option-label {
+            margin-right: 5px;
+        }
+
+        .answer-area {
+            height: 120px;
+            border: 1px solid #eee;
+            margin: 10px 0;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 1cm;
+            width: 100%;
+            text-align: center;
+            font-size: 10pt;
+            color: #666;
+        }
+
+        .latex-formula {
+            font-family: "Times New Roman", serif;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+<div class="secret-header">绝密 ★ 启用前</div>
+
+<div class="paper-header">
+    <div class="paper-title" th:text="${subtitle}">试卷标题</div>
+
+    <div class="paper-subtitle">
+        <span>考试时间：<span th:text="${duration ?: '180'}">180</span> 分钟</span>
+        <span>满分：<span th:text="${totalScore ?: '150'}">150</span> 分</span>
+    </div>
+</div>
+
+<div class="notice-box">
+    <div class="notice-title">考生注意事项：</div>
+    <div class="notice-item">1. 答题前，考生务必将自己的姓名、准考证号填写在答题卡上。</div>
+    <div class="notice-item">2. 选择题每小题选出答案后，请用2B铅笔将答题卡上对应题目的答案标号涂黑。</div>
+    <div class="notice-item">3. 主观题请在答题卡上指定区域作答，或使用草稿纸记录思路。</div>
+</div>
+
+<div th:each="section : ${sections}">
+    <div class="section-header" th:text="${section.name}">一、选择题</div>
+
+    <div th:each="question : ${section.questions}" class="question-item">
+        <div class="question-content">
+            <span class="question-number" th:text="${question.sortOrder + '.'}">1.</span>
+            <span th:utext="${question.content}"></span>
+            <span th:if="${question.type == 1 || question.type == 2}">( &nbsp;&nbsp; )</span>
+        </div>
+
+        <div class="options-grid" th:if="${(question.type == 1 || question.type == 2) && question.options != null}">
+            <div class="option-item" th:each="option, optStat : ${question.options}">
+                <span class="option-circle"></span>
+                <span class="option-label" th:text="'(' + ${T(java.lang.String).valueOf((char)(65 + optStat.index))} + ')'"> (A) </span>
+                <span th:utext="${option}"></span>
+            </div>
+        </div>
+
+        <div th:if="${question.type == 3}" class="question-blanks">
+            <span th:each="i : ${#numbers.sequence(1, 4)}" style="margin-right: 20px;">
+                （<span style="display: inline-block; width: 80px; border-bottom: 1px solid #333;"></span>）
+            </span>
+        </div>
+
+        <div th:if="${question.type == 4}" class="answer-area"></div>
+    </div>
+</div>
+
+<div class="footer">
+    第 1 页（共 [[${totalPages ?: 1}]] 页）
+</div>
+
+</body>
+</html>

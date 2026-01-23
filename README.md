@@ -22,6 +22,8 @@
 14. [附录](#14-附录)
 15. [首页数据接口](#15-首页数据接口-home-page-api)
 16. [未完成考试强制提醒功能](#16-未完成考试强制提醒功能-incomplete-exam-reminder)
+17. [题目批量导入功能](#16-题目批量导入功能)
+18. [题目批量导出功能](#17-题目批量导出功能)
 
 ---
 
@@ -3973,3 +3975,291 @@ python process_md_with_llm.py --batch
 
 **文档更新日期**: 2026-01-17
 **更新内容**: 新增第16章 - 题目批量导入功能文档
+
+---
+
+## 17. 题目批量导出功能
+
+### 17.1 功能概述
+
+题目批量导出功能允许管理员将题库中的题目导出为 PDF 文档，支持多种导出方式和两种 PDF 模式。该功能支持：
+
+- **多种导出方式**: 按习题册导出、按试卷导出、自定义题目导出
+- **两种 PDF 模式**: 仅题目（刷题版）、题目+答案解析
+- **实时预览**: 导出前可预览所有题目内容
+- **灵活筛选**: 支持按科目筛选题目
+- **可选信息**: 可选择是否包含难度、标签、来源等信息
+- **LaTeX 公式支持**: 自动渲染数学公式（KaTeX）
+
+### 17.2 导出方式
+
+#### 17.2.1 按习题册导出
+
+选择一个习题册，导出该习题册中的所有题目。
+
+**适用场景**:
+- 导出整本习题集供学生打印练习
+- 生成纸质版复习资料
+
+#### 17.2.2 按试卷导出
+
+选择一份试卷，导出该试卷中的所有题目。
+
+**适用场景**:
+- 导出历年真题
+- 生成模拟考试卷
+
+#### 17.2.3 自定义题目导出
+
+- 选择科目（可选）
+- 从该科目的题目列表中手动勾选要导出的题目
+- 支持多选、搜索筛选
+
+**适用场景**:
+- 导出特定知识点的题目
+- 生成专项练习卷
+- 整理错题集
+
+### 17.3 PDF 模式
+
+#### 17.3.1 仅题目模式（刷题版）
+
+- 只显示题干和选项
+- 不显示答案和解析
+- 适合打印后独立完成
+
+**导出效果示例**:
+```
+第 1 题 [单选题]
+设函数 f(x) 在点 x0 处可导, 则 f(x) 在点 x0 处（  ）
+A. 一定连续              B. 一定不连续
+C. 不一定连续            D. 以上都不对
+```
+
+#### 17.3.2 题目+答案解析模式
+
+- 显示题干、选项、答案、解析
+- 适合核对答案和复习巩固
+- 答案区域使用绿色背景标识
+- 解析区域使用黄色背景标识
+
+**导出效果示例**:
+```
+第 1 题 [单选题]
+设函数 f(x) 在点 x0 处可导, 则 f(x) 在点 x0 处（  ）
+A. 一定连续              B. 一定不连续
+C. 不一定连续            D. 以上都不对
+
+【答案】A
+
+【解析】可导必连续是基本性质。证明：根据导数定义
+f'(x0) = lim[Δx→0] [f(x0+Δx)-f(x0)]/Δx
+...
+```
+
+### 17.4 附加信息选项
+
+勾选以下选项可在 PDF 中显示相应信息：
+
+| 选项         | 说明                       | 显示位置           |
+| ------------ | -------------------------- | ------------------ |
+| 显示难度     | 显示题目的难度等级         | 每题顶部标签       |
+| 显示标签     | 显示题目的知识点标签       | 每题底部标签列表   |
+| 显示来源     | 显示题目的来源信息         | 每题底部           |
+
+### 17.5 API 接口
+
+#### 17.5.1 预览要导出的题目
+
+**接口**: `POST /question/export/preview`
+
+**请求体**:
+```json
+{
+  "bookId": 1,
+  "paperId": null,
+  "questionIds": null,
+  "subjectId": null
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "data": [
+    {
+      "id": 1,
+      "type": 1,
+      "content": "题目内容",
+      "options": ["A. xxx", "B. xxx"],
+      "answer": "A",
+      "analysis": "解析内容",
+      "tags": ["极限", "连续"],
+      "difficulty": 2,
+      "source": "2024真题"
+    }
+  ]
+}
+```
+
+#### 17.5.2 导出题目为 PDF
+
+**接口**: `POST /question/export/pdf`
+
+**请求体**:
+```json
+{
+  "mode": 2,
+  "bookId": 1,
+  "paperId": null,
+  "questionIds": null,
+  "subjectId": null,
+  "includeDifficulty": true,
+  "includeTags": true,
+  "includeSource": false
+}
+```
+
+**请求参数说明**:
+
+| 参数               | 类型    | 必填 | 说明                                                         |
+| ------------------ | ------- | ---- | ------------------------------------------------------------ |
+| `mode`             | Integer | ✅   | PDF 模式：1-仅题目，2-题目+答案解析                          |
+| `bookId`           | Integer | ⚠️   | 习题册 ID（按习题册导出时填写）                              |
+| `paperId`          | String  | ⚠️   | 试卷 ID（按试卷导出时填写，可能是 UUID 格式）                |
+| `questionIds`      | Array   | ⚠️   | 题目 ID 数组（自定义题目导出时填写）                         |
+| `subjectId`        | Integer | ❌   | 科目 ID（用于筛选）                                         |
+| `includeDifficulty`| Boolean | ❌   | 是否包含难度，默认 false                                    |
+| `includeTags`      | Boolean | ❌   | 是否包含标签，默认 false                                    |
+| `includeSource`    | Boolean | ❌   | 是否包含来源，默认 false                                    |
+
+**响应**: PDF 文件流（`application/pdf`）
+
+**优先级**: `questionIds` > `paperId` > `bookId` > `subjectId`
+
+### 17.6 前端使用示例
+
+#### 17.6.1 按习题册导出
+
+```javascript
+// 预览
+const previewData = {
+  bookId: 1,
+  mode: 2
+}
+const preview = await previewExportQuestions(previewData)
+
+// 导出
+const exportData = {
+  bookId: 1,
+  mode: 2,
+  includeDifficulty: true,
+  includeTags: true
+}
+const pdfBlob = await exportQuestionsToPdf(exportData)
+```
+
+#### 17.6.2 自定义题目导出
+
+```javascript
+// 1. 选择科目
+const subjectId = 1
+
+// 2. 加载该科目的题目
+const questions = await getQuestionsBySubject(subjectId)
+
+// 3. 用户选择要导出的题目
+const selectedIds = [1, 3, 5, 7, 9]
+
+// 4. 预览和导出
+const data = {
+  questionIds: selectedIds,
+  subjectId: subjectId,
+  mode: 1  // 仅题目模式
+}
+const pdfBlob = await exportQuestionsToPdf(data)
+```
+
+### 17.7 PDF 样式说明
+
+生成的 PDF 使用 A4 纸张尺寸，具有以下特点：
+
+- **中文字体支持**: 自动根据操作系统加载中文字体
+  - Windows: 宋体 (simsun.ttc)
+  - macOS: 苹方 (PingFang.ttc)
+  - Linux: 自动搜索系统字体
+- **页眉**: 显示导出标题和时间
+- **页脚**: 显示页码（第 X 页 / 共 Y 页）
+- **题目卡片**: 每道题使用卡片样式，带有阴影和圆角
+- **难度标签**: 简单（绿色）、中等（橙色）、困难（红色）
+- **公式渲染**: LaTeX 公式使用 KaTeX 渲染，支持行内和块级公式
+
+### 17.8 后端实现说明
+
+#### 17.8.1 技术栈
+
+- **模板引擎**: Thymeleaf
+- **PDF 生成**: Flying Saucer (xhtmlrenderer)
+- **模板路径**: `java-back/src/main/resources/templates/pdf/question_template.html`
+
+#### 17.8.2 核心类
+
+| 类名                               | 说明                     |
+| ---------------------------------- | ------------------------ |
+| `QuestionExportDTO`                | 导出请求 DTO             |
+| `PdfExportService`                 | PDF 导出服务接口         |
+| `PdfExportServiceImpl`             | PDF 导出服务实现         |
+| `QuestionController.export/pdf`    | 导出接口                 |
+| `QuestionController.export/preview`| 预览接口                 |
+
+#### 17.8.3 生成流程
+
+```
+1. 接收导出请求 (QuestionExportDTO)
+   ↓
+2. 根据导出条件查询题目列表
+   ↓
+3. 加载题目详情（科目、书本关联）
+   ↓
+4. 构建 Thymeleaf 模板上下文
+   ↓
+5. 渲染 HTML 模板
+   ↓
+6. 使用 Flying Saucer 转换为 PDF
+   ↓
+7. 返回 PDF 文件流
+```
+
+### 17.9 常见问题
+
+#### Q1: 导出的 PDF 中文字体显示异常？
+
+**A**: 检查系统是否安装了中文字体：
+- Windows: 确认 `C:\Windows\Fonts\simsun.ttc` 存在
+- macOS: 确认系统字体存在
+- Linux: 安装中文字体包 `sudo apt-get install fonts-wqy-microhei`
+
+#### Q2: 导出的题目顺序如何控制？
+
+**A**:
+- 按习题册/试卷导出：保持原有关联顺序
+- 自定义导出：按照用户选择的顺序（前端控制）
+
+#### Q3: 可以导出包含图片的题目吗？
+
+**A**:
+- 题目内容中的图片（Base64 或 URL）会在 PDF 中正常显示
+- PDF 模板使用 `<img>` 标签渲染图片
+
+#### Q4: LaTeX 公式如何编写？
+
+**A**:
+- 行内公式: `$公式$`
+- 块级公式: `$$公式$$`
+- 示例: `$\lim_{x\to 0} \frac{\sin x}{x} = 1$`
+
+---
+
+**文档更新日期**: 2026-01-23
+**更新内容**: 新增第17章 - 题目批量导出功能文档

@@ -15,11 +15,20 @@ import java.util.List;
 @AllArgsConstructor
 public class QuestionImportDTO {
 
-    /** 习题册ID */
+    /** 习题册ID（如果新建习题册则为null） */
     private Integer bookId;
 
-    /** 科目ID列表（支持多个科目关联） */
+    /** 新建习题册名称（如果选择现有习题册则为null） */
+    private String newBookName;
+
+    /** 新建习题册类型（1=习题册, 2=试卷，仅在新建时有效） */
+    private Integer newBookType;
+
+    /** 科目ID列表（必填，支持多个科目关联） */
     private List<Integer> subjectIds;
+
+    /** 是否启用去重检查 */
+    private Boolean checkDuplicate;
 
     /** 题目列表 */
     private List<QuestionImportItem> questions;

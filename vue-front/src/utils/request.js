@@ -3,17 +3,15 @@ import { ElMessage } from 'element-plus'
 
 const request = axios.create({
     baseURL: 'http://localhost:8081',
-    timeout: 5000
+    timeout: 60000
 })
 
 // 请求拦截器
 request.interceptors.request.use(
     config => {
-        console.log('请求发送:', config.method?.toUpperCase(), config.url)
         return config
     },
     error => {
-        console.error('请求错误:', error)
         return Promise.reject(error)
     }
 )
@@ -21,16 +19,36 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
     response => {
+        const contentType = response.headers['content-type']
+        // 如果是 blob 响应（PDF），直接返回
+        if (contentType && (contentType.includes('application/pdf') || contentType.includes('octet-stream'))) {
+            return response.data
+        }
+
         const res = response.data
-        if (res.code === 200) {
+        if (res && res.code === 200) {
             return res
+        } else if (res) {
+            const msg = res.msg || res.message || '未知错误'
+            return Promise.reject(new Error(msg))
         } else {
-            ElMessage.error(res.msg || '错误')
-            return Promise.reject(new Error(res.msg || '错误'))
+            return Promise.reject(new Error('无效响应'))
         }
     },
-    error => {
-        ElMessage.error(error.message || '网络请求失败')
+    async error => {
+        let msg = error.message
+        if (error.response?.data instanceof Blob) {
+            // 处理 blob 错误响应
+            const textDecoder = new TextDecoder('utf-8')
+            const errorText = textDecoder.decode(await error.response.data.arrayBuffer())
+            try {
+                const errorJson = JSON.parse(errorText)
+                msg = errorJson.msg || errorJson.message || msg
+            } catch (e) {
+                msg = errorText || msg
+            }
+        }
+        ElMessage.error(msg || '网络请求失败')
         return Promise.reject(error)
     }
 )

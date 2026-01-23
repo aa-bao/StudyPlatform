@@ -112,6 +112,19 @@ public class PaperController {
         }
     }
 
+    @GetMapping("/all")
+    @Operation(summary = "获取所有试卷", description = "获取所有试卷列表")
+    public Result<List<Paper>> getAllPapers() {
+        try {
+            LambdaQueryWrapper<Paper> wrapper = new LambdaQueryWrapper<>();
+            wrapper.orderByDesc(Paper::getCreateTime);
+            List<Paper> papers = paperService.list(wrapper);
+            return Result.success(papers);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     @GetMapping("/page")
     @Operation(summary = "分页查询试卷", description = "支持分页和多条件筛选的试卷查询")
     public Result<Page<Paper>> getPaperPage(
