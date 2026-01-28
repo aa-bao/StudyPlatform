@@ -70,6 +70,18 @@ public class QuestionDTO {
     /** 关联的科目ID列表（多对多） */
     private List<Integer> subjectIds;
 
+    /** 关联的书本名称列表 */
+    private List<String> bookNames;
+
+    /** 关联的科目名称列表 */
+    private List<String> subjectNames;
+
+    /** 关联的书本名称（兼容字段，第一个） */
+    private String bookName;
+
+    /** 关联的科目名称（兼容字段，第一个） */
+    private String subjectName;
+
     /** 创建时间（编辑时返回） */
     @JsonProperty("create_time")
     private LocalDateTime createTime;

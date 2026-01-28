@@ -4,10 +4,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.kaoyanplatform.common.Result;
-import org.example.kaoyanplatform.entity.ExamAnswerDetail;
+import org.example.kaoyanplatform.entity.AnswerRecord;
 import org.example.kaoyanplatform.entity.ExamSession;
 import org.example.kaoyanplatform.entity.dto.ExamStartDTO;
-import org.example.kaoyanplatform.service.ExamAnswerDetailService;
+import org.example.kaoyanplatform.service.ExamRecordService;
 import org.example.kaoyanplatform.service.ExamSessionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -21,9 +21,6 @@ public class ExamSessionController {
 
     @Autowired
     private ExamSessionService examSessionService;
-
-    @Autowired
-    private ExamAnswerDetailService examAnswerDetailService;
 
     @PostMapping("/start")
     @Operation(summary = "开始或恢复考试", description = "初始化考试会话或恢复未完成的考试，返回试卷完整内容和题目列表。如果用户有未完成的会话则复用，否则创建新会话")
@@ -91,18 +88,6 @@ public class ExamSessionController {
         }
     }
 
-    @GetMapping("/{sessionId}/details")
-    @Operation(summary = "获取答题明细", description = "根据会话ID获取所有题目的答题详情，包括AI批改反馈")
-    public Result<List<ExamAnswerDetail>> getSessionDetails(
-            @Parameter(description = "考试会话ID", required = true) @PathVariable String sessionId) {
-        try {
-            List<ExamAnswerDetail> details = examAnswerDetailService.getDetailsBySessionId(sessionId);
-            return Result.success(details);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
-    }
-
     @GetMapping("/user/{userId}")
     @Operation(summary = "获取用户考试历史", description = "根据用户ID获取所有考试会话记录")
     public Result<List<ExamSession>> getUserSessions(
@@ -136,7 +121,6 @@ public class ExamSessionController {
         }
     }
 
-    // ==================== 管理员接口 ====================
 
     @GetMapping("/admin/all")
     @Operation(summary = "获取所有考试记录（管理员）", description = "分页获取所有用户的考试记录，支持按用户ID、试卷ID、状态筛选")

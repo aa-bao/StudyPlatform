@@ -1,8 +1,8 @@
 package org.example.kaoyanplatform.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import org.example.kaoyanplatform.entity.ExamRecord;
 import org.apache.ibatis.annotations.Mapper;
+import org.example.kaoyanplatform.entity.ExamRecord;
 
 @Mapper
 public interface ExamRecordMapper extends BaseMapper<ExamRecord> {

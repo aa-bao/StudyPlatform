@@ -5,141 +5,60 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.kaoyanplatform.common.Result;
-import org.example.kaoyanplatform.entity.UserProgress;
-import org.example.kaoyanplatform.service.UserProgressService;
+import org.example.kaoyanplatform.entity.AnswerRecord;
+import org.example.kaoyanplatform.service.RecordService;
+import org.example.kaoyanplatform.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
-/**
- * 用户学习进度管理控制器
- * 包含用户端和管理员端接口
- */
-@Tag(name = "学习进度管理", description = "用户学习进度相关接口")
+@Tag(name = "用户学习进度管理", description = "用户学习进度查询和管理接口")
 @RestController
 @RequestMapping("/user-progress")
 public class UserProgressController {
 
     @Autowired
-    private UserProgressService userProgressService;
+    private RecordService recordService;
+
+    @Autowired
+    private UserService userService;
 
     /**
-     * 获取用户所有科目的学习进度
-     */
-    @GetMapping("/user/{userId}")
-    @Operation(summary = "获取用户学习进度", description = "获取指定用户在所有科目上的学习进度")
-    public Result<List<UserProgress>> getUserProgress(
-            @Parameter(description = "用户ID", required = true) @PathVariable Long userId) {
-        try {
-            LambdaQueryWrapper<UserProgress> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(UserProgress::getUserId, userId);
-            List<UserProgress> progressList = userProgressService.list(wrapper);
-            return Result.success(progressList);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
-    }
-
-    /**
-     * 获取用户指定科目的学习进度
-     */
-    @GetMapping("/user/{userId}/subject/{subjectId}")
-    @Operation(summary = "获取用户科目进度", description = "获取指定用户在指定科目上的学习进度")
-    public Result<UserProgress> getUserSubjectProgress(
-            @Parameter(description = "用户ID", required = true) @PathVariable Long userId,
-            @Parameter(description = "科目ID", required = true) @PathVariable Integer subjectId) {
-        try {
-            LambdaQueryWrapper<UserProgress> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(UserProgress::getUserId, userId)
-                   .eq(UserProgress::getSubjectId, subjectId);
-            UserProgress progress = userProgressService.getOne(wrapper);
-            return Result.success(progress);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
-    }
-
-    // ==================== 管理员接口 ====================
-
-    /**
-     * 获取所有用户的学习进度统计（管理员）
-     */
-    @GetMapping("/admin/all")
-    @Operation(summary = "获取所有用户学习进度（管理员）", description = "分页获取所有用户的学习进度，支持按用户ID、科目ID筛选")
-    public Result<com.baomidou.mybatisplus.extension.plugins.pagination.Page<UserProgress>> getAllProgress(
-            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
-            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer pageSize,
-            @Parameter(description = "用户ID") @RequestParam(required = false) Long userId,
-            @Parameter(description = "科目ID") @RequestParam(required = false) Integer subjectId) {
-        try {
-            com.baomidou.mybatisplus.extension.plugins.pagination.Page<UserProgress> page =
-                    new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNum, pageSize);
-            LambdaQueryWrapper<UserProgress> wrapper = new LambdaQueryWrapper<>();
-
-            if (userId != null) {
-                wrapper.eq(UserProgress::getUserId, userId);
-            }
-            if (subjectId != null) {
-                wrapper.eq(UserProgress::getSubjectId, subjectId);
-            }
-
-            wrapper.orderByDesc(UserProgress::getUpdateTime);
-            userProgressService.page(page, wrapper);
-            return Result.success(page);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
-    }
-
-    /**
-     * 获取学习进度统计数据（管理员）
+     * 获取学习进度统计（管理员）
      */
     @GetMapping("/admin/stats")
-    @Operation(summary = "获取学习进度统计（管理员）", description = "获取总体学习统计：总学习人数、平均完成数等")
+    @Operation(summary = "获取学习进度统计", description = """
+            获取管理员统计数据，包括：
+            - totalUsers: 总用户数
+            - totalFinished: 总完成题目数
+            - totalCorrect: 总正确题目数
+            - avgAccuracy: 平均正确率
+            """)
     public Result<Map<String, Object>> getProgressStats() {
         try {
             Map<String, Object> stats = new HashMap<>();
 
-            // 统计有学习记录的用户数
-            long totalUsers = userProgressService.count(
-                    new LambdaQueryWrapper<UserProgress>()
-                            .select(UserProgress::getUserId)
-                            .groupBy(UserProgress::getUserId)
+            // 统计总用户数
+            long totalUsers = userService.count();
+
+            // 统计总答题数
+            long totalFinished = recordService.count();
+
+            // 统计总正确数
+            long totalCorrect = recordService.count(
+                new LambdaQueryWrapper<AnswerRecord>().eq(AnswerRecord::getIsCorrect, 1)
             );
-
-            // 统计总学习记录数
-            long totalRecords = userProgressService.count();
-
-            // 统计总完成题目数
-            com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<UserProgress> wrapper =
-                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
-            wrapper.select("IFNULL(sum(finished_count), 0) as totalFinished");
-            Map<String, Object> sumMap = userProgressService.getMap(wrapper);
-            long totalFinished = sumMap != null && sumMap.get("totalFinished") != null
-                    ? Long.parseLong(sumMap.get("totalFinished").toString())
-                    : 0;
-
-            // 统计总正确题目数
-            com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<UserProgress> correctWrapper =
-                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
-            correctWrapper.select("IFNULL(sum(correct_count), 0) as totalCorrect");
-            Map<String, Object> correctMap = userProgressService.getMap(correctWrapper);
-            long totalCorrect = correctMap != null && correctMap.get("totalCorrect") != null
-                    ? Long.parseLong(correctMap.get("totalCorrect").toString())
-                    : 0;
-
-            stats.put("totalUsers", totalUsers);
-            stats.put("totalRecords", totalRecords);
-            stats.put("totalFinished", totalFinished);
-            stats.put("totalCorrect", totalCorrect);
 
             // 计算平均正确率
             double avgAccuracy = totalFinished > 0
-                    ? Math.round((double) totalCorrect / totalFinished * 10000) / 100.0
-                    : 0;
+                ? (double) totalCorrect / totalFinished * 100
+                : 0.0;
+
+            stats.put("totalUsers", totalUsers);
+            stats.put("totalFinished", totalFinished);
+            stats.put("totalCorrect", totalCorrect);
             stats.put("avgAccuracy", avgAccuracy);
 
             return Result.success(stats);
@@ -152,20 +71,115 @@ public class UserProgressController {
      * 获取学习排行榜（管理员）
      */
     @GetMapping("/admin/ranking")
-    @Operation(summary = "获取学习排行榜（管理员）", description = "获取学习完成数排行榜，前N名")
+    @Operation(summary = "获取学习排行榜", description = """
+            获取学习排行榜数据。
+            返回数据包含用户的学习统计信息
+            """)
     public Result<List<Map<String, Object>>> getLearningRanking(
-            @Parameter(description = "排行榜前N名") @RequestParam(defaultValue = "10") Integer limit) {
+            @Parameter(description = "返回数量限制，默认10")
+            @RequestParam(defaultValue = "10") Integer limit) {
         try {
-            // 按用户分组，统计每个用户总完成数和正确数
-            com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<UserProgress> wrapper =
-                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
-            wrapper.select("user_id", "sum(finished_count) as total_finished", "sum(correct_count) as total_correct")
-                   .groupBy("user_id")
-                   .orderByDesc("total_finished")
-                   .last("limit " + limit);
+            // 获取所有答题记录
+            List<AnswerRecord> allRecords = recordService.list();
 
-            List<Map<String, Object>> ranking = userProgressService.listMaps(wrapper);
+            // 按用户分组统计
+            Map<Long, List<AnswerRecord>> userRecordsMap = allRecords.stream()
+                .collect(Collectors.groupingBy(AnswerRecord::getUserId));
+
+            // 构建排行榜数据
+            List<Map<String, Object>> ranking = userRecordsMap.entrySet().stream()
+                .map(entry -> {
+                    List<AnswerRecord> records = entry.getValue();
+                    int totalFinished = records.size();
+                    int totalCorrect = (int) records.stream()
+                        .filter(r -> r.getIsCorrect() != null && r.getIsCorrect() == 1)
+                        .count();
+
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("user_id", entry.getKey());
+                    item.put("total_finished", totalFinished);
+                    item.put("total_correct", totalCorrect);
+                    return item;
+                })
+                .sorted((a, b) -> {
+                    int finishedA = (Integer) a.get("total_finished");
+                    int finishedB = (Integer) b.get("total_finished");
+                    int correctA = (Integer) a.get("total_correct");
+                    int correctB = (Integer) b.get("total_correct");
+                    // 先按完成数排序，再按正确数排序
+                    if (finishedA != finishedB) {
+                        return Integer.compare(finishedB, finishedA);
+                    }
+                    return Integer.compare(correctB, correctA);
+                })
+                .limit(limit)
+                .collect(Collectors.toList());
+
             return Result.success(ranking);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 获取所有用户学习进度（管理员）
+     */
+    @GetMapping("/admin/all")
+    @Operation(summary = "获取所有用户学习进度", description = """
+            分页获取所有用户的学习进度数据
+            """)
+    public Result<Map<String, Object>> getAllUserProgress(
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
+            @Parameter(description = "页大小") @RequestParam(defaultValue = "10") Integer pageSize,
+            @Parameter(description = "用户ID") @RequestParam(required = false) Integer userId,
+            @Parameter(description = "科目ID") @RequestParam(required = false) Integer subjectId) {
+        try {
+            // 获取所有答题记录
+            LambdaQueryWrapper<AnswerRecord> wrapper = new LambdaQueryWrapper<>();
+            if (userId != null) {
+                wrapper.eq(AnswerRecord::getUserId, Long.valueOf(userId));
+            }
+            // 注意：AnswerRecord没有subjectId字段，所以subjectId参数暂时忽略
+
+            List<AnswerRecord> allRecords = recordService.list(wrapper);
+
+            // 按用户分组统计
+            Map<Long, List<AnswerRecord>> userRecordsMap = allRecords.stream()
+                .collect(Collectors.groupingBy(AnswerRecord::getUserId));
+
+            // 构建进度数据列表
+            List<Map<String, Object>> records = userRecordsMap.entrySet().stream()
+                .map(entry -> {
+                    List<AnswerRecord> answerRecords = entry.getValue();
+                    int finishedCount = answerRecords.size();
+                    int correctCount = (int) answerRecords.stream()
+                        .filter(r -> r.getIsCorrect() != null && r.getIsCorrect() == 1)
+                        .count();
+
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("id", entry.getKey());
+                    item.put("userId", entry.getKey());
+                    item.put("subjectId", 0); // AnswerRecord没有subjectId，暂时设为0
+                    item.put("finishedCount", finishedCount);
+                    item.put("correctCount", correctCount);
+                    return item;
+                })
+                .sorted((a, b) -> Integer.compare((Integer) b.get("finishedCount"), (Integer) a.get("finishedCount")))
+                .collect(Collectors.toList());
+
+            // 分页处理
+            int total = records.size();
+            int start = (pageNum - 1) * pageSize;
+            int end = Math.min(start + pageSize, total);
+            List<Map<String, Object>> pagedRecords = start < total
+                ? records.subList(start, end)
+                : new ArrayList<>();
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("records", pagedRecords);
+            result.put("total", total);
+
+            return Result.success(result);
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }

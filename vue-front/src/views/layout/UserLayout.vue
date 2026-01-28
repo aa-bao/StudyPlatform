@@ -183,98 +183,73 @@
         <!-- 未完成考试强制弹窗 -->
         <el-dialog
             v-model="showIncompleteExamDialog"
-            width="520px"
+            width="480px"
             :close-on-click-modal="false"
             :close-on-press-escape="false"
             :show-close="false"
             class="incomplete-exam-dialog"
             align-center
         >
-            <template #header>
-                <div class="custom-dialog-header">
-                    <div class="header-icon-wrapper">
-                        <svg class="header-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="12" cy="12" r="10" fill="url(#gradient-warning)" />
-                            <path d="M12 8V12M12 16H12.01" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-                            <defs>
-                                <linearGradient id="gradient-warning" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#fbbf24" />
-                                    <stop offset="100%" stop-color="#f59e0b" />
-                                </linearGradient>
-                            </defs>
+            <div class="dialog-wrapper">
+                <!-- 顶部图标区 -->
+                <div class="dialog-top">
+                    <div class="top-icon-container">
+                        <svg class="top-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" fill="#f59e0b"/>
+                            <path d="M12 8v4m0 4h.01" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
                         </svg>
                     </div>
-                    <div class="header-content">
-                        <h3 class="header-title">检测到未完成的考试</h3>
-                        <p class="header-subtitle">请继续完成您的考试之旅</p>
-                    </div>
+                    <h2 class="dialog-title">发现未完成的考试</h2>
+                    <p class="dialog-desc">检测到您有正在进行的考试</p>
                 </div>
-            </template>
 
-            <div class="dialog-content">
-                <div class="exam-info-card">
-                    <div class="exam-icon-wrapper">
-                        <svg class="exam-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="3" y="3" width="18" height="18" rx="2" fill="url(#gradient-exam)" opacity="0.15"/>
-                            <path d="M9 11H15M9 14H12M7 7H17C17.5304 7 18.0391 7.21071 18.4142 7.58579C18.7893 7.96086 19 8.46957 19 9V17C19 17.5304 18.7893 18.0391 18.4142 18.4142C18.0391 18.7893 17.5304 19 17 19H7C6.46957 19 5.96086 18.7893 5.58579 18.4142C5.21071 18.0391 5 17.5304 5 17V9C5 8.46957 5.21071 7.96086 5.58579 7.58579C5.96086 7.21071 6.46957 7 7 7Z" fill="url(#gradient-exam)"/>
-                            <defs>
-                                <linearGradient id="gradient-exam" x1="5" y1="7" x2="19" y2="19" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#3b82f6" />
-                                    <stop offset="100%" stop-color="#1d4ed8" />
-                                </linearGradient>
-                            </defs>
-                        </svg>
-                    </div>
-                    <div class="exam-details">
-                        <h3 class="exam-title">{{ incompleteExamInfo.paperTitle }}</h3>
-                        <div class="exam-meta">
-                            <span class="exam-time-badge">
-                                <svg class="time-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                                    <path d="M12 6V12L16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                </svg>
-                                {{ incompleteExamInfo.startTime }}
-                            </span>
+                <!-- 内容区 -->
+                <div class="dialog-body">
+                    <!-- 试卷信息卡片 -->
+                    <div class="exam-card">
+                        <div class="exam-card-header">
+                            <svg class="exam-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span class="exam-label">试卷名称</span>
+                        </div>
+                        <div class="exam-card-content">
+                            <h3 class="exam-name">{{ incompleteExamInfo.paperTitle }}</h3>
+                            <div class="exam-meta">
+                                <div class="meta-item">
+                                    <svg class="meta-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    <span>{{ incompleteExamInfo.startTime }}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- 提示信息 -->
+                    <div class="tips-box">
+                        <svg class="tips-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" stroke="#f59e0b" stroke-width="2"/>
+                            <path d="M12 8v4m0 4h.01" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+                        </svg>
+                        <p class="tips-text">继续完成考试以获得<span class="highlight">更准确</span>的能力评估！</p>
+                    </div>
                 </div>
 
-                <div class="message-box">
-                    <div class="message-icon-wrapper">
-                        <svg class="message-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="12" cy="12" r="10" fill="url(#gradient-info)" opacity="0.1"/>
-                            <path d="M12 16V12M12 8H12.01" stroke="url(#gradient-info)" stroke-width="2.5" stroke-linecap="round"/>
-                            <defs>
-                                <linearGradient id="gradient-info" x1="7" y1="7" x2="17" y2="17" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#3b82f6" />
-                                    <stop offset="100%" stop-color="#2563eb" />
-                                </linearGradient>
-                            </defs>
+                <!-- 底部按钮区 -->
+                <div class="dialog-footer">
+                    <button @click="abandonExam" class="btn-abandon">
+                        放弃考试
+                    </button>
+                    <button @click="continueExam" class="btn-continue">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5 12h14m-7-7 7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                    </div>
-                    <div class="message-content">
-                        <p class="message-text">
-                            检测到您有一场考试尚未完成，为了
-                            <span class="highlight">准确评估</span>
-                            您的各项能力，建议您继续认真作答完成考试。
-                        </p>
-                    </div>
+                        继续考试
+                    </button>
                 </div>
             </div>
-
-            <template #footer>
-                <div class="dialog-footer">
-                    <el-button @click="abandonExam" class="abandon-btn" size="large">
-                        <span>放弃考试</span>
-                    </el-button>
-                    <el-button type="primary" @click="continueExam" class="continue-btn" size="large">
-                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                        <span>继续考试</span>
-                    </el-button>
-                </div>
-            </template>
         </el-dialog>
     </div>
 </template>
@@ -1091,288 +1066,265 @@ onMounted(() => {
 
 /* 未完成考试弹窗样式 */
 .incomplete-exam-dialog {
-    border-radius: 16px;
-    overflow: hidden;
+    border-radius: 20px;
+    overflow: visible;
 }
 
 .incomplete-exam-dialog :deep(.el-dialog__header) {
-    padding: 0;
-    margin: 0;
+    display: none;
 }
 
 .incomplete-exam-dialog :deep(.el-dialog__body) {
     padding: 0;
+    background: transparent;
 }
 
 .incomplete-exam-dialog :deep(.el-dialog__footer) {
-    padding: 0;
-    margin: 0;
+    display: none;
 }
 
-/* 自定义弹窗头部 */
-.custom-dialog-header {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    padding: 24px 28px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    position: relative;
+.incomplete-exam-dialog :deep(.el-dialog) {
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+/* 弹窗包装器 */
+.dialog-wrapper {
+    background: white;
+    border-radius: 20px;
     overflow: hidden;
 }
 
-.custom-dialog-header::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f59e0b' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    opacity: 0.5;
+/* 顶部区域 */
+.dialog-top {
+    background: linear-gradient(135deg, #fef9e7 0%, #fef3c7 100%);
+    padding: 32px 28px 28px;
+    text-align: center;
+    position: relative;
 }
 
-.header-icon-wrapper {
-    width: 56px;
-    height: 56px;
+.dialog-top::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.3), transparent);
+}
+
+.top-icon-container {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 20px;
+    background: white;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: white;
-    border-radius: 14px;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
-    flex-shrink: 0;
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.2);
     position: relative;
-    z-index: 1;
 }
 
-.header-icon {
-    width: 32px;
-    height: 32px;
+.top-icon-container::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px dashed rgba(245, 158, 11, 0.3);
+    animation: spin 20s linear infinite;
 }
 
-.header-content {
-    flex: 1;
-    position: relative;
-    z-index: 1;
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
-.header-title {
-    margin: 0 0 4px 0;
-    font-size: 20px;
+.top-icon {
+    width: 36px;
+    height: 36px;
+}
+
+.dialog-title {
+    margin: 0 0 8px 0;
+    font-size: 22px;
     font-weight: 700;
-    color: #92400e;
+    color: #78350f;
     letter-spacing: -0.3px;
 }
 
-.header-subtitle {
+.dialog-desc {
     margin: 0;
-    font-size: 13px;
-    color: #b45309;
+    font-size: 14px;
+    color: #92400e;
     font-weight: 500;
 }
 
-/* 弹窗内容 */
-.dialog-content {
+/* 主体内容区 */
+.dialog-body {
     padding: 28px;
-    background: #ffffff;
 }
 
-/* 考试信息卡片 */
-.exam-info-card {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 20px;
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+/* 试卷信息卡片 */
+.exam-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
     border-radius: 16px;
-    border: 2px solid rgba(59, 130, 246, 0.2);
-    margin-bottom: 20px;
-    position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.1);
+    margin-bottom: 16px;
+    border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
-.exam-info-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 50%, #3b82f6 100%);
-}
-
-.exam-icon-wrapper {
-    width: 56px;
-    height: 56px;
+.exam-card-header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: white;
-    border-radius: 12px;
-    flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(59, 130, 246, 0.08);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.1);
 }
 
-.exam-icon-svg {
-    width: 32px;
-    height: 32px;
+.exam-icon {
+    width: 18px;
+    height: 18px;
+    color: #3b82f6;
 }
 
-.exam-details {
-    flex: 1;
-    min-width: 0;
+.exam-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e40af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-.exam-title {
-    margin: 0 0 10px 0;
-    font-size: 17px;
+.exam-card-content {
+    padding: 16px;
+}
+
+.exam-name {
+    margin: 0 0 12px 0;
+    font-size: 16px;
     font-weight: 700;
     color: #1e3a8a;
-    line-height: 1.4;
-    word-break: break-word;
+    line-height: 1.5;
 }
 
 .exam-meta {
     display: flex;
     align-items: center;
-    gap: 10px;
 }
 
-.exam-time-badge {
-    display: inline-flex;
+.meta-item {
+    display: flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 12px;
-    background: rgba(59, 130, 246, 0.15);
-    border-radius: 20px;
-    font-size: 12px;
-    color: #1e40af;
-    font-weight: 600;
+    font-size: 13px;
+    color: #64748b;
 }
 
-.time-icon {
+.meta-icon {
     width: 14px;
     height: 14px;
 }
 
-/* 消息提示框 */
-.message-box {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 18px;
-    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-    border-radius: 12px;
-    border-left: 4px solid #3b82f6;
-}
-
-.message-icon-wrapper {
-    width: 40px;
-    height: 40px;
+/* 提示框 */
+.tips-box {
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: white;
-    border-radius: 10px;
+    gap: 12px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-radius: 12px;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.tips-icon {
+    width: 20px;
+    height: 20px;
     flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
 }
 
-.message-icon {
-    width: 24px;
-    height: 24px;
-}
-
-.message-content {
-    flex: 1;
-    padding-top: 2px;
-}
-
-.message-text {
+.tips-text {
     margin: 0;
-    font-size: 14px;
-    color: #334155;
-    line-height: 1.7;
+    font-size: 13px;
     font-weight: 500;
+    color: #92400e;
+    line-height: 1.6;
 }
 
-.highlight {
-    color: #2563eb;
+.tips-text .highlight {
+    color: #d97706;
     font-weight: 700;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%);
-    padding: 2px 8px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.15) 100%);
+    padding: 2px 6px;
     border-radius: 4px;
+    position: relative;
+    display: inline-block;
 }
 
-/* 弹窗底部 */
+/* 底部按钮区 */
 .dialog-footer {
     display: flex;
-    justify-content: flex-end;
     gap: 12px;
-    padding: 20px 28px 28px;
-    background: #fafafa;
-    border-top: 1px solid #e5e7eb;
+    padding: 0 28px 28px 28px;
 }
 
-.abandon-btn {
+.btn-abandon,
+.btn-continue {
     flex: 1;
     height: 48px;
-    border: 2px solid #e5e7eb;
-    background: white;
-    color: #64748b;
-    font-weight: 600;
+    border-radius: 12px;
     font-size: 15px;
-    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.abandon-btn:hover {
-    border-color: #ef4444;
-    color: #ef4444;
-    background: #fef2f2;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
-}
-
-.continue-btn {
-    flex: 1.5;
-    height: 48px;
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    border: none;
-    font-weight: 600;
-    font-size: 15px;
-    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
 }
 
-.continue-btn:hover {
+.btn-abandon {
+    background: white;
+    color: #64748b;
+    border: 2px solid #e2e8f0;
+}
+
+.btn-abandon:hover {
+    background: #f8fafc;
+    border-color: #ef4444;
+    color: #ef4444;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.btn-continue {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+}
+
+.btn-continue:hover {
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
-.btn-icon {
+.btn-continue .btn-icon {
     width: 18px;
     height: 18px;
 }
 
-/* 弹窗动画 */
+/* 弹窗进入动画 */
 .incomplete-exam-dialog :deep(.el-dialog) {
-    border-radius: 16px;
-    overflow: hidden;
-    animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: dialogSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes slideInUp {
+@keyframes dialogSlideIn {
     from {
         opacity: 0;
-        transform: translateY(30px) scale(0.95);
+        transform: translateY(20px) scale(0.95);
     }
     to {
         opacity: 1;

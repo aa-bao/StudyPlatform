@@ -62,8 +62,8 @@
                     <div class="chart-card">
                         <div class="chart-header">
                             <div class="chart-title">
-                                <div class="title-icon"><el-icon><PieChart /></el-icon></div>
-                                <span>题目科目分布</span>
+                                <div class="title-icon"><el-icon><DataAnalysis /></el-icon></div>
+                                <span>科目错题统计</span>
                             </div>
                         </div>
                         <div id="subjectPieChart" class="chart-container"></div>
@@ -91,8 +91,8 @@
                     <div class="chart-card">
                         <div class="chart-header">
                             <div class="chart-title">
-                                <div class="title-icon"><el-icon><Warning /></el-icon></div>
-                                <span>错题热力分布</span>
+                                <div class="title-icon"><el-icon><Clock /></el-icon></div>
+                                <span>答题时段热力图</span>
                             </div>
                         </div>
                         <div id="mistakeHeatmapChart" class="chart-container"></div>
@@ -199,8 +199,8 @@ import { ref, onMounted, nextTick, onUnmounted, h } from 'vue'
 import request from '@/utils/request'
 import * as echarts from 'echarts'
 import {
-    Memo, User, Reading, TrendCharts, PieChart,
-    DataAnalysis, Warning, Trophy, Clock, ArrowUp, ArrowDown
+    Reading, TrendCharts,
+    DataAnalysis, Trophy, Clock
 } from '@element-plus/icons-vue'
 
 // --- 数字滚动组件 ---
@@ -249,25 +249,55 @@ const loadStats = async () => {
     try {
         const res = await request.get('/admin/statistics')
         const data = res.data || res
+
+        // 更新统计数值
         statsCards.value[0].value = data.questionCount || 0
         statsCards.value[1].value = data.userCount || 0
         statsCards.value[2].value = data.exerciseCount || 0
         statsCards.value[3].value = data.todayActive || 0
-        
+
+        // 更新趋势数据
+        updateTrend(0, data.questionTrend)
+        updateTrend(1, data.userTrend)
+        updateTrend(2, data.exerciseTrend)
+        updateTrend(3, data.todayActiveTrend)
+
         await nextTick()
-        initCharts(data)
+        initCharts()
+
+        // 加载动态数据
         loadTopUsers()
+        loadActivityTrend('week')
+        loadRecentActivities()
+        loadSubjectMistakeCount()
+        loadHourlyActivityHeatmap()
     } catch (e) {
         console.warn('使用模拟数据');
         await nextTick(); initCharts({}); loadMockTopUsers();
     }
 }
 
+// 更新趋势数据的辅助函数
+const updateTrend = (index, trendValue) => {
+    if (trendValue === undefined || trendValue === null) return
+
+    const trend = trendValue > 0 ? `+${trendValue}` : `${trendValue}`
+    const trendIcon = trendValue >= 0 ? 'ArrowUp' : 'ArrowDown'
+    const trendColor = trendValue >= 0 ? '#67C23A' : '#F56C6C'
+
+    statsCards.value[index].trend = trend
+    statsCards.value[index].trendIcon = trendIcon
+    statsCards.value[index].trendColor = trendColor
+}
+
 const loadTopUsers = async () => {
     try {
         const res = await request.get('/admin/top-users', { params: { limit: 10 } })
         topUsers.value = res.data || []
-    } catch (e) { loadMockTopUsers() }
+    } catch (e) {
+        console.warn('加载学霸排行榜失败，使用模拟数据')
+        loadMockTopUsers()
+    }
 }
 
 const loadMockTopUsers = () => {
@@ -280,8 +310,226 @@ const loadMockTopUsers = () => {
     ]
 }
 
+// 加载用户活跃趋势
+const loadActivityTrend = async (period = 'week') => {
+    try {
+        const res = await request.get('/admin/activity-trend', { params: { period } })
+        const data = res.data || {}
+
+        // 更新活跃趋势图表
+        if (charts.activity) {
+            charts.activity.setOption({
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: data.dates || []
+                },
+                series: [{
+                    name: '活跃用户',
+                    type: 'line',
+                    smooth: true,
+                    data: data.activeUsers || [],
+                    symbol: 'circle',
+                    symbolSize: 8,
+                    itemStyle: { color: '#409EFF' },
+                    lineStyle: { width: 4, shadowBlur: 10, shadowColor: 'rgba(64,158,255,0.3)' },
+                    areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(64,158,255,0.2)' }, { offset: 1, color: 'transparent' }]) }
+                }]
+            })
+        }
+    } catch (e) {
+        console.warn('加载活跃趋势失败')
+    }
+}
+
+// 加载实时学习动态
+const loadRecentActivities = async () => {
+    try {
+        const res = await request.get('/admin/recent-activities', { params: { limit: 10 } })
+        const activities = res.data || []
+
+        // 转换数据格式
+        realtimeActivities.value = activities.map(item => ({
+            user: item.username,
+            action: item.action,
+            detail: item.detail,
+            time: item.time,
+            color: item.color
+        }))
+    } catch (e) {
+        console.warn('加载实时动态失败，使用模拟数据')
+    }
+}
+
+// 加载科目错题统计
+const loadSubjectMistakeCount = async () => {
+    try {
+        const res = await request.get('/admin/subject-mistake-count')
+        const data = res.data || {}
+
+        // 更新科目错题统计图表
+        if (charts.pie) {
+            charts.pie.setOption({
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: '{b}: {c}题'
+                },
+                grid: {
+                    left: '15%',
+                    right: '10%',
+                    bottom: '10%',
+                    top: '15%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: '{value}题'
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            type: 'dashed'
+                        }
+                    }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: data.subjects || ['政治', '英语', '数学', '408专业课'],
+                    axisLabel: {
+                        fontSize: 12
+                    }
+                },
+                series: [{
+                    name: '错题数量',
+                    type: 'bar',
+                    data: data.counts || [0, 0, 0, 0],
+                    barWidth: 18,
+                    itemStyle: {
+                        borderRadius: [0, 10, 10, 0],
+                        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                            { offset: 0, color: '#409EFF' },
+                            { offset: 1, color: '#F56C6C' }
+                        ])
+                    },
+                    label: {
+                        show: true,
+                        position: 'right',
+                        formatter: '{c}题',
+                        fontSize: 11,
+                        color: '#606266'
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                { offset: 0, color: '#66b1ff' },
+                                { offset: 1, color: '#f78989' }
+                            ])
+                        }
+                    }
+                }]
+            })
+        }
+    } catch (e) {
+        console.warn('加载科目错题统计失败')
+    }
+}
+
+// 加载答题时段热力图
+const loadHourlyActivityHeatmap = async () => {
+    try {
+        const res = await request.get('/admin/hourly-activity-heatmap')
+        const data = res.data || {}
+
+        // 更新答题时段热力图
+        if (charts.heat) {
+            charts.heat.setOption({
+                tooltip: {
+                    position: 'top',
+                    formatter: function(params) {
+                        return `${data.days[params.value[1]]} ${data.hours[params.value[0]]}<br/>答题: ${params.value[2]}次`
+                    }
+                },
+                grid: {
+                    height: '70%',
+                    top: '15%',
+                    left: '10%',
+                    right: '15%'
+                },
+                xAxis: {
+                    type: 'category',
+                    data: data.hours || [],
+                    splitArea: {
+                        show: true
+                    },
+                    axisLabel: {
+                        fontSize: 10
+                    }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: data.days || [],
+                    splitArea: {
+                        show: true
+                    },
+                    axisLabel: {
+                        fontSize: 11
+                    }
+                },
+                visualMap: {
+                    min: 0,
+                    max: 20,
+                    calculable: true,
+                    orient: 'horizontal',
+                    left: 'center',
+                    bottom: '5%',
+                    text: ['低', '', '', '', '', '中', '', '', '', '', '高'],
+                    inRange: {
+                        color: ['#e0f3f8', '#b3e0ff', '#80b5ff', '#4d94ff', '#1a73e8', '#0078d4', '#0050a3', '#003366']
+                    },
+                    textStyle: {
+                        color: '#666'
+                    },
+                    controller: {
+                        inRange: {
+                            color: '#409EFF'
+                        }
+                    }
+                },
+                series: [{
+                    type: 'heatmap',
+                    data: data.data || [],
+                    label: {
+                        show: true,
+                        fontSize: 10,
+                        formatter: function(params) {
+                            return params.value[2] > 0 ? params.value[2] : ''
+                        }
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(0, 0, 0, 0.5)'
+                        }
+                    }
+                }]
+            })
+        }
+    } catch (e) {
+        console.warn('加载答题时段热力图失败')
+    }
+}
+
 // --- 图表初始化 ---
-const initCharts = (data) => {
+const initCharts = () => {
+    // 销毁已存在的图表实例，避免重复初始化
+    const chartIds = ['activity', 'pie', 'rate', 'heat', 'bar']
+    chartIds.forEach(id => {
+        if (charts[id] && !charts[id].isDisposed()) {
+            charts[id].dispose()
+        }
+    })
+
     // 1. 活跃趋势图
     charts.activity = echarts.init(document.getElementById('activityChart'))
     charts.activity.setOption({
@@ -300,19 +548,58 @@ const initCharts = (data) => {
         ]
     })
 
-    // 2. 饼图
+    // 2. 科目错题统计图
     charts.pie = echarts.init(document.getElementById('subjectPieChart'))
     charts.pie.setOption({
-        tooltip: { trigger: 'item' },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            formatter: '{b}: {c}题'
+        },
+        grid: {
+            left: '15%',
+            right: '10%',
+            bottom: '10%',
+            top: '15%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'value',
+            axisLabel: {
+                formatter: '{value}题'
+            },
+            splitLine: {
+                lineStyle: {
+                    type: 'dashed'
+                }
+            }
+        },
+        yAxis: {
+            type: 'category',
+            data: ['政治', '英语', '数学', '408专业课'],
+            axisLabel: {
+                fontSize: 12
+            }
+        },
         series: [{
-            type: 'pie', radius: ['50%', '80%'], avoidLabelOverlap: false,
-            itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-            label: { show: false },
-            data: data.subjectData || [
-                { value: 1048, name: '高数', itemStyle: { color: '#409EFF' } },
-                { value: 735, name: '英语', itemStyle: { color: '#67C23A' } },
-                { value: 580, name: '政治', itemStyle: { color: '#E6A23C' } }
-            ]
+            name: '错题数量',
+            type: 'bar',
+            data: [],
+            barWidth: 18,
+            itemStyle: {
+                borderRadius: [0, 10, 10, 0],
+                color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                    { offset: 0, color: '#409EFF' },
+                    { offset: 1, color: '#F56C6C' }
+                ])
+            },
+            label: {
+                show: true,
+                position: 'right',
+                formatter: '{c}题',
+                fontSize: 11,
+                color: '#606266'
+            }
         }]
     })
 
@@ -327,15 +614,78 @@ const initCharts = (data) => {
         }]
     })
 
-    // 4. 热力图
+    // 4. 答题时段热力图
     charts.heat = echarts.init(document.getElementById('mistakeHeatmapChart'))
-    const heatData = []; for(let i=0; i<7; i++) for(let j=0; j<24; j++) heatData.push([j, i, Math.floor(Math.random()*10)]);
     charts.heat.setOption({
-        tooltip: {}, grid: { height: '70%', top: '10%' },
-        xAxis: { type: 'category', data: Array.from({length:24}, (_,i)=>i+'h') },
-        yAxis: { type: 'category', data: ['Sun', 'Sat', 'Fri', 'Thu', 'Wed', 'Tue', 'Mon'] },
-        visualMap: { min: 0, max: 10, calculable: true, orient: 'horizontal', left: 'center', bottom: '0%', inRange: { color: ['#e0f3f8', '#409EFF', '#003366'] } },
-        series: [{ type: 'heatmap', data: heatData }]
+        tooltip: {
+            position: 'top',
+            formatter: function(params) {
+                return `${params.value[1]} ${params.value[0]}<br/>答题: ${params.value[2]}次`
+            }
+        },
+        grid: {
+            height: '70%',
+            top: '15%',
+            left: '10%',
+            right: '15%'
+        },
+        xAxis: {
+            type: 'category',
+            data: [],
+            splitArea: {
+                show: true
+            },
+            axisLabel: {
+                fontSize: 10
+            }
+        },
+        yAxis: {
+            type: 'category',
+            data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+            splitArea: {
+                show: true
+            },
+            axisLabel: {
+                fontSize: 11
+            }
+        },
+        visualMap: {
+            min: 0,
+            max: 20,
+            calculable: true,
+            orient: 'horizontal',
+            left: 'center',
+            bottom: '5%',
+            text: ['低', '', '', '', '', '中', '', '', '', '', '高'],
+            inRange: {
+                color: ['#e0f3f8', '#b3e0ff', '#80b5ff', '#4d94ff', '#1a73e8', '#0078d4', '#0050a3', '#003366']
+            },
+            textStyle: {
+                color: '#666'
+            },
+            controller: {
+                inRange: {
+                    color: '#409EFF'
+                }
+            }
+        },
+        series: [{
+            type: 'heatmap',
+            data: [],
+            label: {
+                show: true,
+                fontSize: 10,
+                formatter: function(params) {
+                    return params.value[2] > 0 ? params.value[2] : ''
+                }
+            },
+            emphasis: {
+                itemStyle: {
+                    shadowBlur: 10,
+                    shadowColor: 'rgba(0, 0, 0, 0.5)'
+                }
+            }
+        }]
     })
 
     // 5. 柱状图
@@ -349,7 +699,9 @@ const initCharts = (data) => {
 }
 
 const handleResize = () => Object.values(charts).forEach(c => c.resize())
-const handlePeriodChange = (p) => console.log(p)
+const handlePeriodChange = (period) => {
+    loadActivityTrend(period)
+}
 
 onMounted(() => {
     loadStats()

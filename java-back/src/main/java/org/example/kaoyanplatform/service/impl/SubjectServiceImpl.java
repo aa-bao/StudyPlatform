@@ -4,15 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import org.example.kaoyanplatform.constant.SubjectLevelConstants;
-import org.example.kaoyanplatform.entity.MapQuestionSubject;
-import org.example.kaoyanplatform.entity.MapSubjectWeight;
+import org.example.kaoyanplatform.entity.QuestionSubjectRel;
+import org.example.kaoyanplatform.entity.SubjectWeightRel;
 import org.example.kaoyanplatform.entity.Subject;
-import org.example.kaoyanplatform.entity.UserProgress;
 import org.example.kaoyanplatform.entity.dto.SubjectDTO;
-import org.example.kaoyanplatform.mapper.MapQuestionSubjectMapper;
-import org.example.kaoyanplatform.mapper.MapSubjectWeightMapper;
+import org.example.kaoyanplatform.mapper.QuestionSubjectRelMapper;
 import org.example.kaoyanplatform.mapper.SubjectMapper;
-import org.example.kaoyanplatform.mapper.UserProgressMapper;
+import org.example.kaoyanplatform.mapper.SubjectWeightRelMapper;
 import org.example.kaoyanplatform.service.SubjectService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,9 +23,8 @@ import java.util.stream.Collectors;
 
 /**
  * 科目Service实现类
- * 使用映射表（map_question_subject）管理题目与科目的关系
- * 使用映射表（map_subject_book）管理书本与科目的关系
- *
+ * 使用映射表（question_subject_rel）管理题目与科目的关系
+ * 使用映射表（book_subject_rel）管理书本与科目的关系
  * 层级结构说明：
  * - Level 1 (CATEGORY): 考试大类（如：公共课、专业课）
  * - Level 2 (EXAM_SPEC): 考试规格（如：数学一、数学二、英语一）
@@ -39,13 +36,10 @@ import java.util.stream.Collectors;
 public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> implements SubjectService {
 
     @Autowired
-    private MapQuestionSubjectMapper mapQuestionSubjectMapper;
+    private QuestionSubjectRelMapper mapQuestionSubjectMapper;
 
     @Autowired
-    private UserProgressMapper userProgressMapper;
-
-    @Autowired
-    private MapSubjectWeightMapper mapSubjectWeightMapper;
+    private SubjectWeightRelMapper mapSubjectWeightMapper;
 
     @Override
     public List<SubjectDTO> getTree(Long userId, Integer rootId) {
@@ -53,7 +47,7 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> impl
         List<Subject> allSubjects = list();
 
         // 2. 获取每个科目的题目数量（使用新的映射表）
-        QueryWrapper<MapQuestionSubject> qsWrapper = new QueryWrapper<>();
+        QueryWrapper<QuestionSubjectRel> qsWrapper = new QueryWrapper<>();
         qsWrapper.select("subject_id", "count(*) as count");
         qsWrapper.groupBy("subject_id");
         List<Map<String, Object>> qsCounts = mapQuestionSubjectMapper.selectMaps(qsWrapper);
@@ -62,22 +56,11 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> impl
             questionCountMap.put((Integer) map.get("subject_id"), ((Long) map.get("count")).intValue());
         }
 
-        // 3. 获取用户进度
+        // 3. 获取用户进度 - 移除用户进度功能，暂时设为0
         Map<Integer, Integer> finishedCountMap = new HashMap<>();
-        if (userId != null) {
-            QueryWrapper<UserProgress> upWrapper = new QueryWrapper<>();
-            upWrapper.eq("user_id", userId);
-            List<UserProgress> progressList = userProgressMapper.selectList(upWrapper);
-            for (UserProgress up : progressList) {
-                finishedCountMap.put(up.getSubjectId(), up.getFinishedCount());
-            }
-        }
-
-        // 4. 转换为 DTO 并构建树结构
-        Map<Integer, SubjectDTO> dtoMap = new HashMap<>();
-        List<Integer> targetRootIds = new ArrayList<>();
 
         // 确定目标根节点
+        List<Integer> targetRootIds = new ArrayList<>();
         if (rootId != null) {
             // 检查是否为书籍
             List<Integer> mappedIds = baseMapper.getSubjectIdsByBookId(rootId);
@@ -104,6 +87,9 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> impl
                 }
             }
         }
+
+        // 4. 转换为 DTO 并构建树结构
+        Map<Integer, SubjectDTO> dtoMap = new HashMap<>();
 
         // 创建 DTO 对象
         for (Subject s : allSubjects) {
@@ -326,8 +312,8 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> impl
 
     @Override
     public boolean hasQuestionRelations(Integer subjectId) {
-        // 检查 map_question_subject 表中是否存在该科目的关联
-        QueryWrapper<MapQuestionSubject> wrapper = new QueryWrapper<>();
+        // 检查 question_subject_rel 表中是否存在该科目的关联
+        QueryWrapper<QuestionSubjectRel> wrapper = new QueryWrapper<>();
         wrapper.eq("subject_id", subjectId);
         long count = mapQuestionSubjectMapper.selectCount(wrapper);
         return count > 0;
@@ -382,26 +368,18 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> impl
             BeanUtils.copyProperties(s, dto);
             dto.setChildren(new ArrayList<>());
 
-            // 如果提供了 userId，获取统计数据
-            if (userId != null) {
-                // 获取题目数量
-                QueryWrapper<MapQuestionSubject> qsWrapper = new QueryWrapper<>();
-                qsWrapper.eq("subject_id", s.getId());
-                qsWrapper.select("count(*) as count");
-                List<Map<String, Object>> qsCounts = mapQuestionSubjectMapper.selectMaps(qsWrapper);
-                if (!qsCounts.isEmpty()) {
-                    dto.setQuestionCount(((Long) qsCounts.get(0).get("count")).intValue());
-                }
-
-                // 获取完成数量
-                QueryWrapper<UserProgress> upWrapper = new QueryWrapper<>();
-                upWrapper.eq("user_id", userId);
-                upWrapper.eq("subject_id", s.getId());
-                UserProgress progress = userProgressMapper.selectOne(upWrapper);
-                if (progress != null) {
-                    dto.setFinishedCount(progress.getFinishedCount());
-                }
+            // 如果提供了 userId，获取统计数据 - 移除用户进度功能，暂时设为0
+            // 获取题目数量
+            QueryWrapper<QuestionSubjectRel> qsWrapper = new QueryWrapper<>();
+            qsWrapper.eq("subject_id", s.getId());
+            qsWrapper.select("count(*) as count");
+            List<Map<String, Object>> qsCounts = mapQuestionSubjectMapper.selectMaps(qsWrapper);
+            if (!qsCounts.isEmpty()) {
+                dto.setQuestionCount(((Long) qsCounts.get(0).get("count")).intValue());
             }
+
+            // 设置完成数量为0，因为移除了用户进度功能
+            dto.setFinishedCount(0);
 
             result.add(dto);
         }
@@ -481,9 +459,9 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> impl
         List<Subject> allSubjects = listByIds(new ArrayList<>(allRelatedIds));
 
         // 5. 获取该考试规格下的权重映射
-        List<MapSubjectWeight> weightMappings = mapSubjectWeightMapper.listByExamSpecId(examSpecId);
+        List<SubjectWeightRel> weightMappings = mapSubjectWeightMapper.listByExamSpecId(examSpecId);
         Map<Integer, Float> weightMap = new HashMap<>();
-        for (MapSubjectWeight mapping : weightMappings) {
+        for (SubjectWeightRel mapping : weightMappings) {
             weightMap.put(mapping.getSubjectId(), mapping.getWeight());
         }
 
@@ -492,24 +470,13 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> impl
         Map<Integer, Integer> finishedCountMap = new HashMap<>();
 
         // 获取题目数量
-        QueryWrapper<MapQuestionSubject> qsWrapper = new QueryWrapper<>();
+        QueryWrapper<QuestionSubjectRel> qsWrapper = new QueryWrapper<>();
         qsWrapper.in("subject_id", allRelatedIds);
         qsWrapper.select("subject_id", "count(*) as count");
         qsWrapper.groupBy("subject_id");
         List<Map<String, Object>> qsCounts = mapQuestionSubjectMapper.selectMaps(qsWrapper);
         for (Map<String, Object> map : qsCounts) {
             questionCountMap.put((Integer) map.get("subject_id"), ((Long) map.get("count")).intValue());
-        }
-
-        // 获取用户进度
-        if (userId != null) {
-            QueryWrapper<UserProgress> upWrapper = new QueryWrapper<>();
-            upWrapper.eq("user_id", userId);
-            upWrapper.in("subject_id", allRelatedIds);
-            List<UserProgress> progressList = userProgressMapper.selectList(upWrapper);
-            for (UserProgress up : progressList) {
-                finishedCountMap.put(up.getSubjectId(), up.getFinishedCount());
-            }
         }
 
         // 7. 转换为 DTO 并构建树结构
@@ -519,7 +486,7 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> impl
             BeanUtils.copyProperties(s, dto);
             dto.setChildren(new ArrayList<>());
             dto.setQuestionCount(questionCountMap.getOrDefault(s.getId(), 0));
-            dto.setFinishedCount(finishedCountMap.getOrDefault(s.getId(), 0));
+            dto.setFinishedCount(finishedCountMap.getOrDefault(s.getId(), 0)); // 设置为0，因为移除了用户进度功能
 
             // 设置动态权重：从映射表中获取
             if (weightMap.containsKey(s.getId())) {

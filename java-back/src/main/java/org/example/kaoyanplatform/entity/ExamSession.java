@@ -5,13 +5,14 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+// 考试会话实体类
 @Data
-@TableName("tb_exam_session")
+@TableName("exam_session")
 public class ExamSession {
-    @TableId(type = IdType.ASSIGN_UUID)
-    private String id;
-    private String userId;
-    private String paperId;
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long userId;
+    private Long paperId;
     private Integer status;
 
     /**

@@ -1,17 +1,33 @@
 <template>
     <div class="admin-container">
-        <el-card shadow="never" class="import-card">
+        <!-- 导入配置卡片 -->
+        <el-card shadow="never" class="table-card">
             <template #header>
                 <div class="card-header">
                     <div class="text-header">
-                        <span class="title-text">JSON 文件批量导入题目</span>
+                        <span class="title-text">题目批量导入</span>
                         <div class="header-desc">上传 JSON 文件批量导入题目到题库</div>
+                    </div>
+                    <div class="header-btns">
+                        <el-button
+                            type="primary"
+                            size="large"
+                            :loading="importing"
+                            :disabled="!canImport"
+                            @click="handleImport"
+                        >
+                            {{ importing ? '导入中...' : '开始导入' }}
+                        </el-button>
+                        <el-button size="large" @click="resetForm" :disabled="importing">
+                            重置
+                        </el-button>
                     </div>
                 </div>
             </template>
 
-            <!-- 导入表单 -->
-            <el-form :model="importForm" label-width="120px" class="import-form" v-loading="importing">
+            <div v-if="dataLoading" v-loading="true" class="loading-container"></div>
+
+            <el-form v-else :model="importForm" label-width="120px" label-position="left" class="import-form" v-loading="importing">
                 <!-- 习题册选择 -->
                 <el-form-item label="习题册/试卷">
                     <el-radio-group v-model="importForm.bookMode" @change="handleBookModeChange">
@@ -142,94 +158,6 @@
                     </el-alert>
                 </el-form-item>
 
-                <!-- 题目预览 -->
-                <el-form-item v-if="parsedQuestions.length > 0" label="题目预览">
-                    <div class="preview-container">
-                        <div class="preview-header">
-                            <span class="preview-count">共 {{ parsedQuestions.length }} 道题目</span>
-                            <el-button text type="primary" @click="toggleExpandAll">
-                                {{ allExpanded ? '收起全部' : '展开全部' }}
-                            </el-button>
-                        </div>
-                        <el-collapse v-model="activeQuestions" accordion>
-                            <el-collapse-item
-                                v-for="(question, index) in currentPageQuestions"
-                                :key="index"
-                                :name="index"
-                            >
-                                <template #title>
-                                    <div class="question-title">
-                                        <el-tag :type="getTypeTagType(question.type)" size="small" effect="dark">
-                                            {{ getTypeName(question.type) }}
-                                        </el-tag>
-                                        <span class="question-number">NO.{{ (previewCurrentPage - 1) * pageSize + index + 1 }}</span>
-                                    </div>
-                                </template>
-                                <div class="question-detail">
-                                    <div class="detail-row">
-                                        <span class="detail-label">题干：</span>
-                                        <span class="detail-content" v-html="renderLatex(question.content || '(无)')"></span>
-                                    </div>
-
-                                    <div v-if="question.options && question.options.length > 0" class="detail-row">
-                                        <span class="detail-label">选项：</span>
-                                        <div class="detail-content options-list">
-                                            <div
-                                                v-for="(option, optIdx) in question.options"
-                                                :key="optIdx"
-                                                class="option-item"
-                                                v-html="formatOption(option, optIdx)"
-                                            >
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="detail-row">
-                                        <span class="detail-label">答案：</span>
-                                        <span class="detail-content answer" v-html="renderLatex(question.answer || '(未填写)')"></span>
-                                    </div>
-
-                                    <div v-if="question.analysis" class="detail-row">
-                                        <span class="detail-label">解析：</span>
-                                        <span class="detail-content analysis" v-html="renderLatex(question.analysis)"></span>
-                                    </div>
-
-                                    <div v-if="question.tags && question.tags.length > 0" class="detail-row tags-row">
-                                        <span class="detail-label">标签：</span>
-                                        <span class="detail-content">
-                                            <el-tag
-                                                v-for="(tag, tagIdx) in question.tags"
-                                                :key="tagIdx"
-                                                size="small"
-                                                effect="plain"
-                                                style="margin-right: 8px; margin-bottom: 5px"
-                                            >
-                                                {{ tag }}
-                                            </el-tag>
-                                        </span>
-                                    </div>
-
-                                    <div v-if="question.source" class="detail-row">
-                                        <span class="detail-label">来源：</span>
-                                        <span class="detail-content source">{{ question.source }}</span>
-                                    </div>
-                                </div>
-                            </el-collapse-item>
-                        </el-collapse>
-
-                        <!-- 分页 -->
-                        <div v-if="parsedQuestions.length > pageSize" class="preview-pagination">
-                            <el-pagination
-                                :current-page="previewCurrentPage"
-                                :page-size="pageSize"
-                                :total="parsedQuestions.length"
-                                layout="prev, pager, next"
-                                small
-                            />
-                        </div>
-                    </div>
-                </el-form-item>
-
                 <!-- 导入结果 -->
                 <el-form-item v-if="importResult" label="导入结果">
                     <el-alert
@@ -257,23 +185,115 @@
                         </template>
                     </el-alert>
                 </el-form-item>
-
-                <!-- 操作按钮 -->
-                <el-form-item>
-                    <el-button
-                        type="primary"
-                        size="large"
-                        :loading="importing"
-                        :disabled="!canImport"
-                        @click="handleImport"
-                    >
-                        {{ importing ? '导入中...' : '开始导入' }}
-                    </el-button>
-                    <el-button size="large" @click="resetForm" :disabled="importing">
-                        重置
-                    </el-button>
-                </el-form-item>
             </el-form>
+        </el-card>
+
+        <!-- 题目预览卡片 -->
+        <el-card v-if="parsedQuestions.length > 0" shadow="never" class="preview-card">
+            <template #header>
+                <div class="preview-header">
+                    <span class="preview-title">预览题目（共 {{ parsedQuestions.length }} 道）</span>
+                    <el-button text type="primary" @click="toggleExpandAll">
+                        {{ allExpanded ? '收起全部' : '展开全部' }}
+                    </el-button>
+                </div>
+            </template>
+
+            <div class="preview-container">
+                <el-collapse v-model="activeQuestions" accordion>
+                    <el-collapse-item
+                        v-for="(question, index) in currentPageQuestions"
+                        :key="index"
+                        :name="index"
+                    >
+                        <template #title>
+                            <div class="question-title">
+                                <span class="question-number">第 {{ getChineseNumber((previewCurrentPage - 1) * pageSize + index + 1) }} 题</span>
+                                <el-tag :type="getTypeTagType(question.type)" size="small" :style="getTypeTagStyle(question.type)">
+                                    {{ getTypeName(question.type) }}
+                                </el-tag>
+                                <span class="question-brief" v-html="renderLatex((question.content || '').substring(0, 60)) + '...'"></span>
+                            </div>
+                        </template>
+
+                        <div class="question-detail">
+                            <!-- 题干 -->
+                            <div class="detail-section">
+                                <div class="detail-label">
+                                    <el-icon><Document /></el-icon>
+                                    题干
+                                </div>
+                                <div class="detail-content" v-html="renderLatex(question.content || '(无)')"></div>
+                            </div>
+
+                            <!-- 选项（仅选择题显示） -->
+                            <div v-if="question.options && question.options.length > 0" class="detail-section">
+                                <div class="detail-label">
+                                    <el-icon><List /></el-icon>
+                                    选项
+                                </div>
+                                <div class="options-container">
+                                    <div
+                                        v-for="(option, optIdx) in question.options"
+                                        :key="optIdx"
+                                        class="option-item"
+                                        :data-index="String.fromCharCode(65 + optIdx)"
+                                    >
+                                        <span class="option-text" v-html="formatOption(option, optIdx)"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 答案 -->
+                            <div class="detail-section">
+                                <div class="detail-label answer-label">
+                                    <el-icon><CircleCheck /></el-icon>
+                                    答案
+                                </div>
+                                <div class="detail-content answer-content" v-html="renderLatex(question.answer || '(未填写)')"></div>
+                            </div>
+
+                            <!-- 解析 -->
+                            <div v-if="question.analysis" class="detail-section">
+                                <div class="detail-label analysis-label">
+                                    <el-icon><ChatLineSquare /></el-icon>
+                                    解析
+                                </div>
+                                <div class="detail-content analysis-content" v-html="renderLatex(question.analysis)"></div>
+                            </div>
+
+                            <!-- 标签 -->
+                            <div v-if="question.tags && question.tags.length > 0" class="detail-section inline">
+                                <span class="inline-label">标签：</span>
+                                <el-tag
+                                    v-for="(tag, tagIdx) in question.tags"
+                                    :key="tagIdx"
+                                    size="small"
+                                    style="margin-right: 5px"
+                                >
+                                    {{ tag }}
+                                </el-tag>
+                            </div>
+
+                            <!-- 来源 -->
+                            <div v-if="question.source" class="detail-section inline">
+                                <span class="inline-label">来源：{{ question.source }}</span>
+                            </div>
+                        </div>
+                    </el-collapse-item>
+                </el-collapse>
+
+                <!-- 分页 -->
+                <div v-if="parsedQuestions.length > pageSize" class="preview-pagination">
+                    <el-pagination
+                        :current-page="previewCurrentPage"
+                        :page-size="pageSize"
+                        :total="parsedQuestions.length"
+                        layout="prev, pager, next"
+                        small
+                    />
+                </div>
+            </div>
         </el-card>
     </div>
 </template>
@@ -281,10 +301,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Document, List, CircleCheck, ChatLineSquare } from '@element-plus/icons-vue'
 import { getAllBooks, getSubjectTree, importQuestions } from '@/api/questionImportExport'
 import katex from 'katex'
 
 // 数据
+const dataLoading = ref(true)
 const importing = ref(false)
 const allBooks = ref([])
 const subjectTree = ref([])
@@ -336,6 +358,7 @@ const canImport = computed(() => {
 
 // 加载数据
 const loadData = async () => {
+    dataLoading.value = true
     try {
         const [booksRes, subjectsRes] = await Promise.all([
             getAllBooks(),
@@ -351,6 +374,8 @@ const loadData = async () => {
         }
     } catch (error) {
         ElMessage.error('加载数据失败')
+    } finally {
+        dataLoading.value = false
     }
 }
 
@@ -494,10 +519,32 @@ const getTypeTagType = (type) => {
     const types = {
         1: 'success',
         2: 'warning',
-        3: 'info',
-        4: 'danger'
+        3: 'primary',  // 填空题改为蓝色
+        4: ''  // 简答题不使用预设颜色
     }
     return types[type] || ''
+}
+
+// 数字转中文数字
+const getChineseNumber = (num) => {
+    const chineseNums = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+    if (num <= 10) {
+        return chineseNums[num]
+    } else if (num < 20) {
+        return '十' + (num % 10 === 0 ? '' : chineseNums[num % 10])
+    } else {
+        const tens = Math.floor(num / 10)
+        const units = num % 10
+        return chineseNums[tens] + '十' + (units === 0 ? '' : chineseNums[units])
+    }
+}
+
+// 获取题型标签自定义样式（用于简答题等需要自定义颜色的题型）
+function getTypeTagStyle(type) {
+    if (type === 4) {
+        return { backgroundColor: '#722ed1', borderColor: '#722ed1', color: 'white' }
+    }
+    return {}
 }
 
 // 展开/收起全部
@@ -515,12 +562,43 @@ const toggleExpandAll = () => {
 const renderLatex = (text) => {
     if (!text) return ''
 
+    // 如果 text 是对象，尝试提取实际内容
+    let content = text
+    let depth = 0
+    const MAX_DEPTH = 3 // 防止循环引用
+
+    while (typeof content === 'object' && content !== null && depth < MAX_DEPTH) {
+        // 如果有text属性，使用它
+        if (content.text !== undefined) {
+            content = content.text
+        }
+        // 如果有content属性，使用它
+        else if (content.content !== undefined) {
+            content = content.content
+        }
+        // 如果有value属性，使用它
+        else if (content.value !== undefined) {
+            content = content.value
+        }
+        else {
+            // 都没有，转换为字符串
+            content = JSON.stringify(content)
+            break
+        }
+        depth++
+    }
+
+    // 确保是字符串类型
+    if (typeof content !== 'string') {
+        content = String(content)
+    }
+
     // 匹配 $$...$$ (块级公式)
     const blockRegex = /\$\$([^$]+)\$\$/g
     // 匹配 $...$ (行内公式)
     const inlineRegex = /\$([^$]+)\$/g
 
-    let result = text
+    let result = content
 
     // 替换所有 LaTeX 公式
     const replacements = []
@@ -567,16 +645,24 @@ const renderLatex = (text) => {
 
 // 格式化选项显示
 const formatOption = (option, index) => {
+    // 获取文本内容
+    let text = ''
     if (typeof option === 'string') {
-        const label = String.fromCharCode(65 + index)
-        const text = renderLatex(option)
-        return `${label}. ${text}`
+        text = option
     } else if (typeof option === 'object' && option !== null) {
-        const label = option.label || String.fromCharCode(65 + index)
-        const text = renderLatex(option.text || '')
-        return `${label}. ${text}`
+        // 提取 text 字段
+        text = option.text || ''
+        // 如果 text 还是对象，继续提取
+        while (typeof text === 'object' && text !== null) {
+            text = text.text || text.content || ''
+        }
     }
-    return ''
+
+    // 确保 text 是字符串
+    text = String(text || '')
+
+    // 只返回渲染后的文本，不添加前缀（前缀由 CSS ::before 显示）
+    return renderLatex(text)
 }
 
 // 下载模板
@@ -585,40 +671,49 @@ const downloadTemplate = () => {
         "questions": [
             {
                 "type": 1,
-                "content": "设函数 f(x) = x³ - 3x + 1，求 f'(x)",
-                // 选项格式1（旧格式，兼容）：字符串数组
-                // "options": ["3x² - 3", "3x² + 3", "x² - 3", "x² + 3"],
-                // 选项格式2（新格式，推荐）：对象数组
+                "content": "设函数 $f(x) = x^3 - 3x + 1$，求 $f'(x)$",
                 "options": [
-                    {"label": "A", "text": "3x² - 3"},
-                    {"label": "B", "text": "3x² + 3"},
-                    {"label": "C", "text": "x² - 3"},
-                    {"label": "D", "text": "x² + 3"}
+                    {"label": "A", "text": "$3x^2 - 3$"},
+                    {"label": "B", "text": "$3x^2 + 3$"},
+                    {"label": "C", "text": "$x^2 - 3$"},
+                    {"label": "D", "text": "$x^2 + 3$"}
                 ],
                 "answer": "A",
-                "analysis": "根据求导法则，f'(x) = 3x² - 3",
-                "tags": ["导数", "基础题"],
-                "source": "高等数学例题"
+                "analysis": "根据求导公式 $(x^n)' = nx^{n-1}$，得到 $f'(x) = 3x^2 - 3$",
+                "tags": ["导数", "基础求导"],
+                "source": "高等数学例题",
+                "difficulty": 2
             },
             {
                 "type": 2,
-                "content": "下列哪些函数在区间 (0, +∞) 上单调递增？",
+                "content": "下列哪些函数在区间 $(0, +\\infty)$ 上单调递增？",
                 "options": [
-                    {"label": "A", "text": "f(x) = x²"},
-                    {"label": "B", "text": "f(x) = eˣ"},
-                    {"label": "C", "text": "f(x) = ln(x)"},
-                    {"label": "D", "text": "f(x) = 1/x"}
+                    {"label": "A", "text": "$f(x) = x^2$"},
+                    {"label": "B", "text": "$f(x) = e^x$"},
+                    {"label": "C", "text": "$f(x) = \\ln(x)$"},
+                    {"label": "D", "text": "$f(x) = 1/x$"}
                 ],
                 "answer": "ABC",
-                "analysis": "x²在x>0时单调递增；eˣ始终单调递增；ln(x)在定义域内单调递增；1/x在x>0时单调递减",
-                "tags": ["单调性", "多选题"]
+                "analysis": "$x^2$ 在 $x>0$ 时单调递增；$e^x$ 始终单调递增；$\\ln(x)$ 在定义域内单调递增；$1/x$ 在 $x>0$ 时单调递减",
+                "tags": ["单调性", "函数性质"],
+                "difficulty": 3
+            },
+            {
+                "type": 3,
+                "content": "若 $\\lim_{x \\to 0} \\frac{\\sin(2x)}{x} = $ _____",
+                "answer": "2",
+                "analysis": "利用重要极限 $\\lim_{x \\to 0} \\frac{\\sin(x)}{x} = 1$，原式 $= 2 \\times 1 = 2$",
+                "tags": ["极限", "重要极限"],
+                "difficulty": 2
             },
             {
                 "type": 4,
-                "content": "请论述马克思主义哲学中的质变与量变关系。",
-                "answer": "量变是质变的必要准备，质变是量变的必然结果",
-                "analysis": "本题考查唯物辩证法核心原理...",
-                "tags": ["马克思主义哲学", "简答题"]
+                "content": "请论述马克思主义哲学中的质变与量变的辩证关系。",
+                "answer": "量变是质变的必要准备，质变是量变的必然结果，质变引起新的量变",
+                "analysis": "本题考查唯物辩证法的核心原理之一，体现了质量互变规律的基本内容",
+                "tags": ["马克思主义哲学", "简答题", "辩证法"],
+                "source": "政治理论真题",
+                "difficulty": 4
             }
         ]
     }
@@ -639,8 +734,27 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-.import-card {
+.admin-container {
+    min-height: calc(100vh - 84px);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.table-card {
     border-radius: 12px;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+
+    :deep(.el-card__header) {
+        padding: 16px 20px;
+        background: #fff;
+        border-bottom: 1px solid #ebeef5;
+    }
+
+    :deep(.el-card__body) {
+        padding: 20px;
+    }
 }
 
 .card-header {
@@ -661,18 +775,18 @@ onMounted(() => {
     color: #1f2f3d;
     position: relative;
     padding-left: 12px;
-}
 
-.title-text::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 18px;
-    background: #409eff;
-    border-radius: 2px;
+    &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 4px;
+        height: 18px;
+        background: #409eff;
+        border-radius: 2px;
+    }
 }
 
 .header-desc {
@@ -680,8 +794,23 @@ onMounted(() => {
     color: #909399;
 }
 
+.header-btns {
+    display: flex;
+    gap: 10px;
+}
+
+.loading-container {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .import-form {
-    max-width: 800px;
+    background: #fcfcfd;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #ebeef5;
 
     .form-item-tip {
         margin-left: 10px;
@@ -695,41 +824,53 @@ onMounted(() => {
     margin: 10px 0;
 }
 
-.preview-container {
-    width: 100%;
-    border-radius: 8px;
-    padding: 20px;
-    background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+.preview-card {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+    border: none;
 
-    .preview-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        padding: 15px 20px;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    :deep(.el-card__header) {
+        padding: 16px 20px;
+        background: #fff;
+        border-bottom: 1px solid #ebeef5;
+    }
 
-        .preview-count {
-            font-size: 15px;
-            font-weight: 600;
-            color: #303133;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+    :deep(.el-card__body) {
+        padding: 20px;
+        background: #fcfcfd;
+    }
+}
 
-            &::before {
-                content: '';
-                display: inline-block;
-                width: 4px;
-                height: 16px;
-                background: linear-gradient(180deg, #409eff 0%, #66b1ff 100%);
-                border-radius: 2px;
-            }
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .preview-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1f2f3d;
+        padding-left: 12px;
+        position: relative;
+
+        &::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 18px;
+            background: #67c23a;
+            border-radius: 2px;
         }
     }
+}
+
+.preview-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
 
     :deep(.el-collapse) {
         border: none;
@@ -775,190 +916,202 @@ onMounted(() => {
     :deep(.el-collapse-item__content) {
         padding: 0 20px 20px;
     }
+}
 
-    .question-title {
+.question-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+
+    .question-number {
+        font-weight: 700;
+        font-size: 14px;
+        color: #409eff;
+        min-width: 80px;
+    }
+
+    .question-brief {
+        color: #606266;
+        font-size: 14px;
+        flex: 1;
+
+        :deep(.katex) {
+            font-size: 1em;
+        }
+
+        :deep(.katex-display) {
+            display: inline;
+            margin: 0;
+        }
+    }
+}
+
+.question-detail {
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.detail-section {
+    &.inline {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
+        font-size: 14px;
+    }
+}
 
-        .question-number {
-            font-size: 16px;
-            font-weight: 700;
-            padding: 6px 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            letter-spacing: 1px;
-            position: relative;
+.detail-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: #409eff;
+    margin-bottom: 8px;
+    font-size: 14px;
 
-            &::after {
-                content: '';
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 2px;
-                background: linear-gradient(90deg, transparent 0%, rgba(102, 126, 234, 0.3) 50%, transparent 100%);
-            }
-        }
+    &.answer-label {
+        color: #67c23a;
     }
 
-    .question-detail {
-        padding: 20px 0;
+    &.analysis-label {
+        color: #e6a23c;
+    }
+}
 
-        .detail-row {
-            display: flex;
-            margin-bottom: 16px;
-            line-height: 1.8;
-            padding: 12px;
+.detail-content {
+    padding: 12px 16px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    color: #303133;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    :deep(.katex) {
+        font-size: 1em;
+    }
+
+    :deep(.katex-display) {
+        margin: 1em 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    &.answer-content {
+        background: #f0f9ff;
+        border-left: 3px solid #67c23a;
+        color: #67c23a;
+        font-weight: 600;
+    }
+
+    &.analysis-content {
+        background: #fffbf0;
+        border-left: 3px solid #e6a23c;
+        font-style: italic;
+    }
+}
+
+.options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.option-item {
+    padding: 10px 16px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    position: relative;
+    padding-left: 45px;
+    transition: all 0.3s ease;
+
+    &:hover {
+        border-color: #409eff;
+        background: #ecf5ff;
+        transform: translateX(4px);
+        box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+    }
+
+    &::before {
+        content: attr(data-index);
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #409eff;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    .option-text {
+        color: #303133;
+        line-height: 1.6;
+
+        :deep(.katex) {
+            font-size: 1em;
+        }
+
+        :deep(.katex-display) {
+            margin: 0.5em 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+    }
+}
+
+.inline-label {
+    color: #606266;
+    font-weight: 500;
+}
+
+.preview-pagination {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+
+    :deep(.el-pagination) {
+        .el-pager li {
             border-radius: 6px;
-            background: #fafbfc;
+            margin: 0 2px;
             transition: all 0.2s ease;
+            font-weight: 500;
+            background: white;
+            border: 1px solid #e0e0e0;
+
+            &.is-active {
+                background: #409eff;
+                color: white;
+                border-color: #409eff;
+            }
+
+            &:hover:not(.is-active) {
+                color: #409eff;
+                border-color: #409eff;
+            }
+        }
+
+        .btn-prev,
+        .btn-next {
+            border-radius: 6px;
+            padding: 0 12px;
+            transition: all 0.2s ease;
+            background: white;
+            border: 1px solid #e0e0e0;
 
             &:hover {
-                background: #f5f7fa;
-            }
-
-            &:last-child {
-                margin-bottom: 0;
-            }
-
-            &.tags-row {
-                flex-wrap: wrap;
-
-                .detail-content {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 8px;
-                }
-            }
-
-            .detail-label {
-                min-width: 70px;
-                font-weight: 600;
-                color: #606266;
-                flex-shrink: 0;
-                font-size: 13px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-
-            .detail-content {
-                flex: 1;
-                color: #303133;
-                word-break: break-word;
-                font-size: 14px;
-
-                &.answer {
-                    color: #67c23a;
-                    font-weight: 600;
-                    font-size: 15px;
-                    padding: 4px 12px;
-                    background: linear-gradient(135deg, #e7f9e7 0%, #d4f0d4 100%);
-                    border-radius: 4px;
-                    display: inline-block;
-                }
-
-                &.analysis {
-                    color: #909399;
-                    font-style: italic;
-                    line-height: 1.6;
-                    padding: 12px;
-                    background: #fef9f0;
-                    border-left: 3px solid #e6a23c;
-                    border-radius: 4px;
-                }
-
-                &.source {
-                    color: #909399;
-                    font-size: 13px;
-                    font-style: italic;
-                }
-            }
-
-            .options-list {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                width: 100%;
-
-                .option-item {
-                    padding: 10px 15px;
-                    background: white;
-                    border: 1px solid #e4e7ed;
-                    border-radius: 6px;
-                    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                    font-size: 13px;
-                    color: #303133;
-                    transition: all 0.2s ease;
-                    position: relative;
-                    overflow: hidden;
-
-                    &:hover {
-                        border-color: #409eff;
-                        background: linear-gradient(135deg, #ecf5ff 0%, #e1f0ff 100%);
-                        transform: translateX(4px);
-                    }
-
-                    &::before {
-                        content: attr(data-index);
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        bottom: 0;
-                        width: 30px;
-                        background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
-                        color: white;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 12px;
-                        font-weight: 600;
-                        border-radius: 6px 0 0 6px;
-                    }
-
-                    padding-left: 40px;
-                }
-            }
-        }
-    }
-
-    .preview-pagination {
-        display: flex;
-        justify-content: center;
-        margin-top: 20px;
-        padding: 20px;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-
-        :deep(.el-pagination) {
-            .el-pager li {
-                border-radius: 6px;
-                margin: 0 2px;
-                transition: all 0.2s ease;
-                font-weight: 500;
-
-                &.is-active {
-                    background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
-                    color: white;
-                }
-
-                &:hover:not(.is-active) {
-                    color: #409eff;
-                }
-            }
-
-            .btn-prev,
-            .btn-next {
-                border-radius: 6px;
-                padding: 0 12px;
-                transition: all 0.2s ease;
-
-                &:hover {
-                    color: #409eff;
-                }
+                color: #409eff;
+                border-color: #409eff;
             }
         }
     }

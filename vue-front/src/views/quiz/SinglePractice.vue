@@ -545,11 +545,20 @@ const loadQuestionAtIndex = (index) => {
 const formatType = (type) => ({ 1: '单选', 2: '多选', 3: '填空', 4: '简答' }[type] || '未知')
 
 // 选项交互逻辑
-const isOptionSelected = (opt) => {
-  if (Array.isArray(userAnswer.value)) {
-    return userAnswer.value.includes(opt)
+// 获取选项的唯一标识用于比较
+const getOptionKey = (opt) => {
+  if (typeof opt === 'object' && opt !== null) {
+    return opt.text || opt.label || JSON.stringify(opt)
   }
-  return userAnswer.value === opt
+  return opt
+}
+
+const isOptionSelected = (opt) => {
+  const optKey = getOptionKey(opt)
+  if (Array.isArray(userAnswer.value)) {
+    return userAnswer.value.some(ans => getOptionKey(ans) === optKey)
+  }
+  return getOptionKey(userAnswer.value) === optKey
 }
 
 const toggleOption = (opt) => {
@@ -582,7 +591,8 @@ const toggleOption = (opt) => {
       userAnswer.value = []
     }
 
-    const idx = userAnswer.value.indexOf(opt)
+    const optKey = getOptionKey(opt)
+    const idx = userAnswer.value.findIndex(ans => getOptionKey(ans) === optKey)
     if (idx > -1) {
       userAnswer.value.splice(idx, 1)
     } else {
@@ -592,11 +602,12 @@ const toggleOption = (opt) => {
 }
 
 // 辅助判断：提交后高亮正确答案
-const isCorrectAnswer = (optText) => {
+const isCorrectAnswer = (opt) => {
   if (!correctAnswer.value) return false
 
   // 转换选项内容为字母
-  const idx = currentQuestion.value.options.indexOf(optText)
+  const options = currentQuestion.value.options || []
+  const idx = options.findIndex(o => getOptionKey(o) === getOptionKey(opt))
   if (idx === -1) return false
   const letter = String.fromCharCode(65 + idx)
 
@@ -607,7 +618,18 @@ const isCorrectAnswer = (optText) => {
 
 const formatOptionText = (text) => {
   if (!text) return ''
-  return text.replace(/^[A-Z][.、\s]\s*/, '')
+
+  // 如果是对象类型，取 text 或 label 字段
+  if (typeof text === 'object' && text !== null) {
+    return text.text || text.label || ''
+  }
+
+  // 如果是字符串类型
+  if (typeof text === 'string') {
+    return text.replace(/^[A-Z][.、\s]\s*/, '')
+  }
+
+  return String(text)
 }
 
 const submitAnswer = async () => {

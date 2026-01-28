@@ -2,14 +2,14 @@ package org.example.kaoyanplatform.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.example.kaoyanplatform.entity.ExerciseBook;
 import org.example.kaoyanplatform.entity.Question;
+import org.example.kaoyanplatform.entity.Subject;
 import org.example.kaoyanplatform.entity.dto.QuestionDTO;
+import org.example.kaoyanplatform.entity.dto.QuestionExportDTO;
 
 import java.util.List;
 
-/**
- * 题目Service接口
- */
 public interface QuestionService extends IService<Question> {
 
     /**
@@ -63,4 +63,31 @@ public interface QuestionService extends IService<Question> {
      */
     List<Question> findSimilarQuestions(String content);
 
+    /**
+     * 删除题目及其所有关联关系
+     * @param id 题目ID
+     * @return 删除结果
+     */
+    boolean deleteQuestionWithRelations(Long id);
+
+    /**
+     * 获取带有详细关联信息的题目详情
+     * @param id 题目ID
+     * @return 填充了关联信息的题目对象
+     */
+    Question getQuestionWithDetails(Long id);
+
+    /**
+     * 根据导出配置获取题目列表
+     * @param exportDTO 导出配置对象
+     * @return 题目列表
+     */
+    List<Question> getQuestionsByExportConfig(QuestionExportDTO exportDTO);
+
+    /**
+     * 获取带有错题时间的错题列表
+     * @param userId 用户ID
+     * @return 带有错题时间的题目列表
+     */
+    List<Question> getErrorQuestionsWithTime(Integer userId);
 }

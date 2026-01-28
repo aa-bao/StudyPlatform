@@ -39,9 +39,16 @@
             <span class="timer-label">倒计时</span>
             <span class="timer-value">{{ formatTime }}</span>
           </div>
-          <button @click="handleSubmit" :disabled="isSubmitted || submitting" class="submit-btn"
-            :class="{ 'submit-btn--disabled': isSubmitted || submitting }">
-            {{ isSubmitted ? '已提交' : '提交试卷' }}
+          <button v-if="isSubmitted" @click="viewReport" class="view-report-btn">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" stroke-width="2"/>
+              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            查看报告
+          </button>
+          <button v-else @click="handleSubmit" :disabled="submitting" class="submit-btn"
+            :class="{ 'submit-btn--disabled': submitting }">
+            提交试卷
           </button>
         </div>
       </nav>
@@ -74,7 +81,7 @@
               </header>
 
               <!-- 题目列表 -->
-              <div v-for="q in page.questions" :key="q.id" :id="'q' + q.id" class="question-item">
+              <div v-for="q in page.questions" :key="q.id" :id="'q' + q.id" class="question-item" :class="{ 'is-correct': getQuestionStatus(q.id) === 'correct', 'is-wrong': getQuestionStatus(q.id) === 'wrong' }">
                 <!-- 题型标题 -->
                 <div v-if="q.sectionTitle" class="section-banner">{{ q.sectionTitle }}</div>
 
@@ -88,12 +95,18 @@
 
                   <!-- 选择题选项 -->
                   <div v-if="isChoiceQuestion(q.type)" class="options-grid">
-                    <label v-for="opt in Object.keys(q.options || {})" :key="opt" class="option-label">
+                    <label v-for="opt in Object.keys(q.options || {})" :key="opt" class="option-label"
+                      :class="{
+                        'is-selected': isOptionSelected(q.id, opt),
+                        'is-correct-option': isSubmitted && isCorrectOption(q.id, opt),
+                        'is-wrong-option': isSubmitted && isOptionSelected(q.id, opt) && !isCorrectOption(q.id, opt)
+                      }">
                       <input
                         :type="q.type === 'single-choice' ? 'radio' : 'checkbox'"
                         :name="'q' + q.id"
                         :value="opt"
                         :checked="isOptionSelected(q.id, opt)"
+                        :disabled="isSubmitted"
                         @change="handleOptionChange(q.id, opt, q.type)"
                       >
                       <span class="option-text" v-html="'(' + opt + ') ' + renderLatex(q.options[opt])"></span>
@@ -101,14 +114,26 @@
                   </div>
 
                   <!-- 填空题/主观题输入框 -->
-                  <textarea
-                    v-else
-                    v-model="answers[q.id]"
-                    @input="markDone(q.id)"
-                    class="answer-area"
-                    rows="4"
-                    placeholder="请输入你的答案..."
-                  ></textarea>
+                  <div v-else class="answer-input-container">
+                    <textarea
+                      v-model="answers[q.id]"
+                      @input="markDone(q.id)"
+                      @focus="activeLatexPanel = q.id"
+                      :data-question-id="q.id"
+                      class="answer-area"
+                      :disabled="isSubmitted"
+                      rows="4"
+                      placeholder="请输入你的答案..."
+                    ></textarea>
+
+                    <!-- LaTeX 快捷输入面板 -->
+                    <LatexShortcuts
+                      v-if="!isSubmitted && activeLatexPanel === q.id && (q.type === 'fill-blank' || q.type === 'subjective')"
+                      @insert="(latex) => insertLatex(q.id, latex)"
+                      @clear="() => clearLatexInput(q.id)"
+                      @wrap="(wrapper) => wrapLatex(q.id, wrapper)"
+                    />
+                  </div>
                 </template>
               </div>
 
@@ -197,6 +222,13 @@
         </div>
       </transition>
 
+      <!-- 主观题自评对话框 -->
+      <UserGradingDialog
+        :visible="showUserGradingDialog"
+        :session-id="sessionId"
+        @submitted="handleGradingSubmitted"
+      />
+
       <!-- AI 阅卷报告模态框 -->
       <transition name="fade">
         <div v-if="showResultModal" class="modal-overlay">
@@ -221,8 +253,8 @@
             </div>
 
             <div class="modal-btns">
-              <button @click="goBackToHome" class="modal-btn cancel">返回首页</button>
-              <button @click="showResultModal = false" class="modal-btn confirm">关闭</button>
+              <button @click="showResultModal = false" class="modal-btn cancel">关闭</button>
+              <button @click="goBackToHome" class="modal-btn confirm">返回首页</button>
             </div>
           </div>
         </div>
@@ -230,9 +262,14 @@
     </template>
 
     <!-- 回到主页 -->
-    <div v-if="isSubmitted" class="home-fab" @click="goBackToHome" title="返回首页">
-      <img :src="homeIcon" alt="主页" class="home-icon" />
-    </div>
+    <transition name="fab-appear">
+      <div v-if="isSubmitted" class="home-fab" @click="goBackToHome">
+        <div class="fab-content">
+          <img :src="homeIcon" alt="主页" class="home-icon" />
+          <span class="fab-text">返回首页</span>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -244,7 +281,10 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { startExam, saveSnapshot, recordSwitch, submitExam as submitExamApi, getSessionDetail } from '@/api/examSession';
 import { getPaperDetail } from '@/api/paper';
-import homeIcon from '@/assets/icons/home.svg?url'
+import { getSessionExamRecords } from '@/api/examRecord';
+import homeIcon from '@/assets/icons/home.svg?url';
+import UserGradingDialog from '@/components/UserGradingDialog.vue';
+import LatexShortcuts from '@/components/LatexShortcuts.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -254,6 +294,8 @@ const examAppRef = ref(null);
 const isFullScreen = ref(false);
 const isSubmitted = ref(false);
 const showResultModal = ref(false);
+const showUserGradingDialog = ref(false); // 主观题自评对话框
+const activeLatexPanel = ref(null); // 当前激活LaTeX面板的题目ID
 const loading = ref(true);
 const loadingText = ref('正在加载试卷...');
 const error = ref(null);
@@ -277,6 +319,9 @@ const examResult = ref({
   totalScore: 0,
   aiSummary: ''
 });
+
+// 答题详情（批改结果）
+const examDetails = ref([]);
 
 // 侧边栏
 const showSidebar = ref(true);
@@ -479,15 +524,24 @@ const convertOptions = (optionsArray) => {
     return {};
   }
   const optionsObj = {};
-  const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
-  optionsArray.forEach((opt, index) => {
-    if (index < labels.length) {
+  optionsArray.forEach((opt) => {
+    // 处理对象格式：{label: "A", text: "选项内容"}
+    if (typeof opt === 'object' && opt !== null && opt.label && opt.text) {
+      optionsObj[opt.label] = opt.text;
+    }
+    // 处理字符串格式："A. 选项内容" 或 "(A) 选项内容"
+    else if (typeof opt === 'string') {
       const match = opt.match(/^[\(（]?([A-H])[.\.)\)）]\s*(.+)$/);
       if (match) {
         optionsObj[match[1]] = match[2];
       } else {
-        optionsObj[labels[index]] = opt;
+        // 如果没有匹配到格式，使用默认标签
+        const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+        const index = Object.keys(optionsObj).length;
+        if (index < labels.length) {
+          optionsObj[labels[index]] = opt;
+        }
       }
     }
   });
@@ -509,6 +563,30 @@ const isOptionSelected = (questionId, option) => {
     return answer.includes(option);
   }
   return answer === option;
+};
+
+// 获取题目批改状态
+const getQuestionStatus = (questionId) => {
+  if (!isSubmitted.value || !examDetails.value.length) return null;
+
+  const detail = examDetails.value.find(d => d.questionId == questionId);
+  if (!detail) return null;
+
+  if (detail.isCorrect === 1) return 'correct';
+  if (detail.isCorrect === 0) return 'wrong';
+  return null;
+};
+
+// 判断选项是否为正确答案
+const isCorrectOption = (questionId, option) => {
+  if (!isSubmitted.value || !examDetails.value.length) return false;
+
+  const detail = examDetails.value.find(d => d.questionId == questionId);
+  if (!detail || !detail.standardAnswer) return false;
+
+  // 标准答案可能是逗号分隔的字符串（多选题）
+  const standardAnswers = detail.standardAnswer.split(',').map(a => a.trim());
+  return standardAnswers.includes(option);
 };
 
 // 处理选项变化
@@ -764,6 +842,12 @@ const confirmSubmit = async () => {
   isSubmitted.value = true;
   submitting.value = true;
 
+  // 停止计时器
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
   try {
     // 先保存快照
     await saveSnapshotToLocal();
@@ -797,11 +881,15 @@ const confirmSubmit = async () => {
     // 移除历史记录保护，允许用户正常返回
     removeHistoryProtection();
 
-    // 显示结果（此时可能还在批改主观题）
-    showResultModal.value = true;
+    // 获取答题详情（批改结果）
+    await fetchExamDetails();
 
+    // 弹出主观题自评对话框
+    showUserGradingDialog.value = true;
+
+    // 注意：不再立即显示结果，而是在用户完成自评后再显示
     // 开始轮询获取完整成绩
-    startPollingForResult();
+    // startPollingForResult(); // 注释掉原有的轮询逻辑，改由自评完成后触发
   } catch (err) {
     console.error('提交考试失败:', err);
     ElMessage.error(err.message || '提交失败');
@@ -914,6 +1002,112 @@ const handlePopState = (event) => {
 // 移除历史记录保护
 const removeHistoryProtection = () => {
   window.removeEventListener('popstate', handlePopState);
+};
+
+// 查看报告
+const viewReport = async () => {
+  try {
+    const resultRes = await getSessionDetail(sessionId.value);
+    if (resultRes.code === 200 && resultRes.data) {
+      examResult.value = {
+        totalScore: resultRes.data.totalScore || 0,
+        aiSummary: resultRes.data.aiSummary || ''
+      };
+      showResultModal.value = true;
+    }
+  } catch (err) {
+    console.error('获取报告失败:', err);
+    ElMessage.error('获取报告失败');
+  }
+};
+
+// 处理主观题自评完成
+const handleGradingSubmitted = async () => {
+  try {
+    // 重新获取考试结果（包含主观题自评后的分数）
+    const resultRes = await getSessionDetail(sessionId.value);
+    if (resultRes.code === 200 && resultRes.data) {
+      examResult.value = {
+        totalScore: resultRes.data.totalScore || 0,
+        aiSummary: resultRes.data.aiSummary || ''
+      };
+    }
+
+    // 重新获取答题详情（更新批改状态）
+    await fetchExamDetails();
+
+    // 显示最终结果
+    showResultModal.value = true;
+
+    // 开始轮询获取完整成绩（如果需要）
+    startPollingForResult();
+
+    ElMessage.success('批改完成，已更新成绩');
+  } catch (err) {
+    console.error('获取最终成绩失败:', err);
+    ElMessage.error('获取最终成绩失败');
+    // 即使失败也显示结果
+    showResultModal.value = true;
+  }
+};
+
+// LaTeX 快捷输入处理函数
+const insertLatex = (questionId, latex) => {
+  const textarea = document.querySelector(`textarea[data-question-id="${questionId}"]`);
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+
+  // 在光标位置插入 LaTeX 代码
+  answers[questionId] = text.substring(0, start) + latex + text.substring(end);
+
+  // 恢复焦点和光标位置
+  nextTick(() => {
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = start + latex.length;
+  });
+};
+
+const clearLatexInput = (questionId) => {
+  answers[questionId] = '';
+  nextTick(() => {
+    const textarea = document.querySelector(`textarea[data-question-id="${questionId}"]`);
+    if (textarea) textarea.focus();
+  });
+};
+
+const wrapLatex = (questionId, wrapper) => {
+  const textarea = document.querySelector(`textarea[data-question-id="${questionId}"]`);
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = textarea.value.substring(start, end);
+
+  answers[questionId] =
+    textarea.value.substring(0, start) +
+    `${wrapper}${selectedText}${wrapper}` +
+    textarea.value.substring(end);
+
+  nextTick(() => {
+    textarea.focus();
+    textarea.selectionStart = start + wrapper.length;
+    textarea.selectionEnd = end + wrapper.length;
+  });
+};
+
+// 获取答题详情
+const fetchExamDetails = async () => {
+  try {
+    const res = await getSessionExamRecords(sessionId.value);
+    if (res.code === 200) {
+      examDetails.value = res.data || [];
+    }
+  } catch (err) {
+    console.error('获取答题详情失败:', err);
+  }
 };
 
 // 返回
@@ -1373,6 +1567,10 @@ button {
   border: 1px solid #ccc;
 }
 
+.answer-input-container {
+  width: 100%;
+}
+
 .paper-footer {
   margin-top: auto;
   padding: 20px 0;
@@ -1726,19 +1924,21 @@ button {
   position: fixed;
   bottom: 32px;
   right: 32px;
-  width: 56px;
+  min-width: 140px;
   height: 56px;
-  border-radius: 50%;
+  padding: 0 20px;
+  border-radius: 28px;
+  overflow: hidden;
 
-  background: rgba(37, 100, 235, 0.849);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow:
-    0 6px 20px rgba(37, 99, 235, 0.3),
-    0 3px 8px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    0 8px 32px rgba(59, 130, 246, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 
   display: flex;
   align-items: center;
@@ -1750,32 +1950,226 @@ button {
   outline: none;
 }
 
+.home-fab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
 /* 悬停 */
 .home-fab:hover {
-  background: rgb(37, 100, 235);
-  transform: translateY(-4px) scale(1.08);
+  transform: translateY(-6px) scale(1.05);
   box-shadow:
-    0 10px 30px rgba(37, 99, 235, 0.4),
-    0 5px 12px rgba(0, 0, 0, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    0 12px 40px rgba(59, 130, 246, 0.5),
+    0 6px 20px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.home-fab:hover::before {
+  left: 100%;
 }
 
 /* 点击 */
 .home-fab:active {
-  transform: translateY(0) scale(1.02);
-  background: rgba(37, 99, 235, 0.5);
+  transform: translateY(-2px) scale(1.02);
   box-shadow:
-    0 4px 16px rgba(37, 99, 235, 0.25),
-    0 2px 6px rgba(0, 0, 0, 0.06),
+    0 6px 24px rgba(59, 130, 246, 0.4),
+    0 3px 12px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* 按钮内容容器 */
+.fab-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
 }
 
 /* 图标 */
 .home-icon {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   fill: rgb(255, 255, 255);
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  transition: transform 0.3s ease;
+}
+
+.home-fab:hover .home-icon {
+  transform: rotate(-10deg) scale(1.1);
+}
+
+/* 文字 */
+.fab-text {
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* 按钮出现动画 */
+.fab-appear-enter-active {
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fab-appear-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.8);
+}
+
+.fab-appear-enter-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* 查看报告按钮 */
+.view-report-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.view-report-btn:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.view-report-btn .btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* 题目批改状态 */
+.question-item.is-correct {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.question-item.is-wrong {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(239, 68, 68, 0.02) 100%);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+/* 选择题选项批改样式 */
+.option-label.is-correct-option {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%) !important;
+  border-color: #10b981 !important;
+  color: #065f46 !important;
+}
+
+.option-label.is-wrong-option {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%) !important;
+  border-color: #ef4444 !important;
+  color: #991b1b !important;
+}
+
+.home-fab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+/* 悬停 */
+.home-fab:hover {
+  transform: translateY(-6px) scale(1.05);
+  box-shadow:
+    0 12px 40px rgba(102, 126, 234, 0.5),
+    0 6px 20px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.home-fab:hover::before {
+  left: 100%;
+}
+
+/* 点击 */
+.home-fab:active {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow:
+    0 6px 24px rgba(102, 126, 234, 0.4),
+    0 3px 12px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* 按钮内容容器 */
+.fab-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+/* 图标 */
+.home-icon {
+  width: 24px;
+  height: 24px;
+  fill: rgb(255, 255, 255);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  transition: transform 0.3s ease;
+}
+
+.home-fab:hover .home-icon {
+  transform: rotate(-10deg) scale(1.1);
+}
+
+/* 文字 */
+.fab-text {
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* 按钮出现动画 */
+.fab-appear-enter-active {
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fab-appear-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.8);
+}
+
+.fab-appear-enter-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 </style>

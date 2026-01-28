@@ -858,13 +858,19 @@ const handleAiRecognize = async (file) => {
                 form.value.content = dto.content
             }
             if (Array.isArray(dto.options) && dto.options.length >= 4) {
-                // 转换为新的对象格式
-                const labels = ['A', 'B', 'C', 'D']
-                form.value.options = dto.options.slice(0, 4).map((opt, i) => {
-                    // 去除选项中的 ABCD 前缀，避免重复
-                    const text = opt.replace(/^[A-Z][\.\) ：:]\s*/, '').replace(/^[A-Z]\s+/, '')
-                    return { label: labels[i], text }
-                })
+                // Python 后端已经返回对象格式: {label: "A", text: "..."}
+                // 直接使用，无需转换
+                if (dto.options[0] && typeof dto.options[0] === 'object') {
+                    form.value.options = dto.options.slice(0, 4)
+                } else {
+                    // 如果是字符串格式，转换为对象格式
+                    const labels = ['A', 'B', 'C', 'D']
+                    form.value.options = dto.options.slice(0, 4).map((opt, i) => {
+                        // 去除选项中的 ABCD 前缀，避免重复
+                        const text = opt.replace(/^[A-Z][\.\) ：:]\s*/, '').replace(/^[A-Z]\s+/, '')
+                        return { label: labels[i], text }
+                    })
+                }
             }
             if (dto.answer) {
                 // 清理答案中的 ABCD 前缀

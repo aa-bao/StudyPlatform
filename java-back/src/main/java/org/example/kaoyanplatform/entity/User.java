@@ -5,18 +5,21 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import java.time.LocalDateTime;
 
+/**
+ * 用户实体类
+ */
 @Data
-@TableName("tb_user")
+@TableName("user")
 public class User {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String username;            // 账号/用户名
+    private String username;            // 用户名
     private String password;            // 密码
     private String phone;               // 手机号
     private String email;               // 邮箱
     private String nickname;            // 昵称
-    private String avatar;              // 头像url
     private String role;                // 身份
+    private String avatar;              // 头像url
     private String targetSchool;        // 目标院校
     private Integer targetTotalScore;   // 目标总分
     private String examYear;            // 考研年份

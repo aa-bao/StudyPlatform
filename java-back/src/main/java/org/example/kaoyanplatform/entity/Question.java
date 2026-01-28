@@ -8,22 +8,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 题目实体类（重构版：使用 content_json 存储题目核心内容）
+ * 题目实体类
  */
 @Data
-@TableName(value = "tb_question", autoResultMap = true)
+@TableName(value = "question", autoResultMap = true)
 public class Question {
     @TableId(type = IdType.AUTO)
     private Long id;
-
-    /**
-     * 题目类型 (1:单选, 2:多选, 3:填空, 4:简答)
-     */
     private Integer type;
-
-    /**
-     * 难度等级 (1-5)
-     */
     private Integer difficulty;
 
     /**
@@ -54,9 +46,7 @@ public class Question {
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> contentJson;
 
-    /**
-     * 创建时间
-     */
+
     private java.time.LocalDateTime createTime;
 
     // ==================== 便捷访问方法 ====================
@@ -167,7 +157,9 @@ public class Question {
         contentJson.put("source", source);
     }
 
-    // ==================== 非数据库字段（关联信息） ====================
+    // ==================== 非数据库字段（关联信息，用于业务逻辑和前端展示） ====================
+    // 注意：这些字段虽然不是数据库中的真实列，但用于业务逻辑处理和前端展示，
+    // 所以需要保留在实体类中并标记为 @TableField(exist = false)
 
     /**
      * 非数据库字段：用于前端展示错题时间

@@ -2,8 +2,8 @@ package org.example.kaoyanplatform.service.impl;
 
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.example.kaoyanplatform.entity.Book;
-import org.example.kaoyanplatform.entity.Paper;
+import org.example.kaoyanplatform.entity.ExerciseBook;
+import org.example.kaoyanplatform.entity.ExamPaper;
 import org.example.kaoyanplatform.entity.Question;
 import org.example.kaoyanplatform.entity.dto.QuestionExportDTO;
 import org.example.kaoyanplatform.service.*;
@@ -30,10 +30,10 @@ import java.util.stream.Collectors;
 public class PdfExportServiceImpl implements PdfExportService {
 
     private final QuestionService questionService;
-    private final BookService bookService;
-    private final PaperService paperService;
-    private final MapQuestionBookService mapQuestionBookService;
-    private final MapPaperQuestionService mapPaperQuestionService;
+    private final ExerciseBookService bookService;
+    private final ExamPaperService paperService;
+    private final QuestionBookRelService mapQuestionBookService;
+    private final QuestionPaperRelService mapPaperQuestionService;
     private final SubjectService subjectService;
     private final TemplateEngine templateEngine;
 
@@ -57,13 +57,13 @@ public class PdfExportServiceImpl implements PdfExportService {
         boolean isPaperExport = exportDTO.getPaperId() != null;
 
         if (exportDTO.getBookId() != null) {
-            Book book = bookService.getById(exportDTO.getBookId());
+            ExerciseBook book = bookService.getById(exportDTO.getBookId());
             if (book != null) {
                 bookName = book.getName();
                 title = bookName + " - 题目导出";
             }
         } else if (isPaperExport) {
-            Paper paper = paperService.getById(exportDTO.getPaperId());
+            ExamPaper paper = paperService.getById(exportDTO.getPaperId());
             if (paper != null) {
                 subtitle = paper.getTitle();
                 title = "试卷题目导出";
@@ -92,7 +92,7 @@ public class PdfExportServiceImpl implements PdfExportService {
         String templateName;
         if (isPaperExport) {
             // 试卷模板：按试卷结构分组
-            Paper paper = paperService.getById(exportDTO.getPaperId());
+            ExamPaper paper = paperService.getById(exportDTO.getPaperId());
             List<PaperSectionData> sections = groupQuestionsBySection(questions, paper);
             context.setVariable("sections", sections);
             context.setVariable("allQuestions", questions);
@@ -205,11 +205,11 @@ public class PdfExportServiceImpl implements PdfExportService {
     /**
      * 将题目按试卷结构分组
      */
-    private List<PaperSectionData> groupQuestionsBySection(List<Question> questions, Paper paper) {
+    private List<PaperSectionData> groupQuestionsBySection(List<Question> questions, ExamPaper paper) {
         List<PaperSectionData> sections = new ArrayList<>();
 
         if (paper != null && paper.getStructureJson() != null && !paper.getStructureJson().isEmpty()) {
-            for (Paper.PaperSection sectionDef : paper.getStructureJson()) {
+            for (ExamPaper.ExamPaperSection sectionDef : paper.getStructureJson()) {
                 PaperSectionData section = new PaperSectionData();
                 section.setName(sectionDef.getName() != null ? sectionDef.getName() : "第" + (sections.size() + 1) + "部分");
 

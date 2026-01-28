@@ -1,7 +1,5 @@
 package org.example.kaoyanplatform.util;
 
-import org.example.kaoyanplatform.service.GLMService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.regex.Pattern;
@@ -12,9 +10,6 @@ import java.util.regex.Pattern;
  */
 @Component
 public class MathAnswerMatcher {
-
-    @Autowired
-    private GLMService glmService;
 
     /**
      * 对比两个数学答案是否等价
@@ -52,8 +47,8 @@ public class MathAnswerMatcher {
             return true;
         }
 
-        // 5. 使用 LLM 进行智能判断
-        return compareByLLM(standardAnswer, userAnswer);
+        // 注：已移除 LLM 智能判断，AI 批改功能请使用 Python 服务的智能批改接口
+        return false;
     }
 
     /**
@@ -147,29 +142,5 @@ public class MathAnswerMatcher {
         }
 
         return null;
-    }
-
-    /**
-     * 使用 LLM 判断两个数学表达式是否等价
-     */
-    private boolean compareByLLM(String standardAnswer, String userAnswer) {
-        try {
-            String prompt = String.format(
-                "请判断以下两个数学答案是否等价（意思相同即可）。\n" +
-                "标准答案：%s\n" +
-                "用户答案：%s\n" +
-                "只需要回答\"是\"或\"否\"。",
-                standardAnswer, userAnswer
-            );
-
-            String response = glmService.callGLMAPI(prompt);
-
-            // 判断 LLM 的回复
-            return response.contains("是") || response.toLowerCase().contains("yes") || response.toLowerCase().contains("true");
-
-        } catch (Exception e) {
-            // LLM 调用失败，返回 false
-            return false;
-        }
     }
 }

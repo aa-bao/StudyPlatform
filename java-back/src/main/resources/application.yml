@@ -4,22 +4,20 @@ server:
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/kaoyan_platform?serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=utf-8
+    jdbc-url: jdbc:mysql://localhost:3306/kaoyan_platform?serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=utf-8
     username: root
     password: 123456
 
-# MyBatis-Plus
 mybatis-plus:
   configuration:
     map-underline-to-camel-case: true
   global-config:
     db-config:
       id-type: auto
+  mapper-locations: classpath*:/mapper/**/*.xml
 
-zhipu:
-  api:
-    key: e90579b6f4df4a8ab4b9381dfa1b7466.cgxYg4MwekKDlZHO
-
-deepseek:
-  api:
-    key: sk-63c8c71dc2a846ab9d87e695b867f730
+python:
+  backend:
+    url: http://localhost:8082
+    timeout: 30000
+    enabled: true  # 启用 Python 后端

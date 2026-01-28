@@ -5,29 +5,20 @@ import java.util.List;
 
 /**
  * 科目数据传输对象
- * 用于前后端数据交互
  */
 @Data
 public class SubjectDTO {
     private Integer id;
-
     private String name;
-
     private Integer parentId;
-
     private String icon;
-
     private Integer sort;
-
     private String level;
-
     private String scope;
+    private String questionTypes;
 
     /**
-     * 动态权重（根据当前考试规格计算得出）
-     * 用于解决英语一/英语二等不同考试规格下，相同科目名称但权重不同的问题
-     *
-     * 注意：原 weight 字段已删除，统一使用 dynamicWeight
+     * 动态权重
      */
     private Float dynamicWeight;
 
@@ -52,27 +43,27 @@ public class SubjectDTO {
     private String treeId;
 
     /**
-     * 掌握度（用于前端展示）
+     * 掌握度
      */
     private Integer mastery;
 
     /**
-     * 解题通法（用于前端展示）
+     * 解题通法
      */
     private List<String> solutionPatterns;
 
     /**
-     * 高频误区（用于前端展示）
+     * 高频误区
      */
     private List<String> commonMistakes;
 
     /**
-     * 考察热度（用于前端展示）
+     * 考察热度
      */
     private Integer examFrequency;
 
     /**
-     * 展开状态（用于前端树形组件）
+     * 展开状态
      */
     private Boolean expanded;
 }

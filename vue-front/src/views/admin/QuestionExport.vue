@@ -180,7 +180,7 @@
                                         class="option-item"
                                         :data-index="String.fromCharCode(65 + optIdx)"
                                     >
-                                        <span class="option-text" v-html="renderLatex(option)"></span>
+                                        <span class="option-text" v-html="renderLatex(getOptionText(option))"></span>
                                     </div>
                                 </div>
                             </div>
@@ -301,9 +301,19 @@ watch(additionalOptions, (newVal) => {
 
 // LaTeX 渲染函数
 const renderLatex = (content) => {
+    // 处理空值或非字符串类型
     if (!content) return ''
+
+    // 如果是对象或数组，转换为字符串
+    let strContent = content
+    if (typeof content === 'object') {
+        strContent = JSON.stringify(content)
+    } else if (typeof content !== 'string') {
+        strContent = String(content)
+    }
+
     // 确保在渲染前，先将 \\ 替换成 \，防止 KaTeX 错误解析转义字符
-    let processedContent = content.replace(/\\\\/g, '\\')
+    let processedContent = strContent.replace(/\\\\/g, '\\')
 
     return processedContent.replace(/\$([^\$]+)\$/g, (match, tex) => {
         try {
@@ -551,6 +561,34 @@ function getTypeTagStyle(type) {
     }
     return {}
 }
+
+// 获取选项文本内容
+function getOptionText(option) {
+    // 如果是字符串，直接返回
+    if (typeof option === 'string') {
+        return option
+    }
+
+    // 如果是对象，提取 text 字段
+    if (typeof option === 'object' && option !== null) {
+        // 优先使用 text 字段
+        if (option.text !== undefined) {
+            // 如果 text 还是对象，继续提取
+            let text = option.text
+            while (typeof text === 'object' && text !== null) {
+                text = text.text || text.content || ''
+            }
+            return text
+        }
+        // 其次使用 content 字段
+        if (option.content !== undefined) {
+            return option.content
+        }
+    }
+
+    // 兜底返回空字符串
+    return ''
+}
 </script>
 
 <style scoped lang="scss">
@@ -642,6 +680,7 @@ function getTypeTagStyle(type) {
 .preview-card {
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+    border: none;
 
     :deep(.el-card__header) {
         padding: 16px 20px;
@@ -651,6 +690,7 @@ function getTypeTagStyle(type) {
 
     :deep(.el-card__body) {
         padding: 20px;
+        background: #fcfcfd;
     }
 }
 
@@ -684,6 +724,52 @@ function getTypeTagStyle(type) {
     background: #f8f9fa;
     border-radius: 8px;
     padding: 20px;
+
+    :deep(.el-collapse) {
+        border: none;
+        background: transparent;
+    }
+
+    :deep(.el-collapse-item) {
+        margin-bottom: 12px;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s ease;
+        background: white;
+
+        &:hover {
+            box-shadow: 0 4px 16px rgba(64, 158, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        &.is-active {
+            box-shadow: 0 4px 20px rgba(64, 158, 255, 0.2);
+        }
+    }
+
+    :deep(.el-collapse-item__header) {
+        background: white;
+        border: none;
+        padding: 15px 20px;
+        font-size: 14px;
+        height: auto;
+        line-height: 1.5;
+        transition: all 0.3s ease;
+
+        &.is-active {
+            border-bottom: 1px solid #ebeef5;
+        }
+    }
+
+    :deep(.el-collapse-item__wrap) {
+        border: none;
+        background: transparent;
+    }
+
+    :deep(.el-collapse-item__content) {
+        padding: 0 20px 20px;
+    }
 }
 
 .question-title {
@@ -716,7 +802,7 @@ function getTypeTagStyle(type) {
 }
 
 .question-detail {
-    padding: 16px 0;
+    padding: 20px 0;
     display: flex;
     flex-direction: column;
     gap: 16px;

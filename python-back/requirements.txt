@@ -1,8 +1,26 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-openai
-loguru
-PyMuPDF
-mineru
-python-multipart
+# ========== Web 框架 ==========
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# ========== AI SDK ==========
+openai>=1.0.0
+
+# ========== 数据验证 ==========
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# ========== 日志 ==========
+loguru>=0.7.0
+
+# ========== PDF 处理 ==========
+PyMuPDF>=1.23.0
+mineru>=0.5.0
+
+# ========== 文档增强（可选） ==========
+# fastapi-cdn-host  # 自动为 Swagger UI 使用 CDN
+
+# ========== 开发工具 ==========
+# pytest          # 单元测试
+# black           # 代码格式化
+# flake8          # 代码检查

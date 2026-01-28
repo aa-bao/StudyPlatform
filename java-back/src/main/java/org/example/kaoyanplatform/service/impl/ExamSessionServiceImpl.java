@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.kaoyanplatform.client.PythonBackendClient;
 import org.example.kaoyanplatform.entity.*;
 import org.example.kaoyanplatform.entity.dto.ExamStartDTO;
 import org.example.kaoyanplatform.mapper.ExamSessionMapper;
@@ -26,19 +27,19 @@ import java.util.stream.Collectors;
 public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamSession> implements ExamSessionService {
 
     @Autowired
-    private MapPaperQuestionService mapPaperQuestionService;
+    private QuestionPaperRelService mapPaperQuestionService;
 
     @Autowired
-    private PaperService paperService;
+    private ExamPaperService paperService;
 
     @Autowired
     private QuestionService questionService;
 
     @Autowired
-    private ExamAnswerDetailService examAnswerDetailService;
+    private ExamRecordService examAnswerDetailService;
 
     @Autowired
-    private GLMService glmService;
+    private PythonBackendClient pythonBackendClient;
 
     @Autowired
     private MathAnswerMatcher mathAnswerMatcher;
@@ -48,15 +49,15 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
     @Override
     @Transactional
     public ExamStartDTO startOrResumeExam(String userId, String paperId) {
-        Paper paper = paperService.getById(paperId);
+        ExamPaper paper = paperService.getById(Long.parseLong(paperId));
         if (paper == null) {
             throw new RuntimeException("试卷不存在");
         }
 
         // 1. 先查询是否有未完成的会话（status=0）
         LambdaQueryWrapper<ExamSession> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(ExamSession::getUserId, userId)
-                   .eq(ExamSession::getPaperId, paperId)
+        queryWrapper.eq(ExamSession::getUserId, Long.parseLong(userId))
+                   .eq(ExamSession::getPaperId, Long.parseLong(paperId))
                    .eq(ExamSession::getStatus, 0)  // 0-进行中
                    .orderByDesc(ExamSession::getCreateTime)
                    .last("LIMIT 1");
@@ -79,7 +80,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
             if (session.getExpectedEndTime() != null &&
                 LocalDateTime.now().isAfter(session.getExpectedEndTime())) {
                 // 考试已超时，自动提交
-                submitExam(session.getId());
+                submitExam(session.getId().toString());
                 throw new RuntimeException("考试时间已到，本次考试已自动提交");
             }
         } else {
@@ -91,8 +92,8 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
             LocalDateTime expectedEndTime = startTime.plusMinutes(timeLimit);
 
             session = new ExamSession();
-            session.setUserId(userId);
-            session.setPaperId(paperId);
+            session.setUserId(Long.parseLong(userId));
+            session.setPaperId(Long.parseLong(paperId));
             session.setStatus(0);
             session.setStartTime(startTime);
             session.setExpectedEndTime(expectedEndTime);
@@ -118,7 +119,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
 
     @Override
     public boolean saveSnapshot(String sessionId, String snapshotJson) {
-        ExamSession session = getById(sessionId);
+        ExamSession session = getById(Long.parseLong(sessionId));
         if (session == null) {
             return false;
         }
@@ -128,7 +129,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
 
     @Override
     public boolean recordSwitch(String sessionId) {
-        ExamSession session = getById(sessionId);
+        ExamSession session = getById(Long.parseLong(sessionId));
         if (session == null) {
             return false;
         }
@@ -139,7 +140,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
     @Override
     @Transactional
     public void submitExam(String sessionId) {
-        ExamSession session = getById(sessionId);
+        ExamSession session = getById(Long.parseLong(sessionId));
         if (session == null) {
             throw new RuntimeException("考试会话不存在");
         }
@@ -148,10 +149,10 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
             throw new RuntimeException("考试已提交");
         }
 
-        List<MapPaperQuestion> mappings = mapPaperQuestionService.list(
-                new LambdaQueryWrapper<MapPaperQuestion>()
-                        .eq(MapPaperQuestion::getPaperId, session.getPaperId())
-                        .orderByAsc(MapPaperQuestion::getSortOrder)
+        List<QuestionPaperRel> mappings = mapPaperQuestionService.list(
+                new LambdaQueryWrapper<QuestionPaperRel>()
+                        .eq(QuestionPaperRel::getPaperId, session.getPaperId().toString())
+                        .orderByAsc(QuestionPaperRel::getSortOrder)
         );
 
         if (mappings == null || mappings.isEmpty()) {
@@ -165,20 +166,20 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
             throw new RuntimeException("答题快照解析失败");
         }
 
-        List<ExamAnswerDetail> details = new ArrayList<>();
+        List<ExamRecord> details = new ArrayList<>();
         BigDecimal objectiveScore = BigDecimal.ZERO;
         BigDecimal subjectiveTotalScore = BigDecimal.ZERO;
 
-        for (MapPaperQuestion mapping : mappings) {
-            Question question = questionService.getById(Long.parseLong(mapping.getQuestionId()));
+        for (QuestionPaperRel mapping : mappings) {
+            Question question = questionService.getById(mapping.getQuestionId());
             if (question == null) continue;
 
-            String questionId = mapping.getQuestionId();
+            String questionId = mapping.getQuestionId().toString();
             String userAnswer = (String) snapshotAnswers.get(questionId);
 
-            ExamAnswerDetail detail = new ExamAnswerDetail();
-            detail.setSessionId(sessionId);
-            detail.setQuestionId(questionId);
+            ExamRecord detail = new ExamRecord();
+            detail.setSessionId(session.getId());
+            detail.setQuestionId(mapping.getQuestionId());
             detail.setUserAnswer(userAnswer != null ? userAnswer : "");
 
             if (isObjectiveQuestion(question.getType())) {
@@ -209,7 +210,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
         updateById(session);
 
         // 触发异步批改主观题
-        gradeSubjectiveQuestionsAsync(sessionId);
+        gradeSubjectiveQuestionsAsync(session.getId().toString());
     }
 
     @Override
@@ -218,18 +219,18 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
         System.out.println("开始异步批改主观题 - sessionId: " + sessionId);
 
         try {
-            ExamSession session = getById(sessionId);
+            ExamSession session = getById(Long.parseLong(sessionId));
             if (session == null || session.getStatus() != 1) {
                 System.out.println("会话不存在或未提交，跳过批改 - sessionId: " + sessionId);
                 return;
             }
 
             // 查询所有待批改的主观题（isCorrect=3）
-            LambdaQueryWrapper<ExamAnswerDetail> pendingWrapper = new LambdaQueryWrapper<>();
-            pendingWrapper.eq(ExamAnswerDetail::getSessionId, sessionId)
-                    .eq(ExamAnswerDetail::getIsCorrect, 3);
+            LambdaQueryWrapper<ExamRecord> pendingWrapper = new LambdaQueryWrapper<>();
+            pendingWrapper.eq(ExamRecord::getSessionId, session.getId())
+                    .eq(ExamRecord::getIsCorrect, 3);
 
-            List<ExamAnswerDetail> pendingDetails = examAnswerDetailService.list(pendingWrapper);
+            List<ExamRecord> pendingDetails = examAnswerDetailService.list(pendingWrapper);
 
             if (pendingDetails.isEmpty()) {
                 System.out.println("没有待批改的主观题 - sessionId: " + sessionId);
@@ -239,14 +240,14 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
             System.out.println("找到 " + pendingDetails.size() + " 道待批改的主观题");
 
             // 获取试卷题目映射（用于获取分值）
-            List<MapPaperQuestion> mappings = mapPaperQuestionService.list(
-                    new LambdaQueryWrapper<MapPaperQuestion>()
-                            .eq(MapPaperQuestion::getPaperId, session.getPaperId())
+            List<QuestionPaperRel> mappings = mapPaperQuestionService.list(
+                    new LambdaQueryWrapper<QuestionPaperRel>()
+                            .eq(QuestionPaperRel::getPaperId, session.getPaperId().toString())
             );
 
-            Map<String, MapPaperQuestion> mappingMap = mappings.stream()
+            Map<String, QuestionPaperRel> mappingMap = mappings.stream()
                     .collect(Collectors.toMap(
-                            MapPaperQuestion::getQuestionId,
+                            m -> m.getQuestionId().toString(),
                             m -> m,
                             (m1, m2) -> m1
                     ));
@@ -254,24 +255,21 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
             BigDecimal subjectiveScoreEarned = BigDecimal.ZERO;
 
             // 逐道批改主观题
-            for (ExamAnswerDetail detail : pendingDetails) {
+            for (ExamRecord detail : pendingDetails) {
                 try {
-                    Question question = questionService.getById(Long.parseLong(detail.getQuestionId()));
+                    Question question = questionService.getById(detail.getQuestionId().toString());
                     if (question == null) continue;
 
-                    MapPaperQuestion mapping = mappingMap.get(detail.getQuestionId());
+                    QuestionPaperRel mapping = mappingMap.get(detail.getQuestionId().toString());
                     if (mapping == null) continue;
 
-                    // 调用GLM进行批改
-                    String prompt = glmService.generateGradingPrompt(
+                    // 调用 Python 服务进行批改
+                    Map<String, Object> gradingResult = pythonBackendClient.gradeAnswer(
                             question.getContent(),
                             detail.getUserAnswer(),
                             question.getAnswer(),
-                            mapping.getScoreValue().doubleValue()
+                            4  // 简答题类型
                     );
-
-                    String glmResponse = glmService.callGLMAPI(prompt);
-                    Map<String, Object> gradingResult = glmService.parseGradingResult(glmResponse);
 
                     // 更新答题明细
                     Double earnedScore = (Double) gradingResult.getOrDefault("score", 0.0);
@@ -297,12 +295,12 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
             }
 
             // 重新计算总分
-            LambdaQueryWrapper<ExamAnswerDetail> allWrapper = new LambdaQueryWrapper<>();
-            allWrapper.eq(ExamAnswerDetail::getSessionId, sessionId);
-            List<ExamAnswerDetail> allDetails = examAnswerDetailService.list(allWrapper);
+            LambdaQueryWrapper<ExamRecord> allWrapper = new LambdaQueryWrapper<>();
+            allWrapper.eq(ExamRecord::getSessionId, session.getId());
+            List<ExamRecord> allDetails = examAnswerDetailService.list(allWrapper);
 
             BigDecimal totalScore = allDetails.stream()
-                    .map(ExamAnswerDetail::getScoreEarned)
+                    .map(ExamRecord::getScoreEarned)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             // 生成最终总结
@@ -363,14 +361,14 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
         return 0;
     }
 
-    private String generateAISummary(ExamSession session, List<ExamAnswerDetail> details, List<MapPaperQuestion> mappings) {
+    private String generateAISummary(ExamSession session, List<ExamRecord> details, List<QuestionPaperRel> mappings) {
         int correctCount = 0;
         int totalQuestions = details.size();
         int objectiveCorrect = 0;
         int objectiveTotal = 0;
 
         for (int i = 0; i < details.size(); i++) {
-            ExamAnswerDetail detail = details.get(i);
+            ExamRecord detail = details.get(i);
             if (detail.getIsCorrect() == 1) {
                 correctCount++;
                 objectiveCorrect++;
@@ -395,9 +393,9 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
         summary.append("\nAI 批改反馈：\n");
 
         for (int i = 0; i < details.size(); i++) {
-            ExamAnswerDetail detail = details.get(i);
+            ExamRecord detail = details.get(i);
             if (detail.getIsCorrect() == 2 && detail.getAiFeedback() != null && !detail.getAiFeedback().isEmpty()) {
-                Question q = questionService.getById(Long.parseLong(detail.getQuestionId()));
+                Question q = questionService.getById(detail.getQuestionId().toString());
                 if (q != null) {
                     summary.append(String.format("【第%d题】%s\n", i + 1, q.getContent()));
                     summary.append(String.format("得分：%.1f 分\n", detail.getScoreEarned().doubleValue()));

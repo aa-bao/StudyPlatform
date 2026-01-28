@@ -20,7 +20,7 @@ public interface SubjectMapper extends BaseMapper<Subject> {
      * @param bookId 书籍ID
      * @return 科目ID列表
      */
-    @Select("SELECT subject_id FROM map_subject_book WHERE book_id = #{bookId}")
+    @Select("SELECT subject_id FROM book_subject_rel WHERE book_id = #{bookId}")
     List<Integer> getSubjectIdsByBookId(@Param("bookId") Integer bookId);
 
     /**
@@ -29,7 +29,7 @@ public interface SubjectMapper extends BaseMapper<Subject> {
      * @param examSpecId 考试规格ID（如：英语一=2，英语二=3）
      * @return 科目列表
      */
-    @Select("SELECT * FROM tb_subject WHERE id = #{examSpecId} OR parent_id = #{examSpecId} OR scope LIKE CONCAT('%', #{examSpecId}, '%') ORDER BY sort ASC")
+    @Select("SELECT * FROM subject WHERE id = #{examSpecId} OR parent_id = #{examSpecId} OR scope LIKE CONCAT('%', #{examSpecId}, '%') ORDER BY sort ASC")
     List<Subject> getTreeByExamSpecId(@Param("examSpecId") Integer examSpecId);
 
     /**
@@ -37,6 +37,6 @@ public interface SubjectMapper extends BaseMapper<Subject> {
      *
      * @return 考试规格列表
      */
-    @Select("SELECT * FROM tb_subject WHERE level = 1 ORDER BY sort ASC")
+    @Select("SELECT * FROM subject WHERE level = 1 ORDER BY sort ASC")
     List<Subject> getAllExamSpecs();
 }

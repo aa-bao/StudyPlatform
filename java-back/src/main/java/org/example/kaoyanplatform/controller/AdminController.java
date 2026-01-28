@@ -1,15 +1,11 @@
 package org.example.kaoyanplatform.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.kaoyanplatform.common.Result;
 import org.example.kaoyanplatform.entity.dto.MistakeHeatmapDTO;
-import org.example.kaoyanplatform.service.MistakeRecordService;
-import org.example.kaoyanplatform.service.QuestionService;
-import org.example.kaoyanplatform.service.UserService;
-import org.example.kaoyanplatform.service.MapQuestionSubjectService;
+import org.example.kaoyanplatform.service.AdminService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,17 +23,11 @@ import java.util.*;
 public class AdminController {
 
     @Autowired
-    private QuestionService questionService;
+    private AdminService adminService;
 
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private MistakeRecordService mistakeRecordService;
-
-    @Autowired
-    private MapQuestionSubjectService mapQuestionSubjectService;
-
+    /**
+     * 获取全局统计数据
+     */
     @GetMapping("/statistics")
     @Operation(summary = "获取统计数据", description = """
             获取管理员统计数据，包括：
@@ -50,46 +40,8 @@ public class AdminController {
     public Result<Map<String, Object>> getStatistics(
             @Parameter(description = "用户ID，可选参数。传入则返回个人模式数据，不传则返回全局管理员数据")
             @RequestParam(required = false) Integer userId) {
-        Map<String, Object> map = new HashMap<>();
-
-        // 1. 处理卡片统计数据
-        if (userId != null) {
-            // 普通用户模式
-            map.put("questionCount", questionService.count());
-            map.put("userCount", 1);
-            map.put("exerciseCount", mistakeRecordService.count(new QueryWrapper<org.example.kaoyanplatform.entity.MistakeRecord>().eq("user_id", userId)));
-            map.put("todayActive", "个人模式");
-        } else {
-            // 管理员模式：显示全局数据
-            map.put("questionCount", questionService.count());
-            map.put("userCount", userService.count());
-            map.put("exerciseCount", 1024);
-            map.put("todayActive", 56);
-        }
-
-        // 2. 饼图数据（通过映射表查询各科目题目数量）
-        List<Map<String, Object>> seriesData = new ArrayList<>();
-
-        // 通过映射表查询各科目的题目数量
-        // 政治科目ID=1
-        long politicsCount = getCountBySubjectId(1);
-        seriesData.add(Map.of("name", "政治", "value", politicsCount));
-
-        // 英语科目ID=2
-        long englishCount = getCountBySubjectId(2);
-        seriesData.add(Map.of("name", "英语", "value", englishCount));
-
-        // 数学科目ID=3
-        long mathCount = getCountBySubjectId(3);
-        seriesData.add(Map.of("name", "数学", "value", mathCount));
-
-        // 408专业课科目ID=4
-        long cs408Count = getCountBySubjectId(4);
-        seriesData.add(Map.of("name", "408专业课", "value", cs408Count));
-
-        map.put("subjectData", seriesData);
-
-        return Result.success(map);
+        Map<String, Object> statistics = adminService.getStatistics(userId);
+        return Result.success(statistics);
     }
 
     /**
@@ -103,7 +55,7 @@ public class AdminController {
             - count: 错题数量
             """)
     public Result<List<MistakeHeatmapDTO>> getMistakeHeatmap() {
-        List<MistakeHeatmapDTO> heatmap = mistakeRecordService.getMistakeHeatmap();
+        List<MistakeHeatmapDTO> heatmap = adminService.getMistakeHeatmap();
         return Result.success(heatmap);
     }
 
@@ -121,26 +73,130 @@ public class AdminController {
     public Result<List<MistakeHeatmapDTO.HotMistakeQuestion>> getHotMistakes(
             @Parameter(description = "返回数量限制，默认20，可根据需要调整")
             @RequestParam(defaultValue = "20") Integer limit) {
-        List<MistakeHeatmapDTO.HotMistakeQuestion> hotMistakes = mistakeRecordService.getHotMistakeQuestions(limit);
+        List<MistakeHeatmapDTO.HotMistakeQuestion> hotMistakes = adminService.getHotMistakes(limit);
         return Result.success(hotMistakes);
     }
 
     /**
-     * 根据科目ID获取题目数量（通过映射表）
-     * @param subjectId 科目ID
-     * @return 题目数量
+     * 获取用户活跃趋势数据
      */
-    private long getCountBySubjectId(int subjectId) {
-        try {
-            List<Long> questionIds = mapQuestionSubjectService.getQuestionIdsBySubjectId(subjectId);
-            return questionIds != null ? questionIds.size() : 0;
-        } catch (Exception e) {
-            // 如果查询失败，返回0
-            return 0;
-        }
+    @GetMapping("/activity-trend")
+    @Operation(summary = "获取用户活跃趋势", description = """
+            获取用户活跃趋势数据，支持按周/月/年查询。
+            返回数据包含：
+            - dates: 日期数组
+            - activeUsers: 每日活跃用户数数组
+            """)
+    public Result<Map<String, Object>> getActivityTrend(
+            @Parameter(description = "时间周期：week-最近7天，month-最近30天，year-最近12个月")
+            @RequestParam(defaultValue = "week") String period) {
+        Map<String, Object> result = adminService.getActivityTrend(period);
+        return Result.success(result);
+    }
+
+    /**
+     * 获取答题正确率趋势
+     */
+    @GetMapping("/accuracy-trend")
+    @Operation(summary = "获取答题正确率趋势", description = """
+            获取答题正确率趋势数据，支持按周/月查询。
+            返回数据包含：
+            - dates: 日期数组
+            - accuracy: 正确率数组（百分比）
+            - totalQuestions: 总题数数组
+            """)
+    public Result<Map<String, Object>> getAccuracyTrend(
+            @Parameter(description = "时间周期：week-最近7天，month-最近30天")
+            @RequestParam(defaultValue = "week") String period) {
+        Map<String, Object> result = adminService.getAccuracyTrend(period);
+        return Result.success(result);
+    }
+
+    /**
+     * 获取题目难度分布
+     */
+    @GetMapping("/difficulty-distribution")
+    @Operation(summary = "获取题目难度分布", description = """
+            获取题目难度分布数据。
+            返回数据包含：
+            - difficulty: 难度等级数组
+            - count: 题目数量数组
+            """)
+    public Result<Map<String, Object>> getDifficultyDistribution() {
+        Map<String, Object> result = adminService.getDifficultyDistribution();
+        return Result.success(result);
+    }
+
+    /**
+     * 获取用户答题时段热力图数据
+     */
+    @GetMapping("/hourly-activity-heatmap")
+    @Operation(summary = "获取用户答题时段热力图", description = """
+            获取最近7天24小时的答题活跃度数据。
+            返回数据包含：
+            - hours: 小时数组(0-23)
+            - days: 星期数组(周一到周日)
+            - data: 二维数据[count]
+            """)
+    public Result<Map<String, Object>> getHourlyActivityHeatmap() {
+        Map<String, Object> result = adminService.getHourlyActivityHeatmap();
+        return Result.success(result);
+    }
+
+    /**
+     * 获取科目错题数量统计
+     */
+    @GetMapping("/subject-mistake-count")
+    @Operation(summary = "获取科目错题数量统计", description = """
+            获取各科目的错题数量统计。
+            返回数据包含：
+            - subjects: 科目名称数组
+            - counts: 错题数量数组
+            """)
+    public Result<Map<String, Object>> getSubjectMistakeCount() {
+        Map<String, Object> result = adminService.getSubjectMistakeCount();
+        return Result.success(result);
+    }
+
+    /**
+     * 获取实时学习动态
+     */
+    @GetMapping("/recent-activities")
+    @Operation(summary = "获取实时学习动态", description = """
+            获取最近的学习动态记录。
+            返回数据包含：
+            - username: 用户名
+            - action: 动作描述
+            - detail: 详细信息
+            - time: 时间描述
+            - color: 颜色标识
+            """)
+    public Result<List<Map<String, Object>>> getRecentActivities(
+            @Parameter(description = "返回数量限制，默认10条")
+            @RequestParam(defaultValue = "10") Integer limit) {
+        List<Map<String, Object>> activities = adminService.getRecentActivities(limit);
+        return Result.success(activities);
+    }
+
+    /**
+     * 获取学霸排行榜
+     */
+    @GetMapping("/top-users")
+    @Operation(summary = "获取学霸排行榜", description = """
+            获取学习排名前列的用户。
+            返回数据包含：
+            - id: 用户ID
+            - username: 用户名
+            - avatar: 头像
+            - exerciseCount: 刷题数
+            - accuracy: 正确率
+            - studyHours: 学习时长(小时)
+            """)
+    public Result<List<Map<String, Object>>> getTopUsers(
+            @Parameter(description = "返回数量限制，默认10")
+            @RequestParam(defaultValue = "10") Integer limit) {
+        List<Map<String, Object>> topRankings = adminService.getTopUsers(limit);
+        return Result.success(topRankings);
     }
 }
-
-
-
 

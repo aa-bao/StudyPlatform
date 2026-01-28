@@ -1,23 +1,16 @@
 package org.example.kaoyanplatform.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.example.kaoyanplatform.entity.MapQuestionBook;
-import org.example.kaoyanplatform.entity.MapQuestionSubject;
-import org.example.kaoyanplatform.entity.Question;
-import org.example.kaoyanplatform.entity.Subject;
-import org.example.kaoyanplatform.entity.Book;
+import org.example.kaoyanplatform.entity.*;
 import org.example.kaoyanplatform.entity.dto.QuestionDTO;
-import org.example.kaoyanplatform.mapper.MapQuestionBookMapper;
-import org.example.kaoyanplatform.mapper.MapQuestionSubjectMapper;
+import org.example.kaoyanplatform.entity.dto.QuestionExportDTO;
+import org.example.kaoyanplatform.mapper.QuestionBookRelMapper;
 import org.example.kaoyanplatform.mapper.QuestionMapper;
-import org.example.kaoyanplatform.service.MapQuestionBookService;
-import org.example.kaoyanplatform.service.MapQuestionSubjectService;
-import org.example.kaoyanplatform.service.QuestionService;
-import org.example.kaoyanplatform.service.SubjectService;
-import org.example.kaoyanplatform.service.BookService;
-import org.springframework.beans.BeanUtils;
+import org.example.kaoyanplatform.mapper.QuestionSubjectRelMapper;
+import org.example.kaoyanplatform.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,30 +19,32 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * 题目Service实现类（重构版：支持 content_json 结构）
- * 使用映射表（map_question_subject、map_question_book）管理题目与科目、书本的关系
- */
 @Service
 public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> implements QuestionService {
 
     @Autowired
-    private MapQuestionSubjectMapper mapQuestionSubjectMapper;
+    private QuestionSubjectRelMapper mapQuestionSubjectMapper;
 
     @Autowired
-    private MapQuestionBookMapper mapQuestionBookMapper;
+    private QuestionBookRelMapper mapQuestionBookMapper;
 
     @Autowired
-    private MapQuestionSubjectService mapQuestionSubjectService;
+    private QuestionSubjectRelService mapQuestionSubjectService;
 
     @Autowired
-    private MapQuestionBookService mapQuestionBookService;
+    private QuestionBookRelService mapQuestionBookService;
 
     @Autowired
     private SubjectService subjectService;
 
     @Autowired
-    private BookService bookService;
+    private ExerciseBookService bookService;
+
+    @Autowired
+    private ErrorQuestionService mistakeRecordService;
+
+    @Autowired
+    private QuestionPaperRelService mapPaperQuestionService;
 
     @Override
     public List<Question> getQuestionsBySubjectIds(List<Integer> subjectIds) {
@@ -58,7 +53,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         }
 
         // 使用映射表 map_question_subject
-        QueryWrapper<MapQuestionSubject> qsWrapper = new QueryWrapper<>();
+        QueryWrapper<QuestionSubjectRel> qsWrapper = new QueryWrapper<>();
         qsWrapper.in("subject_id", subjectIds);
         qsWrapper.select("question_id");
         List<Object> qIds = mapQuestionSubjectMapper.selectObjs(qsWrapper);
@@ -97,7 +92,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         // 2. 保存题目-书本关联关系
         if (questionDTO.getBookIds() != null && !questionDTO.getBookIds().isEmpty()) {
             for (Integer bookId : questionDTO.getBookIds()) {
-                MapQuestionBook relation = new MapQuestionBook();
+                QuestionBookRel relation = new QuestionBookRel();
                 relation.setQuestionId(questionId);
                 relation.setBookId(bookId);
                 mapQuestionBookMapper.insert(relation);
@@ -107,7 +102,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         // 3. 保存题目-科目关联关系
         if (questionDTO.getSubjectIds() != null && !questionDTO.getSubjectIds().isEmpty()) {
             for (Integer subjectId : questionDTO.getSubjectIds()) {
-                MapQuestionSubject relation = new MapQuestionSubject();
+                QuestionSubjectRel relation = new QuestionSubjectRel();
                 relation.setQuestionId(questionId);
                 relation.setSubjectId(subjectId);
                 mapQuestionSubjectMapper.insert(relation);
@@ -211,7 +206,9 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         }
 
         queryWrapper.orderByDesc("id");
-        Page<Question> resultPage = page(page, queryWrapper);
+        IPage<Question> iPage = super.page(page, queryWrapper);
+        Page<Question> resultPage = new Page<>(iPage.getCurrent(), iPage.getSize(), iPage.getTotal());
+        resultPage.setRecords(iPage.getRecords());
 
         // 填充 subjectName 和 bookName
         if (resultPage.getRecords() != null && !resultPage.getRecords().isEmpty()) {
@@ -241,7 +238,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
 
                     List<String> bookNames = new ArrayList<>();
                     for (Integer bId : bIds) {
-                        Book book = bookService.getById(bId);
+                        ExerciseBook book = bookService.getById(bId);
                         if (book != null) {
                             bookNames.add(book.getName());
                         }
@@ -277,7 +274,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         return false;
 
         // TODO: 如果数据量大，建议改用原生 SQL 查询:
-        // SELECT COUNT(*) > 0 FROM tb_question
+        // SELECT COUNT(*) > 0 FROM question
         // WHERE JSON_EXTRACT(content_json, '$.content') = #{content}
     }
 
@@ -316,8 +313,114 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         return similarQuestions;
 
         // TODO: 如果数据量大，建议改用原生 SQL 查询:
-        // SELECT * FROM tb_question
+        // SELECT * FROM question
         // WHERE JSON_EXTRACT(content_json, '$.content') LIKE CONCAT('%', #{keyword}, '%')
         // LIMIT 10
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deleteQuestionWithRelations(Long id) {
+        // 删除题目相关的书本关联关系
+        mapQuestionBookService.removeAllQuestionBookRelations(id);
+        // 删除题目相关的科目关联关系
+        mapQuestionSubjectService.removeAllQuestionSubjectRelations(id);
+        // 删除题目本身
+        return removeById(id);
+    }
+
+    @Override
+    public Question getQuestionWithDetails(Long id) {
+        Question question = getById(id);
+        if (question == null) return null;
+
+        // 填充书本信息
+        List<Integer> bookIds = mapQuestionBookService.getBookIdsByQuestionId(id);
+        question.setBookIds(bookIds != null ? bookIds : Collections.emptyList());
+
+        if (bookIds != null && !bookIds.isEmpty()) {
+            List<String> bookNames = new ArrayList<>();
+            for (Integer bookId : bookIds) {
+                ExerciseBook book = bookService.getById(bookId);
+                if (book != null) {
+                    bookNames.add(book.getName());
+                }
+            }
+            question.setBookNames(bookNames);
+            question.setBookName(bookNames.isEmpty() ? null : bookNames.get(0));
+        } else {
+            question.setBookNames(Collections.emptyList());
+            question.setBookName(null);
+        }
+
+        // 填充科目信息
+        List<Integer> subjectIds = mapQuestionSubjectService.getSubjectIdsByQuestionId(id);
+        question.setSubjectIds(subjectIds != null ? subjectIds : Collections.emptyList());
+
+        if (subjectIds != null && !subjectIds.isEmpty()) {
+            List<String> subjectNames = new ArrayList<>();
+            for (Integer subjectId : subjectIds) {
+                Subject subject = subjectService.getById(subjectId);
+                if (subject != null) {
+                    subjectNames.add(subject.getName());
+                }
+            }
+            question.setSubjectNames(subjectNames);
+            question.setSubjectName(subjectNames.isEmpty() ? null : subjectNames.get(0));
+        } else {
+            question.setSubjectNames(Collections.emptyList());
+            question.setSubjectName(null);
+        }
+
+        return question;
+    }
+
+    @Override
+    public List<Question> getQuestionsByExportConfig(QuestionExportDTO exportDTO) {
+        List<Question> questions = new ArrayList<>();
+
+        // 优先级1: 自定义题目ID列表
+        if (exportDTO.getQuestionIds() != null && !exportDTO.getQuestionIds().isEmpty()) {
+            questions.addAll(listByIds(exportDTO.getQuestionIds()));
+        }
+        // 优先级2: 按试卷导出
+        else if (exportDTO.getPaperId() != null) {
+            List<Question> paperQuestions = mapPaperQuestionService.getQuestionsWithDetails(exportDTO.getPaperId());
+            questions.addAll(paperQuestions);
+        }
+        // 优先级3: 按习题册导出
+        else if (exportDTO.getBookId() != null) {
+            List<Question> bookQuestions = getQuestionsByBookId(exportDTO.getBookId());
+            questions.addAll(bookQuestions);
+        }
+        // 优先级4: 按科目导出
+        else if (exportDTO.getSubjectId() != null) {
+            List<Question> subjectQuestions = getQuestionsBySubjectIds(Collections.singletonList(exportDTO.getSubjectId()));
+            questions.addAll(subjectQuestions);
+        }
+
+        return questions;
+    }
+
+    @Override
+    public List<Question> getErrorQuestionsWithTime(Integer userId) {
+        List<ErrorQuestion> list = mistakeRecordService.list(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ErrorQuestion>()
+                        .eq(ErrorQuestion::getUserId, userId));
+
+        if (list.isEmpty()) return new ArrayList<>();
+
+        List<Integer> qIds = list.stream().map(ErrorQuestion::getQuestionId).collect(Collectors.toList());
+        List<Question> questions = listByIds(qIds);
+
+        // 将错题时间合并到题目对象中
+        questions.forEach(q -> {
+            list.stream()
+                    .filter(m -> m.getQuestionId().longValue() == q.getId())
+                    .findFirst()
+                    .ifPresent(m -> q.setMistakeTime(m.getUpdateTime() != null ? m.getUpdateTime() : m.getCreateTime()));
+        });
+
+        return questions;
     }
 }

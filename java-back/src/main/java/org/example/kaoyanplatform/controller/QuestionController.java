@@ -4,10 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.example.kaoyanplatform.client.PythonBackendClient;
 import org.example.kaoyanplatform.common.Result;
 import org.example.kaoyanplatform.entity.Question;
-import org.example.kaoyanplatform.entity.MistakeRecord;
-import org.example.kaoyanplatform.entity.Book;
+import org.example.kaoyanplatform.entity.ErrorQuestion;
+import org.example.kaoyanplatform.entity.ExerciseBook;
 import org.example.kaoyanplatform.entity.Subject;
 import org.example.kaoyanplatform.entity.dto.QuestionDTO;
 import org.example.kaoyanplatform.entity.dto.QuestionImportDTO;
@@ -39,28 +40,28 @@ public class QuestionController {
     private QuestionService questionService;
 
     @Autowired
-    private MistakeRecordService mistakeRecordService;
+    private ErrorQuestionService mistakeRecordService;
 
     @Autowired
     private SubjectService subjectService;
 
     @Autowired
-    private BookService bookService;
+    private ExerciseBookService bookService;
 
     @Autowired
-    private MapQuestionSubjectService mapQuestionSubjectService;
+    private QuestionSubjectRelService mapQuestionSubjectService;
 
     @Autowired
-    private MapQuestionBookService mapQuestionBookService;
+    private QuestionBookRelService mapQuestionBookService;
 
     @Autowired
     private PdfExportService pdfExportService;
 
     @Autowired
-    private MapPaperQuestionService mapPaperQuestionService;
+    private QuestionPaperRelService mapPaperQuestionService;
 
     @Autowired
-    private GLMService glmService;
+    private PythonBackendClient pythonBackendClient;
 
     // 1. 按知识点获取题目（递归下级）
     @GetMapping("/list-by-knowledge-point")
@@ -122,57 +123,16 @@ public class QuestionController {
     @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除题目", description = "级联删除题目及其科目、书本关联关系。")
     public Result deleteQuestion(@PathVariable Long id) {
-        mapQuestionBookService.removeAllQuestionBookRelations(id);
-        mapQuestionSubjectService.removeAllQuestionSubjectRelations(id);
-        questionMapper.deleteById(id);
-        return Result.success("删除成功");
+        boolean success = questionService.deleteQuestionWithRelations(id);
+        return success ? Result.success("删除成功") : Result.error("删除失败");
     }
 
     // 7. 获取题目详情
     @GetMapping("/{id}")
     @Operation(summary = "获取题目详情", description = "包含题目基本信息及关联的所有书本和科目ID列表。")
     public Result getQuestionById(@PathVariable Long id) {
-        Question question = questionMapper.selectById(id);
+        Question question = questionService.getQuestionWithDetails(id);
         if (question == null) return Result.error("题目不存在");
-
-        List<Integer> bookIds = mapQuestionBookService.getBookIdsByQuestionId(id);
-        question.setBookIds(bookIds != null ? bookIds : Collections.emptyList());
-        
-        // 填充所有书本名称
-        if (bookIds != null && !bookIds.isEmpty()) {
-            List<String> bookNames = new ArrayList<>();
-            for (Integer bookId : bookIds) {
-                Book book = bookService.getById(bookId);
-                if (book != null) {
-                    bookNames.add(book.getName());
-                }
-            }
-            question.setBookNames(bookNames);
-            question.setBookName(bookNames.isEmpty() ? null : bookNames.get(0));
-        } else {
-            question.setBookNames(Collections.emptyList());
-            question.setBookName(null);
-        }
-
-        List<Integer> subjectIds = mapQuestionSubjectService.getSubjectIdsByQuestionId(id);
-        question.setSubjectIds(subjectIds != null ? subjectIds : Collections.emptyList());
-        
-        // 填充所有科目名称
-        if (subjectIds != null && !subjectIds.isEmpty()) {
-            List<String> subjectNames = new ArrayList<>();
-            for (Integer subjectId : subjectIds) {
-                Subject subject = subjectService.getById(subjectId);
-                if (subject != null) {
-                    subjectNames.add(subject.getName());
-                }
-            }
-            question.setSubjectNames(subjectNames);
-            question.setSubjectName(subjectNames.isEmpty() ? null : subjectNames.get(0));
-        } else {
-            question.setSubjectNames(Collections.emptyList());
-            question.setSubjectName(null);
-        }
-
         return Result.success(question);
     }
 
@@ -180,22 +140,7 @@ public class QuestionController {
     @GetMapping("/getErrorBook")
     @Operation(summary = "获取错题本")
     public Result getErrorBook(@RequestParam Integer userId) {
-        List<MistakeRecord> list = mistakeRecordService.list(
-                new LambdaQueryWrapper<MistakeRecord>().eq(MistakeRecord::getUserId, userId));
-
-        if (list.isEmpty()) return Result.success(new ArrayList<>());
-
-        List<Integer> qIds = list.stream().map(MistakeRecord::getQuestionId).collect(Collectors.toList());
-        List<Question> questions = questionService.listByIds(qIds);
-
-        // 将错题时间合并到题目对象中
-        questions.forEach(q -> {
-            list.stream()
-                    .filter(m -> m.getQuestionId().longValue() == q.getId())
-                    .findFirst()
-                    .ifPresent(m -> q.setMistakeTime(m.getUpdateTime() != null ? m.getUpdateTime() : m.getCreateTime()));
-        });
-
+        List<Question> questions = questionService.getErrorQuestionsWithTime(userId);
         return Result.success(questions);
     }
 
@@ -222,13 +167,13 @@ public class QuestionController {
     // 10. 手动保存错题
     @PostMapping("/saveWrong")
     @Operation(summary = "保存错题")
-    public Result saveWrong(@RequestBody MistakeRecord mistakeRecord) {
+    public Result saveWrong(@RequestBody ErrorQuestion mistakeRecord) {
         if (mistakeRecord.getUserId() == null || mistakeRecord.getQuestionId() == null) {
             return Result.error("参数不完整");
         }
-        LambdaQueryWrapper<MistakeRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MistakeRecord::getUserId, mistakeRecord.getUserId())
-                .eq(MistakeRecord::getQuestionId, mistakeRecord.getQuestionId());
+        LambdaQueryWrapper<ErrorQuestion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ErrorQuestion::getUserId, mistakeRecord.getUserId())
+                .eq(ErrorQuestion::getQuestionId, mistakeRecord.getQuestionId());
 
         if (mistakeRecordService.count(wrapper) == 0) {
             mistakeRecordService.save(mistakeRecord);
@@ -260,7 +205,7 @@ public class QuestionController {
 
             // 如果新建习题册
             if (bookId == null && importDTO.getNewBookName() != null && !importDTO.getNewBookName().trim().isEmpty()) {
-                Book newBook = new Book();
+                ExerciseBook newBook = new ExerciseBook();
                 newBook.setName(importDTO.getNewBookName().trim());
                 newBook.setDescription("通过JSON导入自动创建");
                 bookService.save(newBook);
@@ -369,7 +314,7 @@ public class QuestionController {
     @Operation(summary = "预览导出题目", description = "根据导出条件预览将要导出的题目列表")
     public Result previewExportQuestions(@RequestBody QuestionExportDTO exportDTO) {
         try {
-            List<Question> questions = getQuestionsByExportConfig(exportDTO);
+            List<Question> questions = questionService.getQuestionsByExportConfig(exportDTO);
 
             // 加载题目详情（科目、书本等）
             for (Question question : questions) {
@@ -378,8 +323,8 @@ public class QuestionController {
 
                 if (bookIds != null && !bookIds.isEmpty()) {
                     List<String> bookNames = new ArrayList<>();
-                    for (Integer bookId : bookIds) {
-                        Book book = bookService.getById(bookId);
+                    for (Integer bookIdTemp : bookIds) {
+                        ExerciseBook book = bookService.getById(bookIdTemp);
                         if (book != null) {
                             bookNames.add(book.getName());
                         }
@@ -392,8 +337,8 @@ public class QuestionController {
 
                 if (subjectIds != null && !subjectIds.isEmpty()) {
                     List<String> subjectNames = new ArrayList<>();
-                    for (Integer subjectId : subjectIds) {
-                        Subject subject = subjectService.getById(subjectId);
+                    for (Integer subjectIdTemp : subjectIds) {
+                        Subject subject = subjectService.getById(subjectIdTemp);
                         if (subject != null) {
                             subjectNames.add(subject.getName());
                         }
@@ -437,41 +382,12 @@ public class QuestionController {
         }
     }
 
-    /**
-     * 根据导出配置获取题目列表
-     */
-    private List<Question> getQuestionsByExportConfig(QuestionExportDTO exportDTO) {
-        List<Question> questions = new ArrayList<>();
-
-        // 优先级1: 自定义题目ID列表
-        if (exportDTO.getQuestionIds() != null && !exportDTO.getQuestionIds().isEmpty()) {
-            questions.addAll(questionService.listByIds(exportDTO.getQuestionIds()));
-        }
-        // 优先级2: 按试卷导出
-        else if (exportDTO.getPaperId() != null) {
-            List<Question> paperQuestions = mapPaperQuestionService.getQuestionsWithDetails(exportDTO.getPaperId());
-            questions.addAll(paperQuestions);
-        }
-        // 优先级3: 按习题册导出
-        else if (exportDTO.getBookId() != null) {
-            List<Question> bookQuestions = questionService.getQuestionsByBookId(exportDTO.getBookId());
-            questions.addAll(bookQuestions);
-        }
-        // 优先级4: 按科目导出
-        else if (exportDTO.getSubjectId() != null) {
-            List<Question> subjectQuestions = questionService.getQuestionsBySubjectIds(Collections.singletonList(exportDTO.getSubjectId()));
-            questions.addAll(subjectQuestions);
-        }
-
-        return questions;
-    }
-
-    // 13. AI 图片识别题目
+    // 14. AI 图片识别题目
     @PostMapping("/recognize")
     @Operation(summary = "AI图片识别题目", description = "使用智谱GLM-4.6V-Flash API识别图片中的题目内容")
     public Result recognizeQuestion(@RequestParam("file") MultipartFile file) {
         try {
-            QuestionDTO questionDTO = glmService.recognizeQuestionFromImage(file);
+            QuestionDTO questionDTO = pythonBackendClient.recognizeQuestion(file);
             return Result.success(questionDTO);
         } catch (IllegalArgumentException e) {
             return Result.error(e.getMessage());

@@ -6,16 +6,14 @@ import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.example.kaoyanplatform.entity.MapQuestionSubject;
+import org.example.kaoyanplatform.entity.QuestionSubjectRel;
 import org.example.kaoyanplatform.entity.Subject;
 import org.example.kaoyanplatform.entity.User;
-import org.example.kaoyanplatform.entity.UserProgress;
 import org.example.kaoyanplatform.entity.dto.UserStudyStatsDTO;
 import org.example.kaoyanplatform.entity.dto.HomePageDataDTO;
-import org.example.kaoyanplatform.mapper.MapQuestionSubjectMapper;
+import org.example.kaoyanplatform.mapper.QuestionSubjectRelMapper;
 import org.example.kaoyanplatform.mapper.SubjectMapper;
 import org.example.kaoyanplatform.mapper.UserMapper;
-import org.example.kaoyanplatform.mapper.UserProgressMapper;
 import org.example.kaoyanplatform.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,10 +30,7 @@ import java.util.stream.Collectors;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     @Autowired
-    private UserProgressMapper userProgressMapper;
-
-    @Autowired
-    private MapQuestionSubjectMapper mapQuestionSubjectMapper;
+    private QuestionSubjectRelMapper mapQuestionSubjectMapper;
 
     @Autowired
     private SubjectMapper subjectMapper;
@@ -105,46 +100,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         statsDTO.setTargetSchool(user.getTargetSchool());
         statsDTO.setExamYear(user.getExamYear());
 
-        // 2. 查询用户的学习进度记录
-        QueryWrapper<UserProgress> progressWrapper = new QueryWrapper<>();
-        progressWrapper.eq("user_id", userId);
-        List<UserProgress> progressList = userProgressMapper.selectList(progressWrapper);
-
-        // 3. 获取所有顶级科目（level = 1）
+        // 2. 获取所有顶级科目（level = 1）
         QueryWrapper<Subject> subjectWrapper = new QueryWrapper<>();
         subjectWrapper.eq("level", "1");
         List<Subject> topSubjects = subjectMapper.selectList(subjectWrapper);
 
-        // 4. 构建科目统计数据
+        // 3. 构建科目统计数据
         List<UserStudyStatsDTO.SubjectStats> subjectStatsList = new ArrayList<>();
 
         // 获取每个科目的题目总数
         Map<Integer, Integer> subjectQuestionCount = getSubjectQuestionCount();
 
-        // 处理用户进度数据
-        Map<Integer, UserProgress> progressMap = progressList.stream()
-                .collect(Collectors.toMap(UserProgress::getSubjectId, p -> p, (p1, p2) -> p1));
-
         for (Subject subject : topSubjects) {
             UserStudyStatsDTO.SubjectStats subjectStats = new UserStudyStatsDTO.SubjectStats();
             subjectStats.setSubjectId(subject.getId());
             subjectStats.setSubjectName(subject.getName());
-
-            UserProgress progress = progressMap.get(subject.getId());
-            if (progress != null) {
-                subjectStats.setFinishedCount(progress.getFinishedCount());
-                subjectStats.setCorrectCount(progress.getCorrectCount());
-
-                // 计算正确率
-                if (progress.getFinishedCount() != null && progress.getFinishedCount() > 0) {
-                    double accuracy = (progress.getCorrectCount() * 100.0) / progress.getFinishedCount();
-                    subjectStats.setAccuracy(Math.round(accuracy * 100.0) / 100.0); // 保留两位小数
-                }
-            } else {
-                subjectStats.setFinishedCount(0);
-                subjectStats.setCorrectCount(0);
-                subjectStats.setAccuracy(0.0);
-            }
+            subjectStats.setFinishedCount(0); // 暂时设为0，因为移除了用户进度功能
+            subjectStats.setCorrectCount(0); // 暂时设为0
+            subjectStats.setAccuracy(0.0); // 暂时设为0
 
             // 计算覆盖度
             Integer totalCount = subjectQuestionCount.get(subject.getId());
@@ -189,7 +162,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * 获取每个科目的题目总数
      */
     private Map<Integer, Integer> getSubjectQuestionCount() {
-        QueryWrapper<MapQuestionSubject> wrapper = new QueryWrapper<>();
+        QueryWrapper<QuestionSubjectRel> wrapper = new QueryWrapper<>();
         wrapper.select("subject_id", "count(*) as count");
         wrapper.groupBy("subject_id");
         List<Map<String, Object>> resultList = mapQuestionSubjectMapper.selectMaps(wrapper);
@@ -229,27 +202,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         HomePageDataDTO.StudyStats stats = new HomePageDataDTO.StudyStats();
 
         // 获取总刷题数
-        QueryWrapper<UserProgress> progressWrapper = new QueryWrapper<>();
-        progressWrapper.eq("user_id", userId);
-        List<UserProgress> progressList = userProgressMapper.selectList(progressWrapper);
-
-        int totalQuestions = progressList.stream()
-                .mapToInt(p -> p.getFinishedCount() != null ? p.getFinishedCount() : 0)
-                .sum();
+        int totalQuestions = 0; // 暂时设为0，因为移除了用户进度功能
         stats.setQuestionsDone(totalQuestions);
 
         // 获取总正确数，计算正确率
-        int totalCorrect = progressList.stream()
-                .mapToInt(p -> p.getCorrectCount() != null ? p.getCorrectCount() : 0)
-                .sum();
-        double accuracy = totalQuestions > 0 ? (totalCorrect * 100.0 / totalQuestions) : 0.0;
+        double accuracy = 0.0; // 暂时设为0
         stats.setAccuracy(Math.round(accuracy * 10.0) / 10.0);
 
-        // 获取错题本数量
-        // 这里需要注入MistakeRecordMapper，暂时用模拟数据
+        // 获取错题本数量（暂时用模拟数据）
         stats.setMistakesCount(0);
 
-        // 学习时长（暂时用模拟数据，后续可以添加字段）
+        // 学习时长（暂时用模拟数据）
         stats.setTodayStudyTime(0.0);
         stats.setTotalStudyHours(0.0);
         stats.setConsecutiveDays(0);
