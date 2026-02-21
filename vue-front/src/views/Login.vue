@@ -99,7 +99,7 @@
                         <label>邮箱 / 账号</label>
                         <div class="input-wrapper">
                             <img :src="emailIcon" class="field-icon" alt="email">
-                            <input type="email" v-model="loginForm.username" placeholder="请输入邮箱">
+                            <input type="text" v-model="loginForm.username" placeholder="请输入邮箱或账号">
                         </div>
                     </div>
                     <div class="input-group">
@@ -152,7 +152,8 @@
                         <label>设置密码</label>
                         <div class="input-wrapper">
                             <img :src="lockIcon" class="field-icon" alt="lock">
-                            <input type="password" v-model="registerForm.password" placeholder="8-20位字符">
+                            <input :type="showPassword ? 'text' : 'password'" v-model="registerForm.password" placeholder="8-20位字符">
+                            <img :src="eyesIcon" class="field-icon password-toggle-icon" alt="toggle password" @click="showPassword = !showPassword" style="cursor: pointer;">
                         </div>
                     </div>
                     <div class="checkbox-group">
@@ -202,6 +203,7 @@ import lockIcon from '@/assets/icons/lock.svg?url'
 import securityIcon from '@/assets/icons/security.svg?url'
 import weixinIcon from '@/assets/icons/weixin.svg?url'
 import qqIcon from '@/assets/icons/qq.svg?url'
+import eyesIcon from '@/assets/icons/eyes.svg?url'
 import { loginApi, registerApi } from '@/api/user';
 import { sendMailCode } from '@/api/mail';
 import { useUserStore } from '@/stores/user';
@@ -225,6 +227,9 @@ const registerForm = reactive({
     password: '',
     agree: false
 });
+
+// 密码可见性控制
+const showPassword = ref(false)
 
 // 登录处理
 const handleLogin = async () => {
@@ -312,7 +317,9 @@ const handleRegister = async () => {
         // 注册成功
         ElMessage.success('注册成功！请登录');
         activeTab.value = 'login';
-        loginForm.username = registerForm.username;
+        // 将注册时输入的账号和密码设置到登录表单中
+        loginForm.username = registerForm.username.split('@')[0]; // 使用邮箱前缀作为用户名
+        loginForm.password = registerForm.password;
         registerForm.username = '';
         registerForm.code = '';
         registerForm.password = '';
@@ -859,7 +866,7 @@ const handleForgetPassword = () => {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 0.75rem;
-    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    padding: 0.75rem 2.5rem 0.75rem 2.5rem;
     font-size: 0.875rem;
     outline: none;
     transition: all 0.2s;
@@ -1037,6 +1044,16 @@ const handleForgetPassword = () => {
     transition: all 0.2s;
     font-size: 1.25rem;
     padding: 0;
+}
+
+/* 密码切换按钮样式 */
+.password-toggle-icon {
+    width: 20px;
+    height: 20px;
+    filter: brightness(0) invert(0.5);
+    position: absolute;
+    right: 0.875rem;
+    left: auto;
 }
 
 .social-icon img {

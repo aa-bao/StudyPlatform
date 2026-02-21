@@ -174,4 +174,26 @@ public class SubjectController {
         boolean success = subjectService.batchUpdateSort(subjects);
         return success ? Result.success("排序更新成功") : Result.error("排序更新失败");
     }
+
+    // 12. 获取知识点树（Level 3+）
+    @GetMapping("/knowledge-points")
+    @Operation(summary = "获取知识点树", description = "获取 Level 3 及以上的知识点树，用于题目编辑。")
+    public Result getKnowledgePoints(
+            @Parameter(description = "考试规格ID，可选") @RequestParam(required = false) Integer examSpecId) {
+        System.out.println("【API调用】获取知识点树，examSpecId: " + examSpecId);
+        List<org.example.kaoyanplatform.entity.dto.SubjectDTO> result = subjectService.getKnowledgePoints(examSpecId);
+        System.out.println("【API调用】返回数据量: " + result.size());
+        if (!result.isEmpty()) {
+            System.out.println("【API调用】第一个节点: " + result.get(0).getName() + ", children数: " + (result.get(0).getChildren() != null ? result.get(0).getChildren().size() : 0));
+        }
+        return Result.success(result);
+    }
+
+    // 13. 测试接口：获取所有科目（调试用）
+    @GetMapping("/all-subjects")
+    @Operation(summary = "获取所有科目（调试）", description = "获取所有科目及其层级信息")
+    public Result getAllSubjects() {
+        List<org.example.kaoyanplatform.entity.Subject> all = subjectService.list();
+        return Result.success(all);
+    }
 }

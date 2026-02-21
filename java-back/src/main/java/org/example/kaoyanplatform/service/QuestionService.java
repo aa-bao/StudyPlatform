@@ -90,4 +90,48 @@ public interface QuestionService extends IService<Question> {
      * @return 带有错题时间的题目列表
      */
     List<Question> getErrorQuestionsWithTime(Integer userId);
+
+    /**
+     * 按知识点获取题目（包括所有子知识点）
+     * @param subjectId 科目ID
+     * @return 题目列表
+     */
+    List<Question> getQuestionsByKnowledgePoint(Integer subjectId);
+
+    /**
+     * 按科目或书本获取题目
+     * @param subjectId 科目ID（可选）
+     * @param bookId 书本ID（可选）
+     * @return 题目列表
+     */
+    List<Question> getQuestionsBySubjectOrBook(Integer subjectId, Integer bookId);
+
+    /**
+     * 保存错题记录
+     * @param userId 用户ID
+     * @param questionId 题目ID
+     * @return 是否保存成功
+     */
+    boolean saveWrongQuestion(Integer userId, Long questionId);
+
+    /**
+     * 批量导入题目
+     * @param importDTO 导入数据传输对象
+     * @return 导入结果信息
+     */
+    String importQuestions(org.example.kaoyanplatform.entity.dto.QuestionImportDTO importDTO);
+
+    /**
+     * 预览导出题目（填充详细信息）
+     * @param questions 题目列表
+     * @return 填充了详细信息的题目列表
+     */
+    List<Question> previewExportQuestions(List<Question> questions);
+
+    /**
+     * AI图片识别题目
+     * @param file 图片文件
+     * @return 识别出的题目DTO
+     */
+    QuestionDTO recognizeQuestion(org.springframework.web.multipart.MultipartFile file);
 }

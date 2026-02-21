@@ -1,15 +1,20 @@
 package org.example.kaoyanplatform.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -23,6 +28,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 // 开启跨域允许
                 .cors(cors -> cors.configure(http))
+                // 添加 JWT 认证过滤器
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 // 配置权限控制
                 .authorizeHttpRequests(auth -> auth
                         // 允许所有人访问登录、注册、以及上传后的静态资源路径

@@ -7,13 +7,6 @@
     @close="handleClose"
   >
     <div class="grading-container">
-      <el-alert
-        title="请对照标准答案，对自己的主观题进行客观评分"
-        type="info"
-        :closable="false"
-        show-icon
-        style="margin-bottom: 20px;"
-      />
 
       <!-- 快捷操作 -->
       <div class="shortcut-actions">
@@ -27,7 +20,7 @@
       <!-- 主观题列表 -->
       <div class="question-list">
         <div
-          v-for="(item, index) in subjectiveQuestions"
+          v-for="(item) in subjectiveQuestions"
           :key="item.questionId"
           class="question-item"
         >
@@ -43,14 +36,12 @@
 
           <div class="answer-section">
             <div class="answer-box">
-              <div class="answer-label">📝 你的答案：</div>
-              <div class="answer-content user-answer">
-                {{ item.userAnswer || '未作答' }}
-              </div>
+              <div class="answer-label">你的答案：</div>
+              <div class="answer-content user-answer" v-html="renderLatex(item.userAnswer || '未作答')"></div>
             </div>
 
             <div class="answer-box">
-              <div class="answer-label">📊 标准答案：</div>
+              <div class="answer-label">标准答案：</div>
               <div class="answer-content standard-answer" v-html="renderLatex(item.standardAnswer)"></div>
             </div>
           </div>
@@ -58,35 +49,27 @@
           <!-- 评分区域 -->
           <div class="grading-section">
             <div class="grading-item">
-              <div class="grading-label">
-                📝 过程分（{{ item.processScoreValue }}分，占{{ (item.processRatio * 100).toFixed(0) }}%）
-              </div>
+              <div class="grading-label">📝 过程分（过程是否正确）</div>
               <div class="grading-options">
                 <el-radio-group v-model="item.userProcessGrading">
-                  <el-radio :label="1">✓ 过程正确</el-radio>
-                  <el-radio :label="0">✗ 过程错误</el-radio>
+                  <el-radio :value="1">✓ 过程正确</el-radio>
+                  <el-radio :value="0">✗ 过程错误</el-radio>
                 </el-radio-group>
               </div>
             </div>
 
             <div class="grading-item">
-              <div class="grading-label">
-                ✎️ 结果分（{{ item.resultScoreValue }}分，占{{ (item.resultRatio * 100).toFixed(0) }}%）
-              </div>
+              <div class="grading-label">✎️ 结果分（答案是否正确）</div>
               <div class="grading-options">
                 <el-radio-group v-model="item.userResultGrading">
-                  <el-radio :label="1">✓ 答案正确</el-radio>
-                  <el-radio :label="0">✗ 答案错误</el-radio>
+                  <el-radio :value="1">✓ 答案正确</el-radio>
+                  <el-radio :value="0">✗ 答案错误</el-radio>
                 </el-radio-group>
               </div>
             </div>
 
             <div class="score-preview">
               本题得分：<strong>{{ calculateQuestionScore(item) }}</strong> / {{ item.totalScore }} 分
-              <span class="score-detail">
-                （过程：{{ item.userProcessGrading === 1 ? item.processScoreValue : 0 }}分 +
-                结果：{{ item.userResultGrading === 1 ? item.resultScoreValue : 0 }}分）
-              </span>
             </div>
           </div>
         </div>
@@ -160,12 +143,21 @@ const loadSubjectiveQuestions = async () => {
 // 计算单题得分
 const calculateQuestionScore = (item) => {
   let score = 0
+
+  const totalScore = parseFloat(item.totalScore || 0)
+  if (totalScore === 0) return '0.0'
+
+  // 过程分 = 总分 * 0.8 四舍五入
+  const processScore = Math.round(totalScore * 0.8)
+  const resultScore = totalScore - processScore
+
   if (item.userProcessGrading === 1) {
-    score += parseFloat(item.processScoreValue || 0)
+    score += processScore
   }
   if (item.userResultGrading === 1) {
-    score += parseFloat(item.resultScoreValue || 0)
+    score += resultScore
   }
+
   return score.toFixed(1)
 }
 

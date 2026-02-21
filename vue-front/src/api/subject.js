@@ -58,3 +58,16 @@ export function getSubjectListApi() {
         method: 'get'
     })
 }
+
+// 获取知识点树（Level 3+）- 新增接口
+export function getKnowledgePointsApi(examSpecId) {
+    const params = {}
+    if (examSpecId !== null && examSpecId !== undefined) {
+        params.examSpecId = examSpecId
+    }
+    return request({
+        url: '/subject/knowledge-points',
+        method: 'get',
+        params
+    })
+}

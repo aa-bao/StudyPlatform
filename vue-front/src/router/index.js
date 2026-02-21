@@ -48,6 +48,13 @@ const routes = [
         component: () => import('@/views/quiz/SinglePractice.vue'),
         props: true
       },
+      // 每日测试
+      {
+        path: 'daily-test',
+        component: () => import('@/views/quiz/SinglePractice.vue'),
+        props: (route) => ({ mode: 'daily-test' }),
+        meta: { hideLayout: true }
+      },
       // 专项突破
       {
         path: 'topic-drill',

@@ -57,7 +57,11 @@ public class UserController {
         String password = (String) loginData.get("password");
         boolean remember = loginData.get("remember") != null ? (Boolean) loginData.get("remember") : false;
 
-        User user = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
+        // 支持通过用户名或邮箱登录
+        User user = userService.getOne(new LambdaQueryWrapper<User>()
+                .eq(User::getUsername, username)
+                .or()
+                .eq(User::getEmail, username));
 
         if (user != null && passwordEncoder.matches(password, user.getPassword())) {
             user.setPassword(null);

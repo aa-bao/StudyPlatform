@@ -17,6 +17,7 @@ public class AnswerRecord {
     private Integer isCorrect;
     private Integer score;
     private Integer duration;
+    private String source;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

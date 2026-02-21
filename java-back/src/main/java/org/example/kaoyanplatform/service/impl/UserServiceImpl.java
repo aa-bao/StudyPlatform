@@ -86,7 +86,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         // 5. 设置默认头像
         if (StrUtil.isBlank(user.getAvatar())) {
-            user.setAvatar("/img/default-avatar.png");
+            user.setAvatar("http://localhost:8081/img/default-avatar.png");
         }
 
         // 6. 设置默认考研年份，确保 Dashboard 进度条有终点数据

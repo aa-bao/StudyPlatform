@@ -12,5 +12,9 @@ public class WebConfig implements WebMvcConfigurer {
         // 将网络路径 /uploads/** 映射到本地磁盘路径
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:" + System.getProperty("user.dir") + "/uploads/");
+
+        // 将网络路径 /img/** 映射到 static/img 目录
+        registry.addResourceHandler("/img/**")
+                .addResourceLocations("classpath:/static/img/");
     }
 }

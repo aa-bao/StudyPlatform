@@ -11,7 +11,7 @@
  Target Server Version : 80036 (8.0.36)
  File Encoding         : 65001
 
- Date: 26/01/2026 18:17:31
+ Date: 29/01/2026 14:28:13
 */
 
 SET NAMES utf8mb4;
@@ -32,7 +32,7 @@ CREATE TABLE `answer_record`  (
   `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_user_ques`(`user_id` ASC, `question_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '答题记录表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '答题记录表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for book_subject_rel
@@ -58,7 +58,7 @@ CREATE TABLE `error_question`  (
   `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
   `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '添加时间',
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '错题记录表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '错题记录表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for exam_paper
@@ -85,18 +85,23 @@ CREATE TABLE `exam_paper`  (
 DROP TABLE IF EXISTS `exam_record`;
 CREATE TABLE `exam_record`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `session_id` bigint NULL DEFAULT NULL COMMENT '会话id',
-  `question_id` bigint NULL DEFAULT NULL COMMENT '题目id',
+  `session_id` bigint NOT NULL COMMENT '会话id',
+  `question_id` bigint NOT NULL COMMENT '题目id',
   `user_answer` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL COMMENT '用户答案',
   `is_correct` tinyint NULL DEFAULT NULL COMMENT '对/错/待定（主观题）',
   `score_earned` decimal(5, 2) NULL DEFAULT NULL COMMENT '得分率',
   `duration_seconds` int NULL DEFAULT NULL COMMENT '用时',
   `ai_feedback` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL COMMENT 'ai返回',
+  `user_process_grading` tinyint NULL DEFAULT NULL COMMENT '用户自评-过程：null-未批改, 0-错误, 1-正确',
+  `user_result_grading` tinyint NULL DEFAULT NULL COMMENT '用户自评-结果：null-未批改, 0-错误, 1-正确',
+  `grading_time` datetime NULL DEFAULT NULL COMMENT '批改时间',
   `knowledge_point_id` int NULL DEFAULT NULL COMMENT '知识点id',
   `create_time` datetime NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE,
-  INDEX `session_id`(`session_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '考试记录表' ROW_FORMAT = DYNAMIC;
+  INDEX `session_id`(`session_id` ASC) USING BTREE,
+  INDEX `idx_session_question`(`session_id` ASC, `question_id` ASC) USING BTREE,
+  INDEX `idx_user_grading`(`user_process_grading` ASC, `user_result_grading` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 29 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '考试记录表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for exam_session
@@ -119,7 +124,7 @@ CREATE TABLE `exam_session`  (
   INDEX `idx_user_id`(`user_id` ASC) USING BTREE,
   INDEX `idx_paper_id`(`paper_id` ASC) USING BTREE,
   INDEX `idx_status`(`status` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '考试会话表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 8 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '考试会话表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for exercise_book
@@ -160,7 +165,7 @@ CREATE TABLE `question`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_type`(`type` ASC) USING BTREE,
   INDEX `idx_difficulty`(`difficulty` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '题目表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 17 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '题目表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for question_book_rel
@@ -174,7 +179,7 @@ CREATE TABLE `question_book_rel`  (
   UNIQUE INDEX `uk_question_book`(`question_id` ASC, `book_id` ASC) USING BTREE,
   INDEX `idx_question_id`(`question_id` ASC) USING BTREE,
   INDEX `idx_book_id`(`book_id` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '题目-书本关联表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 17 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '题目-书本关联表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for question_paper_rel
@@ -187,10 +192,14 @@ CREATE TABLE `question_paper_rel`  (
   `sort_order` smallint NULL DEFAULT NULL COMMENT '题号',
   `score_value` decimal(5, 2) NULL DEFAULT NULL COMMENT '分值',
   `type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL COMMENT '题目类型: \r\n1-单选\r\n2-多选\r\n3-填空\r\n4-综合应用\r\n5-完型填空\r\n6-阅读理解\r\n7-新题型\r\n8-翻译\r\n9-小作文\r\n10-大作文',
+  `process_score` int NULL DEFAULT NULL COMMENT '过程分满分（仅用于简答题）',
+  `process_ratio` double NULL DEFAULT NULL COMMENT '过程分比例（如0.8表示80%，仅用于简答题）',
+  `result_score` int NULL DEFAULT NULL COMMENT '结果分满分（仅用于简答题）',
+  `result_ratio` double NULL DEFAULT NULL COMMENT '结果分比例（如0.2表示20%，仅用于简答题）',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `paper_id`(`paper_id` ASC) USING BTREE,
   INDEX `idx_map_paper_question_type`(`type` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '题目-试卷关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 21 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '题目-试卷关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for question_subject_rel
@@ -204,7 +213,7 @@ CREATE TABLE `question_subject_rel`  (
   UNIQUE INDEX `uk_question_subject`(`question_id` ASC, `subject_id` ASC) USING BTREE,
   INDEX `idx_question_id`(`question_id` ASC) USING BTREE,
   INDEX `idx_subject_id`(`subject_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '题目-科目关联表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 89 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '题目-科目关联表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for resource
@@ -218,7 +227,7 @@ CREATE TABLE `resource`  (
   `subject_id` int NULL DEFAULT NULL,
   `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '学习资料表' ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '学习资料表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for subject
@@ -250,7 +259,7 @@ CREATE TABLE `subject_weight_rel`  (
   UNIQUE INDEX `uk_subject_exam`(`subject_id` ASC, `exam_spec_id` ASC) USING BTREE COMMENT '同一科目在同一考试规格下只能有一条记录',
   INDEX `idx_exam_spec`(`exam_spec_id` ASC) USING BTREE COMMENT '考试规格索引',
   INDEX `idx_subject`(`subject_id` ASC) USING BTREE COMMENT '科目索引'
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '科目权重映射表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '科目权重映射表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for user

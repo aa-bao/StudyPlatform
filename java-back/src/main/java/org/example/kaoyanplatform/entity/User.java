@@ -24,6 +24,7 @@ public class User {
     private Integer targetTotalScore;   // 目标总分
     private String examYear;            // 考研年份
     private String examSubjects;        // 公共课
+    private String motto;               // 个人简介/座右铭
 
     @TableField(fill = FieldFill.INSERT)
     @JsonProperty("createTime")

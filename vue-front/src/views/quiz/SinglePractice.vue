@@ -10,7 +10,7 @@
               <div class="header-left">
                 <el-button @click="goBack" circle icon="Back" class="back-btn" />
                 <div class="subject-info">
-                  <span class="subject-name">{{ $route.query.name || '专项练习' }}</span>
+                  <span class="subject-name">{{ isDailyTestMode ? '每日测试' : ($route.query.name || '专项练习') }}</span>
                   <span class="q-progress">进度 {{ currentIndex + 1 }} / {{ questions.length }}</span>
                 </div>
               </div>
@@ -68,14 +68,15 @@
           <div class="answer-card">
             <div class="answer-header">
               <div class="title-group">
-                <span class="title-text">请选择答案</span>
+                <span class="title-text">{{ getAnswerTitle() }}</span>
                 <span class="hint-text" v-if="currentQuestion.type === 2">(多选题)</span>
               </div>
               <el-button :icon="isCollected ? StarFilled : Star" :type="isCollected ? 'warning' : 'default'" circle
                 @click="handleCollectionClick" />
             </div>
 
-            <div class="options-container">
+            <!-- 选择题答题区 -->
+            <div v-if="currentQuestion.type === 1 || currentQuestion.type === 2" class="options-container">
               <div v-for="(opt, index) in currentQuestion.displayOptions" :key="index" class="option-item" :class="{
                 'selected': isOptionSelected(opt),
                 'disabled': hasSubmitted,
@@ -101,9 +102,86 @@
               </div>
             </div>
 
+            <!-- 填空题答题区 -->
+            <div v-else-if="currentQuestion.type === 3" class="fill-blank-area">
+              <el-input
+                v-model="userAnswer"
+                type="text"
+                placeholder="请输入你的答案，不会做请填「不知道」"
+                :disabled="hasSubmitted"
+                size="large"
+                class="fill-input"
+                :class="{
+                  'correct-input': hasSubmitted && isCorrect,
+                  'wrong-input': hasSubmitted && !isCorrect
+                }"
+                clearable
+              >
+                <template #prefix>
+                  <el-icon><EditPen /></el-icon>
+                </template>
+              </el-input>
+            </div>
+
+            <!-- 主观题答题区 -->
+            <div v-else-if="currentQuestion.type === 4" class="subjective-area">
+              <!-- 未提交状态 -->
+              <el-input
+                v-if="!hasSubmitted"
+                v-model="userAnswer"
+                type="textarea"
+                :rows="8"
+                placeholder="请输入你的答案，详细阐述你的思路和理由..."
+                class="subjective-input"
+                show-word-limit
+                maxlength="2000"
+              />
+              <!-- 已提交状态，显示自评界面 -->
+              <div v-else class="subjective-review-area">
+                <div class="reference-answer-box">
+                  <div class="ref-answer-label">参考答案：</div>
+                  <div class="ref-answer-content" v-html="renderLatex(correctAnswer || '暂无参考答案')"></div>
+                </div>
+                <div class="self-assessment-area">
+                  <div class="assessment-title">
+                    <el-icon><Warning /></el-icon>
+                    <span>请诚信选择你的答题情况：</span>
+                  </div>
+                  <div class="assessment-buttons">
+                    <el-button
+                      size="large"
+                      :disabled="isCorrect !== null"
+                      @click="selfAssess(true)"
+                      :class="['assess-btn', 'correct-btn', { 'is-selected': isCorrect === true }]"
+                    >
+                      <el-icon><Select /></el-icon>
+                      答对了
+                    </el-button>
+                    <el-button
+                      size="large"
+                      :disabled="isCorrect !== null"
+                      @click="selfAssess(false)"
+                      :class="['assess-btn', 'wrong-btn', { 'is-selected': isCorrect === false }]"
+                    >
+                      <el-icon><CloseBold /></el-icon>
+                      答错了
+                    </el-button>
+                  </div>
+                  <div class="integrity-notice">
+                    <el-icon><InfoFilled /></el-icon>
+                    <span>越真实的数据训练出的模型效果越符合你的水平！</span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="!hasSubmitted" class="input-hint">
+                <el-icon><InfoFilled /></el-icon>
+                <span>主观题提交后可查看参考答案并进行自评</span>
+              </div>
+            </div>
+
             <!-- 提交后的简短状态栏 (不显示解析) -->
             <transition name="el-zoom-in-top">
-              <div v-if="hasSubmitted" class="status-bar" :class="isCorrect ? 'success-bar' : 'error-bar'">
+              <div v-if="hasSubmitted && currentQuestion.type !== 4" class="status-bar" :class="isCorrect ? 'success-bar' : 'error-bar'">
                 <div class="status-content">
                   <el-icon v-if="isCorrect" size="20">
                     <Select />
@@ -134,12 +212,13 @@
               </div>
 
               <el-button type="primary" class="submit-btn" @click="submitAnswer" v-if="!hasSubmitted"
-                :disabled="!userAnswer || (Array.isArray(userAnswer) && userAnswer.length === 0)" round>
+                :disabled="!canSubmit()" round>
                 提交答案
               </el-button>
 
-              <el-button type="success" class="next-btn" @click="nextQuestion" v-else round>
-                {{ isLastQuestion ? '查看报告' : '下一题' }} <el-icon class="el-icon--right">
+              <el-button type="success" class="next-btn" @click="nextQuestion" v-else round
+                :disabled="currentQuestion.type === 4 && isCorrect === null">
+                {{ getNextButtonText() }} <el-icon class="el-icon--right">
                   <ArrowRight />
                 </el-icon>
               </el-button>
@@ -203,8 +282,8 @@
           <div class="analysis-q-type">{{ formatType(currentQuestion?.type) }}</div>
           <div class="analysis-q-stem" v-html="renderLatex(currentQuestion?.content)"></div>
 
-          <!-- 显示所有选项 -->
-          <div class="analysis-options-review">
+          <!-- 选择题显示所有选项 -->
+          <div v-if="currentQuestion?.type === 1 || currentQuestion?.type === 2" class="analysis-options-review">
             <div v-for="(opt, index) in currentQuestion?.displayOptions" :key="index" class="analysis-opt-item"
               v-show="opt !== '我不会做'" :class="{
                 'is-correct': isCorrectAnswer(opt),
@@ -227,7 +306,8 @@
           </div>
           <div class="result-item">
             <span class="label">你的答案：</span>
-            <span class="value" :class="isCorrect ? 'correct' : 'wrong'">{{ userAnswer }}</span>
+            <span class="value" :class="getAnswerClass()">{{ formatUserAnswerForDisplay() }}</span>
+            <el-tag v-if="currentQuestion?.type === 4 && isCorrect === null" type="warning" size="small" style="margin-left: 8px">未自评</el-tag>
           </div>
         </div>
 
@@ -245,7 +325,7 @@
     </el-dialog>
 
     <!-- 结果统计弹窗 -->
-    <el-dialog v-model="showReport" title="本次练习报告" width="420px" center destroy-on-close custom-class="report-dialog"
+    <el-dialog v-model="showReport" :title="isDailyTestMode ? '每日测试报告' : '本次练习报告'" width="420px" center destroy-on-close custom-class="report-dialog"
       top="5vh">
       <div class="report-dashboard">
         <div class="score-circle">
@@ -288,8 +368,8 @@
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="restartPractice" icon="Refresh">再练一次</el-button>
-          <el-button type="primary" @click="$router.push('/user/subject')" icon="Back">返回题库</el-button>
+          <el-button v-if="!isDailyTestMode" @click="restartPractice" icon="Refresh">再练一次</el-button>
+          <el-button type="primary" @click="goBack" icon="Back">{{ isDailyTestMode ? '返回首页' : '返回题库' }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -387,15 +467,21 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
-import { Select, CloseBold, Back, ArrowLeft, ArrowRight, EditPen, Delete, Close, List, Refresh, Reading, RefreshLeft, Star, StarFilled, Plus } from '@element-plus/icons-vue'
+import { Select, CloseBold, Back, ArrowLeft, ArrowRight, EditPen, Delete, Close, List, Refresh, Reading, RefreshLeft, Star, StarFilled, Plus, InfoFilled, Warning } from '@element-plus/icons-vue'
 import katex from 'katex'
+import { getDailyTestQuestionsApi } from '@/api/user'
 
 const route = useRoute()
 const router = useRouter()
 
+const isDailyTestMode = computed(() => route.path === '/user/daily-test')
+
 const goBack = () => {
-  // 直接返回到科目选择首页 (SubjectList)
-  router.push('/user/subject')
+  if (isDailyTestMode.value) {
+    router.push('/user/home')
+  } else {
+    router.push('/user/subject')
+  }
 }
 
 const mode = ref('daily')
@@ -468,11 +554,35 @@ const progressPercentage = computed(() => {
   return Math.round(((currentIndex.value + 1) / questions.value.length) * 100)
 })
 
-// 初始化
 const loadQuestions = async () => {
-  // 优先使用 bookId 查询 (新逻辑)
-  // 兼容旧逻辑：如果只有 name (source) 也可以查
-  const bookId = route.params.subjectId // 注意：路由参数名暂未改，这里其实是 bookId
+  if (isDailyTestMode.value) {
+    await loadDailyTestQuestions()
+  } else {
+    await loadSubjectQuestions()
+  }
+}
+
+const loadDailyTestQuestions = async () => {
+  const userId = JSON.parse(localStorage.getItem('user') || '{}').id
+  if (!userId) {
+    ElMessage.error('未登录，请先登录')
+    router.push('/login')
+    return
+  }
+
+  const res = await getDailyTestQuestionsApi(userId)
+  if (res.code === 200 && res.data && res.data.length > 0) {
+    questions.value = res.data
+    loadQuestionAtIndex(0)
+    startTimer()
+  } else {
+    ElMessage.info(res.msg || '暂无每日测试题目，先去刷题吧！')
+    router.push('/user/home')
+  }
+}
+
+const loadSubjectQuestions = async () => {
+  const bookId = route.params.subjectId
   const sourceName = route.query.name
 
   const res = await request.get('/question/list-by-subject', {
@@ -510,13 +620,19 @@ const loadQuestionAtIndex = (index) => {
   showAnalysisDialog.value = false
   currentQuestionStartTime.value = Date.now()
 
-  // 处理选项随机化
-  // 1. 获取原始选项
-  let rawOptions = [...currentQuestion.value.options]
-  // 2. 随机打乱
-  rawOptions.sort(() => Math.random() - 0.5)
-  // 3. 添加"不会做"作为固定选项
-  currentQuestion.value.displayOptions = [...rawOptions, "我不会做"]
+  // 只对选择题处理选项随机化
+  if (currentQuestion.value.type === 1 || currentQuestion.value.type === 2) {
+    // 处理选项随机化
+    // 1. 获取原始选项
+    let rawOptions = [...currentQuestion.value.options]
+    // 2. 随机打乱
+    rawOptions.sort(() => Math.random() - 0.5)
+    // 3. 添加"不会做"作为固定选项
+    currentQuestion.value.displayOptions = [...rawOptions, "我不会做"]
+  } else {
+    // 填空题和主观题没有选项
+    currentQuestion.value.displayOptions = []
+  }
 
   // 检查收藏状态
   checkCollectionStatus()
@@ -533,7 +649,7 @@ const loadQuestionAtIndex = (index) => {
     if (currentQuestion.value.type === 2) {
       userAnswer.value = [] // 多选初始化为数组
     } else {
-      userAnswer.value = ''
+      userAnswer.value = '' // 单选、填空、主观题都初始化为字符串
     }
     hasSubmitted.value = false
     isCorrect.value = false
@@ -543,6 +659,63 @@ const loadQuestionAtIndex = (index) => {
 }
 
 const formatType = (type) => ({ 1: '单选', 2: '多选', 3: '填空', 4: '简答' }[type] || '未知')
+
+const getAnswerTitle = () => {
+  const type = currentQuestion.value?.type
+  if (type === 1) return '请选择答案'
+  if (type === 2) return '请选择答案'
+  if (type === 3) return '请填写答案'
+  if (type === 4) return '请作答'
+  return '请作答'
+}
+
+const formatUserAnswerForDisplay = () => {
+  if (Array.isArray(userAnswer.value)) {
+    return userAnswer.value.map(opt => {
+      if (typeof opt === 'object' && opt !== null) {
+        return opt.text || opt.label || JSON.stringify(opt)
+      }
+      return String(opt)
+    }).join(', ')
+  }
+  return userAnswer.value || ''
+}
+
+const canSubmit = () => {
+  // 选择题：需要有选择
+  if (currentQuestion.value.type === 1 || currentQuestion.value.type === 2) {
+    return userAnswer.value && (!Array.isArray(userAnswer.value) || userAnswer.value.length > 0)
+  }
+  // 填空题和主观题：需要有输入内容
+  return userAnswer.value && userAnswer.value.trim().length > 0
+}
+
+// 主观题自评
+const selfAssess = (correct) => {
+  isCorrect.value = correct
+  historyMap.value[currentIndex.value].isCorrect = correct
+
+  // 提示用户自评结果
+  if (correct) {
+    ElMessage.success('已标记为答对，继续保持！')
+  } else {
+    ElMessage.info('已标记为答错，查看解析加强理解')
+  }
+}
+
+const getNextButtonText = () => {
+  if (currentQuestion.value.type === 4 && isCorrect.value === null) {
+    return '请先自评'
+  }
+  return isLastQuestion.value ? '查看报告' : '下一题'
+}
+
+const getAnswerClass = () => {
+  if (currentQuestion.value?.type === 4 && isCorrect.value === null) {
+    return '' // 主观题未自评时不显示颜色
+  }
+  return isCorrect.value ? 'correct' : 'wrong'
+}
 
 // 选项交互逻辑
 // 获取选项的唯一标识用于比较
@@ -633,15 +806,25 @@ const formatOptionText = (text) => {
 }
 
 const submitAnswer = async () => {
-  if (!userAnswer.value || (Array.isArray(userAnswer.value) && userAnswer.value.length === 0)) {
-    return ElMessage.warning('请先选择答案')
-  }
+  // 选择题验证
+  if (currentQuestion.value.type === 1 || currentQuestion.value.type === 2) {
+    if (!userAnswer.value || (Array.isArray(userAnswer.value) && userAnswer.value.length === 0)) {
+      return ElMessage.warning('请先选择答案')
+    }
 
-  // 检查是否选了"不会做"
-  if (userAnswer.value === '不会做') {
-    await processSubmission(null, true)
-  } else {
-    await processSubmission(userAnswer.value)
+    // 检查是否选了"不会做"
+    if (userAnswer.value === '不会做') {
+      await processSubmission(null, true)
+    } else {
+      await processSubmission(userAnswer.value)
+    }
+  }
+  // 填空题和主观题验证
+  else if (currentQuestion.value.type === 3 || currentQuestion.value.type === 4) {
+    if (!userAnswer.value || !userAnswer.value.trim()) {
+      return ElMessage.warning('请先输入答案')
+    }
+    await processSubmission(userAnswer.value.trim())
   }
 }
 
@@ -664,6 +847,7 @@ const processSubmission = async (rawAnswer, isUnknown = false) => {
     const index = currentQuestion.value.options.indexOf(rawAnswer)
     if (index !== -1) finalAnswer = String.fromCharCode(65 + index)
   } else {
+    // 填空题和主观题：直接使用用户输入
     finalAnswer = rawAnswer
   }
 
@@ -673,16 +857,23 @@ const processSubmission = async (rawAnswer, isUnknown = false) => {
     questionId: currentQuestion.value.id,
     userAnswer: finalAnswer,
     userId: JSON.parse(localStorage.getItem('user')).id,
-    duration: duration > 0 ? duration : 1
+    duration: duration > 0 ? duration : 1,
+    source: isDailyTestMode.value ? 'daily_test' : 'single_practice'
   }
 
   const res = await request.post('/record/submit', payload)
 
   if (res.code === 200) {
     hasSubmitted.value = true
-    isCorrect.value = res.data.isCorrect === 1
     correctAnswer.value = res.data.correctAnswer
     analysis.value = res.data.analysis
+
+    // 主观题不自动判定正误，等待用户自评
+    if (currentQuestion.value.type === 4) {
+      isCorrect.value = null // null 表示未自评
+    } else {
+      isCorrect.value = res.data.isCorrect === 1
+    }
 
     historyMap.value[currentIndex.value] = {
       userAnswer: isUnknown ? '我不会做' : rawAnswer, // 保存当前状态（可能是数组或字符串）
@@ -718,6 +909,8 @@ const restartPractice = () => {
 const getReviewClass = (index) => {
   const record = historyMap.value[index]
   if (!record || !record.hasSubmitted) return 'unanswered'
+  // 主观题未自评的情况
+  if (record.isCorrect === null) return 'pending'
   return record.isCorrect ? 'correct' : 'wrong'
 }
 
@@ -1312,6 +1505,257 @@ const renderLatex = (content) => {
   font-weight: bold;
 }
 
+/* 填空题答题区 */
+.fill-blank-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.fill-input {
+  font-size: 18px;
+}
+
+.fill-input :deep(.el-input__wrapper) {
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 2px solid #e4e7ed;
+  transition: all 0.3s;
+  box-shadow: none;
+}
+
+.fill-input :deep(.el-input__wrapper:hover) {
+  border-color: #409EFF;
+}
+
+.fill-input :deep(.el-input__wrapper.is-focus) {
+  border-color: #409EFF;
+  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.1);
+}
+
+.fill-input.correct-input :deep(.el-input__wrapper) {
+  border-color: #67C23A;
+  background-color: #f0f9eb;
+}
+
+.fill-input.wrong-input :deep(.el-input__wrapper) {
+  border-color: #F56C6C;
+  background-color: #fef0f0;
+}
+
+/* 主观题答题区 */
+.subjective-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.subjective-input {
+  font-size: 16px;
+}
+
+.subjective-input :deep(.el-textarea__inner) {
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 2px solid #e4e7ed;
+  transition: all 0.3s;
+  line-height: 1.8;
+  resize: none;
+}
+
+.subjective-input :deep(.el-textarea__inner:hover) {
+  border-color: #409EFF;
+}
+
+.subjective-input :deep(.el-textarea__inner:focus) {
+  border-color: #409EFF;
+  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.1);
+}
+
+.subjective-input.correct-input :deep(.el-textarea__inner) {
+  border-color: #67C23A;
+  background-color: #f0f9eb;
+}
+
+.subjective-input.wrong-input :deep(.el-textarea__inner) {
+  border-color: #F56C6C;
+  background-color: #fef0f0;
+}
+
+/* 输入提示 */
+.input-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f4f4f5;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.5;
+}
+
+.input-hint .el-icon {
+  font-size: 16px;
+  color: #409EFF;
+}
+
+/* 主观题自评区域 */
+.subjective-review-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+
+.reference-answer-box {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.ref-answer-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 12px;
+}
+
+.ref-answer-content {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #212529;
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.self-assessment-area {
+  background: #fff9e6;
+  border: 2px solid #ffeaa7;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.assessment-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #d68910;
+  margin-bottom: 20px;
+}
+
+.assessment-title .el-icon {
+  font-size: 20px;
+}
+
+.assessment-buttons {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.assess-btn {
+  flex: 1;
+  height: 56px;
+  font-size: 17px;
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 答对了按钮 - 绿色渐变 */
+.correct-btn {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-color: #81c784;
+  color: #2e7d32;
+}
+
+.correct-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+  border-color: #66bb6a;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(76, 175, 80, 0.3);
+}
+
+.correct-btn.is-selected {
+  background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+  border-color: #1b5e20;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(46, 125, 50, 0.4);
+}
+
+/* 答错了按钮 - 红色渐变 */
+.wrong-btn {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  border-color: #e57373;
+  color: #c62828;
+}
+
+.wrong-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffcdd2 0%, #ef9a9a 100%);
+  border-color: #ef5350;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(244, 67, 54, 0.3);
+}
+
+.wrong-btn.is-selected {
+  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+  border-color: #b71c1c;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(198, 40, 40, 0.4);
+}
+
+/* 按钮图标样式 */
+.assess-btn .el-icon {
+  font-size: 20px;
+  margin-right: 6px;
+}
+
+/* 禁用状态 */
+.assess-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.integrity-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f1f3f5;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #495057;
+  line-height: 1.6;
+}
+
+.integrity-notice .el-icon {
+  font-size: 16px;
+  color: #228be6;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
 /* 状态栏 (内联状态) */
 .status-bar {
   display: flex;
@@ -1617,14 +2061,6 @@ const renderLatex = (content) => {
   padding-top: 20px;
 }
 
-.review-title {
-  font-size: 14px;
-  font-weight: bold;
-  color: #606266;
-  margin-bottom: 12px;
-  text-align: left;
-}
-
 .review-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -1657,6 +2093,12 @@ const renderLatex = (content) => {
   background: #fef0f0;
   color: #F56C6C;
   border: 1px solid #fab6b6;
+}
+
+.review-item.pending {
+  background: #fff9e6;
+  color: #E6A23C;
+  border: 1px solid #fad88b;
 }
 
 .review-item:hover {

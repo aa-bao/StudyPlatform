@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
 const request = axios.create({
     baseURL: 'http://localhost:8081',
@@ -9,6 +10,11 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
     config => {
+        const userStore = useUserStore()
+        const token = userStore.token
+        if (token && token.trim()) {
+            config.headers.Authorization = `Bearer ${token}`
+        }
         return config
     },
     error => {
@@ -47,6 +53,13 @@ request.interceptors.response.use(
             } catch (e) {
                 msg = errorText || msg
             }
+        } else if (error.response?.status === 401) {
+            // 处理 token 过期或未授权
+            msg = '登录已过期，请重新登录'
+            const userStore = useUserStore()
+            userStore.clearUserInfo()
+            // 跳转到登录页面
+            window.location.href = '/login'
         }
         ElMessage.error(msg || '网络请求失败')
         return Promise.reject(error)

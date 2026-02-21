@@ -1,15 +1,11 @@
 package org.example.kaoyanplatform.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.kaoyanplatform.client.PythonBackendClient;
 import org.example.kaoyanplatform.common.Result;
 import org.example.kaoyanplatform.entity.Question;
-import org.example.kaoyanplatform.entity.ErrorQuestion;
-import org.example.kaoyanplatform.entity.ExerciseBook;
-import org.example.kaoyanplatform.entity.Subject;
 import org.example.kaoyanplatform.entity.dto.QuestionDTO;
 import org.example.kaoyanplatform.entity.dto.QuestionImportDTO;
 import org.example.kaoyanplatform.entity.dto.QuestionExportDTO;
@@ -40,13 +36,8 @@ public class QuestionController {
     private QuestionService questionService;
 
     @Autowired
-    private ErrorQuestionService mistakeRecordService;
-
-    @Autowired
     private SubjectService subjectService;
 
-    @Autowired
-    private ExerciseBookService bookService;
 
     @Autowired
     private QuestionSubjectRelService mapQuestionSubjectService;
@@ -57,8 +48,6 @@ public class QuestionController {
     @Autowired
     private PdfExportService pdfExportService;
 
-    @Autowired
-    private QuestionPaperRelService mapPaperQuestionService;
 
     @Autowired
     private PythonBackendClient pythonBackendClient;
@@ -167,145 +156,26 @@ public class QuestionController {
     // 10. 手动保存错题
     @PostMapping("/saveWrong")
     @Operation(summary = "保存错题")
-    public Result saveWrong(@RequestBody ErrorQuestion mistakeRecord) {
-        if (mistakeRecord.getUserId() == null || mistakeRecord.getQuestionId() == null) {
+    public Result saveWrong(@RequestParam Integer userId, @RequestParam Long questionId) {
+        if (userId == null || questionId == null) {
             return Result.error("参数不完整");
         }
-        LambdaQueryWrapper<ErrorQuestion> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ErrorQuestion::getUserId, mistakeRecord.getUserId())
-                .eq(ErrorQuestion::getQuestionId, mistakeRecord.getQuestionId());
-
-        if (mistakeRecordService.count(wrapper) == 0) {
-            mistakeRecordService.save(mistakeRecord);
-        }
-        return Result.success("错题已记录");
+        
+        boolean success = questionService.saveWrongQuestion(userId, questionId);
+        return success ? Result.success("错题已记录") : Result.error("保存失败");
     }
 
     // 11. JSON批量导入题目
     @PostMapping("/import")
     @Operation(summary = "JSON批量导入题目", description = "接收JSON格式的题目数据，批量导入题库")
     public Result importQuestions(@RequestBody QuestionImportDTO importDTO) {
-        if (importDTO.getQuestions() == null || importDTO.getQuestions().isEmpty()) {
-            return Result.error("题目列表不能为空");
-        }
-
-        if (importDTO.getSubjectIds() == null || importDTO.getSubjectIds().isEmpty()) {
-            return Result.error("科目ID不能为空");
-        }
-
-        // 验证科目是否存在
-        for (Integer subjectId : importDTO.getSubjectIds()) {
-            if (subjectService.getById(subjectId) == null) {
-                return Result.error("科目ID: " + subjectId + " 不存在");
-            }
-        }
-
         try {
-            Integer bookId = importDTO.getBookId();
-
-            // 如果新建习题册
-            if (bookId == null && importDTO.getNewBookName() != null && !importDTO.getNewBookName().trim().isEmpty()) {
-                ExerciseBook newBook = new ExerciseBook();
-                newBook.setName(importDTO.getNewBookName().trim());
-                newBook.setDescription("通过JSON导入自动创建");
-                bookService.save(newBook);
-                bookId = newBook.getId();
-            } else if (bookId != null) {
-                // 验证书本是否存在
-                if (bookService.getById(bookId) == null) {
-                    return Result.error("习题册不存在");
-                }
-            }
-
-            // 最终使用的习题册ID
-            Integer finalBookId = bookId;
-
-            // 去重检查，默认启用
-            boolean checkDuplicate = importDTO.getCheckDuplicate() != null && importDTO.getCheckDuplicate();
-
-            // 批量保存题目
-            int successCount = 0;
-            int duplicateCount = 0;
-            int failCount = 0;
-            List<String> errorMessages = new ArrayList<>();
-
-            for (QuestionImportDTO.QuestionImportItem item : importDTO.getQuestions()) {
-                try {
-                    // 去重检查
-                    if (checkDuplicate && questionService.isQuestionExist(item.getContent())) {
-                        duplicateCount++;
-                        continue;
-                    }
-
-                    // 构造 QuestionDTO
-                    QuestionDTO questionDTO = new QuestionDTO();
-                    questionDTO.setType(item.getType());
-                    questionDTO.setContent(item.getContent());
-
-                    // 处理选项：支持旧格式（字符串数组）和新格式（对象数组）
-                    if (item.getOptions() != null) {
-                        // 如果传入的是字符串数组，转换为对象数组格式
-                        if (item.getOptions() instanceof List) {
-                            List<?> optionsList = (List<?>) item.getOptions();
-                            if (!optionsList.isEmpty() && optionsList.get(0) instanceof String) {
-                                // 旧格式：["选项1", "选项2", "选项3", "选项4"]
-                                // 转换为新格式：[{"label": "A", "text": "选项1"}, ...]
-                                List<Map<String, String>> formattedOptions = new ArrayList<>();
-                                String[] labels = {"A", "B", "C", "D", "E", "F"};
-                                for (int i = 0; i < optionsList.size() && i < labels.length; i++) {
-                                    Map<String, String> option = new java.util.HashMap<>();
-                                    option.put("label", labels[i]);
-                                    option.put("text", (String) optionsList.get(i));
-                                    formattedOptions.add(option);
-                                }
-                                questionDTO.setOptions(formattedOptions);
-                            } else if (optionsList.get(0) instanceof Map) {
-                                // 新格式：已经是对象数组，直接使用
-                                questionDTO.setOptions((List<Map<String, String>>) (List<?>) optionsList);
-                            }
-                        }
-                    }
-
-                    questionDTO.setAnswer(item.getAnswer());
-                    questionDTO.setAnalysis(item.getAnalysis());
-                    questionDTO.setTags(item.getTags());
-                    questionDTO.setSource(item.getSource());
-                    questionDTO.setSubjectIds(importDTO.getSubjectIds());
-
-                    // 只有在有习题册ID时才设置
-                    if (finalBookId != null) {
-                        questionDTO.setBookIds(Collections.singletonList(finalBookId));
-                    }
-
-                    // 保存题目
-                    boolean success = questionService.saveQuestionWithRelations(questionDTO);
-                    if (success) {
-                        successCount++;
-                    } else {
-                        failCount++;
-                        String content = item.getContent() != null
-                            ? item.getContent().substring(0, Math.min(50, item.getContent().length()))
-                            : "(无内容)";
-                        errorMessages.add("题目保存失败: " + content);
-                    }
-                } catch (Exception e) {
-                    failCount++;
-                    errorMessages.add("题目导入失败: " + e.getMessage());
-                }
-            }
-
-            String resultMessage = String.format("导入完成！成功: %d, 跳过重复: %d, 失败: %d", successCount, duplicateCount, failCount);
-            if (!errorMessages.isEmpty()) {
-                resultMessage += "\n错误信息:\n" + String.join("\n", errorMessages.subList(0, Math.min(5, errorMessages.size())));
-                if (errorMessages.size() > 5) {
-                    resultMessage += "\n...还有 " + (errorMessages.size() - 5) + " 条错误";
-                }
-            }
-
+            String resultMessage = questionService.importQuestions(importDTO);
             return Result.success(resultMessage);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Result.error("导入失败: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
         }
     }
 
@@ -315,41 +185,9 @@ public class QuestionController {
     public Result previewExportQuestions(@RequestBody QuestionExportDTO exportDTO) {
         try {
             List<Question> questions = questionService.getQuestionsByExportConfig(exportDTO);
-
-            // 加载题目详情（科目、书本等）
-            for (Question question : questions) {
-                List<Integer> bookIds = mapQuestionBookService.getBookIdsByQuestionId(question.getId());
-                question.setBookIds(bookIds != null ? bookIds : Collections.emptyList());
-
-                if (bookIds != null && !bookIds.isEmpty()) {
-                    List<String> bookNames = new ArrayList<>();
-                    for (Integer bookIdTemp : bookIds) {
-                        ExerciseBook book = bookService.getById(bookIdTemp);
-                        if (book != null) {
-                            bookNames.add(book.getName());
-                        }
-                    }
-                    question.setBookNames(bookNames);
-                }
-
-                List<Integer> subjectIds = mapQuestionSubjectService.getSubjectIdsByQuestionId(question.getId());
-                question.setSubjectIds(subjectIds != null ? subjectIds : Collections.emptyList());
-
-                if (subjectIds != null && !subjectIds.isEmpty()) {
-                    List<String> subjectNames = new ArrayList<>();
-                    for (Integer subjectIdTemp : subjectIds) {
-                        Subject subject = subjectService.getById(subjectIdTemp);
-                        if (subject != null) {
-                            subjectNames.add(subject.getName());
-                        }
-                    }
-                    question.setSubjectNames(subjectNames);
-                }
-            }
-
-            return Result.success(questions);
+            List<Question> detailedQuestions = questionService.previewExportQuestions(questions);
+            return Result.success(detailedQuestions);
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("预览失败: " + e.getMessage());
         }
     }
@@ -387,7 +225,7 @@ public class QuestionController {
     @Operation(summary = "AI图片识别题目", description = "使用智谱GLM-4.6V-Flash API识别图片中的题目内容")
     public Result recognizeQuestion(@RequestParam("file") MultipartFile file) {
         try {
-            QuestionDTO questionDTO = pythonBackendClient.recognizeQuestion(file);
+            QuestionDTO questionDTO = questionService.recognizeQuestion(file);
             return Result.success(questionDTO);
         } catch (IllegalArgumentException e) {
             return Result.error(e.getMessage());

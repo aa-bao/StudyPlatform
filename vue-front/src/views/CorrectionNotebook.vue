@@ -154,7 +154,7 @@ import katex from 'katex'
 // 导入自定义图标
 import politicsIcon from '@/assets/icons/politics.svg?url'
 import englishIcon from '@/assets/icons/english.svg?url'
-import mathIcon from '@/assets/icons/math_1.svg?url'
+import mathIcon from '@/assets/icons/math.svg?url'
 import csIcon from '@/assets/icons/408.svg?url'
 
 // 状态管理

@@ -43,3 +43,17 @@ export function getLearningRanking(limit = 10) {
         params: { limit }
     })
 }
+
+/**
+ * 获取学习热力图数据
+ * @param {Number|String} userId 用户ID
+ * @param {Number} days 查询天数，默认180天
+ * @returns {Promise} 返回热力图数据
+ */
+export function getStudyHeatmap(userId, days = 180) {
+    return request({
+        url: `/user-progress/heatmap/${userId}`,
+        method: 'get',
+        params: { days }
+    })
+}

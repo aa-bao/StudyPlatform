@@ -5,11 +5,7 @@
             <el-aside v-if="!route.meta.hideLayout" width="70px" class="aside-menu">
                 <div class="logo-box">
                     <div class="logo-icon-wrapper">
-                        <svg class="logo-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M14 16C14 14.8954 14.8954 14 16 14H20C21.1046 14 22 14.8954 22 16V32C22 33.1046 21.1046 34 20 34H16C14.8954 34 14 33.1046 14 32V16Z" fill="white" fill-opacity="0.9"/>
-                            <path d="M26 20C26 18.8954 26.8954 18 28 18H32C33.1046 18 34 18.8954 34 20V32C34 33.1046 33.1046 34 32 34H28C26.8954 34 26 33.1046 26 32V20Z" fill="white" fill-opacity="0.9"/>
-                            <circle cx="24" cy="38" r="2" fill="white" fill-opacity="0.6"/>
-                        </svg>
+                        <span class="logo-letter">Y</span>
                     </div>
                 </div>
 
@@ -275,9 +271,9 @@ const router = useRouter()
 const route = useRoute();
 const userStore = useUserStore() // 使用 store
 const transitionStore = useTransitionStore()
-const activeMenu = computed(() => router.path)
+const activeMenu = computed(() => route.path)
 
-// 页面进入动画状态 - 从 store 获取
+// 从 store 获取页面进入动画状态
 const isTransitioningFromHome = computed(() => transitionStore.isEnteringLayout)
 
 // 监听 store 中的 userInfo 变化
@@ -290,7 +286,7 @@ const userName = computed(() => {
 })
 
 const userAvatar = computed(() => {
-    return userStore.userInfo.avatar || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
+    return userStore.userInfo.avatar
 })
 
 const userRole = computed(() => {
@@ -413,15 +409,11 @@ const abandonExam = () => {
     })
 }
 
-// 组件挂载时检测未完成考试
 onMounted(() => {
-    // 延迟1秒检测，避免页面加载时立即弹窗影响体验
     setTimeout(() => {
         checkIncompleteExam()
     }, 1000)
 
-    // 检测是否从 Home 页面进入，触发偏移补偿动画
-    // 通过检查 referrer 或路由状态判断
     const fromHome = router.options.history.state?.back === '/user/home' ||
                       document.referrer.includes('/user/home')
 
@@ -491,12 +483,13 @@ onMounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    
 }
 
-.logo-icon {
-    width: 100%;
-    height: 100%;
+.logo-letter {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+    line-height: 1;
     animation: logoFloat 3s ease-in-out infinite;
 }
 
@@ -601,9 +594,8 @@ onMounted(() => {
 }
 
 .menu-item.active .menu-icon-svg {
-    filter: invert(0%) sepia(0%) saturate(100%) hue-rotate(0deg) brightness(100%) contrast(100%);
+    filter: invert(42%) sepia(98%) saturate(1814%) hue-rotate(189deg) brightness(99%) contrast(91%);
     transform: scale(1.15);
-    filter: drop-shadow(0 0 8px rgba(64, 158, 255, 0.5));
 }
 
 /* 菜单文字 - 默认隐藏 */

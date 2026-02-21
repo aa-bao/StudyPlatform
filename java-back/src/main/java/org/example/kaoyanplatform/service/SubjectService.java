@@ -98,4 +98,13 @@ public interface SubjectService extends IService<Subject> {
      * 批量更新科目排序
      */
     boolean batchUpdateSort(List<Subject> subjects);
+
+    /**
+     * 获取知识点树（Level 3+）
+     * 用于题目编辑时选择知识点
+     *
+     * @param examSpecId 考试规格ID（可选），如果提供则返回该考试规格下的知识点树
+     * @return 知识点树（只包含 Level 3 及以上的节点）
+     */
+    List<SubjectDTO> getKnowledgePoints(Integer examSpecId);
 }

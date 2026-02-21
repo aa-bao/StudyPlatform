@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.kaoyanplatform.common.Result;
 import org.example.kaoyanplatform.entity.AnswerRecord;
+import org.example.kaoyanplatform.entity.dto.StudyHeatmapDTO;
 import org.example.kaoyanplatform.service.RecordService;
 import org.example.kaoyanplatform.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -95,22 +96,26 @@ public class UserProgressController {
                         .filter(r -> r.getIsCorrect() != null && r.getIsCorrect() == 1)
                         .count();
 
+                    // 计算正确率（返回Double类型）
+                    double accuracy = totalFinished > 0 ? (double) totalCorrect / totalFinished * 100 : 0.0;
+
+                    // 获取用户信息
+                    var user = userService.getById(entry.getKey());
+
                     Map<String, Object> item = new HashMap<>();
-                    item.put("user_id", entry.getKey());
-                    item.put("total_finished", totalFinished);
-                    item.put("total_correct", totalCorrect);
+                    item.put("userId", entry.getKey());
+                    item.put("nickname", user != null ? user.getNickname() : "未知用户");
+                    item.put("avatar", user != null ? user.getAvatar() : "/img/default-avatar.png");
+                    item.put("totalQuestions", totalFinished);
+                    item.put("totalCorrect", totalCorrect);
+                    item.put("accuracy", accuracy);
                     return item;
                 })
                 .sorted((a, b) -> {
-                    int finishedA = (Integer) a.get("total_finished");
-                    int finishedB = (Integer) b.get("total_finished");
-                    int correctA = (Integer) a.get("total_correct");
-                    int correctB = (Integer) b.get("total_correct");
-                    // 先按完成数排序，再按正确数排序
-                    if (finishedA != finishedB) {
-                        return Integer.compare(finishedB, finishedA);
-                    }
-                    return Integer.compare(correctB, correctA);
+                    int finishedA = (Integer) a.get("totalQuestions");
+                    int finishedB = (Integer) b.get("totalQuestions");
+                    // 先按完成数排序
+                    return Integer.compare(finishedB, finishedA);
                 })
                 .limit(limit)
                 .collect(Collectors.toList());
@@ -183,5 +188,28 @@ public class UserProgressController {
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
+    }
+
+    /**
+     * 获取学习热力图数据
+     */
+    @GetMapping("/heatmap/{userId}")
+    @Operation(summary = "获取学习热力图数据", description = """
+            获取用户最近N天的学习热力图数据，包括每日学习时长和答题数量。
+            参数:
+            - userId: 用户ID
+            - days: 查询天数（默认180，最大365）
+            """)
+    public Result<List<StudyHeatmapDTO>> getStudyHeatmap(
+            @Parameter(description = "用户ID", required = true)
+            @PathVariable Long userId,
+            @Parameter(description = "查询天数", example = "180")
+            @RequestParam(defaultValue = "180") Integer days) {
+
+        if (days > 365) days = 365;
+        if (days < 1) days = 1;
+
+        List<StudyHeatmapDTO> data = recordService.getDailyStudyStats(userId, days);
+        return Result.success(data);
     }
 }

@@ -1,287 +1,278 @@
 <template>
     <div class="dashboard-container">
-        <!-- 顶部筛选区域 -->
-        <div class="dashboard-header">
-            <div class="welcome-section">
-                <h1>数据看板 </h1>
-                <span class="subtitle">学习数据全景分析</span>
-                <p class="last-update">最后更新: {{ lastUpdateTime }}</p>
-            </div>
-
-            <div class="header-actions">
-                <el-date-picker v-model="dateRange" type="daterange" range-separator="至" start-placeholder="开始日期"
-                    end-placeholder="结束日期" :shortcuts="shortcuts" @change="handleDateChange" />
-                <el-select v-model="subjectFilter" placeholder="选择科目" @change="handleSubjectChange">
-                    <el-option label="全部科目" value="all" />
-                    <el-option v-for="subject in allSubjects" :key="subject.id" :label="subject.name"
-                        :value="subject.id" />
-                </el-select>
-                <el-button type="primary" @click="exportReport">
-                    <el-icon :size="24">
-                        <Download />
-                    </el-icon>
-                    导出学习报告
-                </el-button>
-            </div>
+        <!-- 加载状态 -->
+        <div v-if="loading" class="loading-state">
+            <el-icon class="is-loading" :size="48">
+                <Loading />
+            </el-icon>
+            <p>数据加载中...</p>
         </div>
 
-        <!-- 第一行：核心指标卡片 -->
-        <div class="stats-grid">
-            <div class="stat-card" @click="goToPractice()">
-                <div class="stat-header">
-                    <h3>累计刷题</h3>
-                    <el-icon name="Collection" class="stat-icon" />
-                </div>
-                <div class="stat-value">{{ coreStats.totalQuestions }}</div>
-                <div class="stat-trend positive">
-                    <el-icon name="Top" /> +{{ coreStats.todayQuestions }} 今日
-                </div>
-            </div>
-
-            <div class="stat-card" @click="viewMistakeAnalysis()">
-                <div class="stat-header">
-                    <h3>总体正确率</h3>
-                    <el-icon name="Promotion" class="stat-icon" />
-                </div>
-                <div class="stat-value">{{ coreStats.accuracy }}%</div>
-                <div class="stat-trend" :class="coreStats.accuracyTrend > 0 ? 'positive' : 'negative'">
-                    <el-icon :name="coreStats.accuracyTrend > 0 ? 'Top' : 'Bottom'" />
-                    {{ Math.abs(coreStats.accuracyTrend) }}% {{ coreStats.accuracyTrend > 0 ? '上升' : '下降' }}
-                </div>
-            </div>
-
-            <div class="stat-card" @click="viewStudyTime()">
-                <div class="stat-header">
-                    <h3>累计学习时长</h3>
-                    <el-icon name="Timer" class="stat-icon" />
-                </div>
-                <div class="stat-value">{{ coreStats.totalStudyHours }}h</div>
-                <div class="stat-trend positive">
-                    <el-icon name="Top" /> +{{ coreStats.todayStudyHours }}h 今日
-                </div>
-            </div>
-
-            <div class="stat-card" @click="viewMistakes()">
-                <div class="stat-header">
-                    <h3>错题本数量</h3>
-                    <el-icon name="Failed" class="stat-icon" />
-                </div>
-                <div class="stat-value">{{ coreStats.mistakeCount }}</div>
-                <div class="stat-trend negative">
-                    <el-icon name="Bottom" /> +{{ coreStats.newMistakes }} 今日新增
-                </div>
-            </div>
+        <!-- 错误状态 -->
+        <div v-else-if="error" class="error-state">
+            <el-alert
+                title="加载失败"
+                type="error"
+                :description="error"
+                show-icon
+                :closable="false"
+            />
+            <el-button @click="loadDashboardData" type="primary" style="margin-top: 20px;">重新加载</el-button>
         </div>
 
-        <!-- 第二行：主要图表 -->
-        <div class="charts-row">
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h2>学科能力雷达图</h2>
-                    <el-dropdown @command="handleRadarCommand">
-                        <el-button type="primary" text>
-                            操作 <el-icon name="ArrowDownBold" />
-                        </el-button>
-                        <template #dropdown>
-                            <el-dropdown-menu>
-                                <el-dropdown-item command="change-metrics">更改指标</el-dropdown-item>
-                                <el-dropdown-item command="compare-with-avg">与平均值对比</el-dropdown-item>
-                                <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
-                            </el-dropdown-menu>
-                        </template>
-                    </el-dropdown>
+        <!-- 正常内容 -->
+        <div v-else>
+            <!-- 顶部筛选区域 -->
+            <div class="dashboard-header">
+                <div class="welcome-section">
+                    <h1>数据看板</h1>
+                    <span class="subtitle">学习数据全景分析</span>
+                    <p class="last-update">最后更新: {{ lastUpdateTime }}</p>
                 </div>
-                <div ref="radarChart" class="chart-area" style="width: 100%; height: 400px;"></div>
+
+                <div class="header-actions">
+                    <el-date-picker v-model="dateRange" type="daterange" range-separator="至" start-placeholder="开始日期"
+                        end-placeholder="结束日期" :shortcuts="shortcuts" @change="handleDateChange" />
+                    <el-select v-model="subjectFilter" placeholder="选择科目" @change="handleSubjectChange">
+                        <el-option label="全部科目" value="all" />
+                        <el-option v-for="subject in allSubjects" :key="subject.id" :label="subject.name"
+                            :value="subject.id" />
+                    </el-select>
+                </div>
             </div>
 
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h2>错题热力分布</h2>
-                    <el-dropdown @command="handleHeatmapCommand">
-                        <el-button type="primary" text>
-                            操作 <el-icon name="ArrowDownBold" />
-                        </el-button>
-                        <template #dropdown>
-                            <el-dropdown-menu>
-                                <el-dropdown-item command="filter-subject">按科目筛选</el-dropdown-item>
-                                <el-dropdown-item command="sort-by-errors">按错误率排序</el-dropdown-item>
-                                <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
-                            </el-dropdown-menu>
-                        </template>
-                    </el-dropdown>
+            <!-- 第一行：核心指标卡片 -->
+            <div class="stats-grid">
+                <div class="stat-card" @click="goToPractice()">
+                    <div class="stat-header">
+                        <h3>累计刷题</h3>
+                        <el-icon name="Collection" class="stat-icon" />
+                    </div>
+                    <div class="stat-value">{{ coreStats.totalQuestions || 0 }}</div>
+                    <div class="stat-trend positive">
+                        <el-icon name="Top" /> +{{ coreStats.todayQuestions || 0 }} 今日
+                    </div>
                 </div>
-                <div ref="heatMap" class="chart-area" style="width: 100%; height: 400px;"></div>
-            </div>
-        </div>
 
-        <!-- 第三行：学习趋势和错题分析 -->
-        <div class="analysis-row">
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h2>学习趋势</h2>
-                    <el-radio-group v-model="trendPeriod" @change="updateTrendChart">
-                        <el-radio-button label="daily">日</el-radio-button>
-                        <el-radio-button label="weekly">周</el-radio-button>
-                        <el-radio-button label="monthly">月</el-radio-button>
-                    </el-radio-group>
+                <div class="stat-card" @click="viewMistakeAnalysis()">
+                    <div class="stat-header">
+                        <h3>总体正确率</h3>
+                        <el-icon name="Promotion" class="stat-icon" />
+                    </div>
+                    <div class="stat-value">{{ coreStats.accuracy || 0 }}%</div>
+                    <div class="stat-trend" :class="coreStats.accuracyTrend > 0 ? 'positive' : 'negative'">
+                        <el-icon :name="coreStats.accuracyTrend > 0 ? 'Top' : 'Bottom'" />
+                        {{ Math.abs(coreStats.accuracyTrend) }}% {{ coreStats.accuracyTrend > 0 ? '上升' : '下降' }}
+                    </div>
                 </div>
-                <div ref="trendChart" class="chart-area" style="width: 100%; height: 350px;"></div>
+
+                <div class="stat-card" @click="viewStudyTime()">
+                    <div class="stat-header">
+                        <h3>累计学习时长</h3>
+                        <el-icon name="Timer" class="stat-icon" />
+                    </div>
+                    <div class="stat-value">{{ coreStats.totalStudyHours || 0 }}h</div>
+                    <div class="stat-trend positive">
+                        <el-icon name="Top" /> +{{ coreStats.todayStudyHours || 0 }}h 今日
+                    </div>
+                </div>
+
+                <div class="stat-card" @click="viewMistakes()">
+                    <div class="stat-header">
+                        <h3>错题数量</h3>
+                        <el-icon name="Failed" class="stat-icon" />
+                    </div>
+                    <div class="stat-value">{{ coreStats.mistakeCount || 0 }}</div>
+                    <div class="stat-trend negative">
+                        <el-icon name="Bottom" /> +{{ coreStats.newMistakes || 0 }} 今日新增
+                    </div>
+                </div>
             </div>
 
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h2>高频错题分析</h2>
-                    <el-button type="primary" text @click="generateWeaknessReport">
-                        <el-icon name="Document" /> 生成弱点报告
-                    </el-button>
-                </div>
-                <div class="hot-mistakes-container">
-                    <el-table :data="hotMistakes" height="280">
-                        <el-table-column prop="rank" label="排名" width="60" align="center" />
-                        <el-table-column prop="content" label="题目" show-overflow-tooltip>
-                            <template #default="{ row }">
-                                <span class="question-content" @click="goToQuestion(row.id)">
-                                    {{ row.content.substring(0, 30) }}...
-                                </span>
+            <!-- 第二行：主要图表 -->
+            <div class="charts-row">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h2>学科能力雷达图</h2>
+                        <el-dropdown @command="handleRadarCommand">
+                            <el-button type="primary" text>
+                                操作 <el-icon name="ArrowDownBold" />
+                            </el-button>
+                            <template #dropdown>
+                                <el-dropdown-menu>
+                                    <el-dropdown-item command="change-metrics">更改指标</el-dropdown-item>
+                                    <el-dropdown-item command="compare-with-avg">与平均值对比</el-dropdown-item>
+                                    <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+                                </el-dropdown-menu>
                             </template>
-                        </el-table-column>
-                        <el-table-column prop="subjectName" label="科目" width="100" />
-                        <el-table-column prop="errorRate" label="错误率" width="100">
-                            <template #default="{ row }">
-                                <el-tag :type="getErrorTagType(row.errorRate)">
-                                    {{ row.errorRate }}%
-                                </el-tag>
+                        </el-dropdown>
+                    </div>
+                    <div ref="radarChart" class="chart-area" style="width: 100%; height: 400px;"></div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h2>错题热力分布</h2>
+                        <el-dropdown @command="handleHeatmapCommand">
+                            <el-button type="primary" text>
+                                操作 <el-icon name="ArrowDownBold" />
+                            </el-button>
+                            <template #dropdown>
+                                <el-dropdown-menu>
+                                    <el-dropdown-item command="filter-subject">按科目筛选</el-dropdown-item>
+                                    <el-dropdown-item command="sort-by-errors">按错误率排序</el-dropdown-item>
+                                    <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+                                </el-dropdown-menu>
                             </template>
-                        </el-table-column>
-                        <el-table-column prop="errorCount" label="错误次数" width="100" />
-                    </el-table>
-                </div>
-            </div>
-        </div>
-
-        <!-- 第四行：目标进度和排行榜 -->
-        <div class="progress-row">
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h2>考研目标进度</h2>
-                    <el-button type="primary" text @click="editTarget">
-                        <el-icon name="Edit" /> 编辑目标
-                    </el-button>
-                </div>
-                <div class="target-progress">
-                    <div class="target-info">
-                        <p class="target-school">目标院校: <span>{{ userInfo.target_school }}</span></p>
-                        <p class="target-exam">考试类型: <span>{{ examType }}</span></p>
-                        <p class="target-date">考试日期: <span>{{ userInfo.exam_date }}</span></p>
+                        </el-dropdown>
                     </div>
-
-                    <el-progress :text-inside="true" :stroke-width="25" :percentage="targetProgress.percentage"
-                        :color="getProgressColor(targetProgress.percentage)" status="success">
-                        <span class="progress-text">{{ targetProgress.percentage }}%</span>
-                    </el-progress>
-
-                    <div class="progress-details">
-                        <p>已完成 <span class="completed">{{ targetProgress.completed }}</span> /
-                            计划 <span class="total">{{ targetProgress.total }}</span> 题目</p>
-                        <p>预计达成目标日期: <span class="estimate-date">{{ targetProgress.estimateDate }}</span></p>
-                    </div>
+                    <div ref="heatMap" class="chart-area" style="width: 100%; height: 400px;"></div>
                 </div>
             </div>
 
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h2>排行榜</h2>
-                    <el-dropdown @command="handleRankingCommand">
-                        <el-button type="primary" text>
-                            排序 <el-icon name="Sort" />
-                        </el-button>
-                        <template #dropdown>
-                            <el-dropdown-menu>
-                                <el-dropdown-item command="by-correct-rate">按正确率</el-dropdown-item>
-                                <el-dropdown-item command="by-total-questions">按刷题量</el-dropdown-item>
-                                <el-dropdown-item command="by-study-time">按学习时长</el-dropdown-item>
-                            </el-dropdown-menu>
-                        </template>
-                    </el-dropdown>
-                </div>
-                <div class="ranking-container">
-                    <div class="ranking-item self-item">
-                        <div class="ranking-position user-position">
-                            {{ userRanking.position }}
-                        </div>
-                        <el-avatar :size="40" :src="userInfo.avatar" class="ranking-avatar" />
-                        <div class="ranking-info">
-                            <p class="ranking-nickname">{{ userInfo.nickname }}</p>
-                            <p class="ranking-stats">
-                                正确率: {{ userRanking.accuracy }}% |
-                                刷题数: {{ userRanking.questions }} 题
-                            </p>
-                        </div>
+            <!-- 第三行：学习趋势和错题分析 -->
+            <div class="analysis-row">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h2>学习趋势</h2>
+                        <el-radio-group v-model="trendPeriod" @change="handleTrendPeriodChange">
+                            <el-radio-button value="daily">日</el-radio-button>
+                            <el-radio-button value="weekly">周</el-radio-button>
+                            <el-radio-button value="monthly">月</el-radio-button>
+                        </el-radio-group>
                     </div>
+                    <div ref="trendChart" class="chart-area" style="width: 100%; height: 350px;"></div>
+                </div>
 
-                    <div class="ranking-list">
-                        <div v-for="(ranker, index) in topRankers" :key="index" class="ranking-item"
-                            :class="{ 'highlight-item': index < 3 }">
-                            <div class="ranking-position" :class="getPositionClass(index + 1)">
-                                {{ index + 1 }}
-                            </div>
-                            <el-avatar :size="40" :src="ranker.avatar" class="ranking-avatar" />
-                            <div class="ranking-info">
-                                <p class="ranking-nickname">{{ ranker.nickname }}</p>
-                                <p class="ranking-stats">
-                                    正确率: {{ ranker.accuracy }}% |
-                                    刷题数: {{ ranker.questions }} 题
-                                </p>
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h2>高频错题分析</h2>
+                    </div>
+                    <div class="hot-mistakes-list">
+                        <div v-for="(mistake, index) in hotMistakes" :key="index" class="hot-mistake-item"
+                             @click="viewQuestionDetail(mistake)">
+                            <div class="mistake-index">{{ index + 1 }}</div>
+                            <div class="mistake-content">
+                                <div class="mistake-subject">
+                                    <span class="subject-badge" :class="'subject-' + mistake.subjectType">
+                                        {{ mistake.subjectName }}
+                                    </span>
+                                    <span class="knowledge-point">{{ mistake.knowledgePoint }}</span>
+                                    <span class="error-count">错误 {{ mistake.errorCount }} 次</span>
+                                </div>
+                                <div class="mistake-question" v-html="renderLatex(mistake.question)"></div>
                             </div>
                         </div>
+                        <div v-if="hotMistakes.length === 0" class="empty-state">
+                            <p>🎉 暂无错题数据</p>
+                        </div>
                     </div>
+                </div>
+            </div>
 
-                    <div class="ranking-footer">
-                        <el-button type="primary" @click="viewFullRanking">查看完整排行榜</el-button>
+            <!-- 考研目标进度 -->
+            <div class="progress-section">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h2>考研目标进度</h2>
+                        <el-button type="primary" text @click="editTarget">
+                            <el-icon name="Edit" /> 编辑目标
+                        </el-button>
+                    </div>
+                    <div class="target-progress">
+                        <div class="target-info">
+                            <p class="target-school">目标院校: <span>{{ userInfo.target_school || '未设置' }}</span></p>
+                            <p class="target-exam">考试类型: <span>{{ examType }}</span></p>
+                            <p class="target-date">考试日期: <span>{{ formattedExamDate }}</span></p>
+                            <p class="days-left">距离考试还有 <span class="days-count">{{ daysToExam }}</span> 天</p>
+                        </div>
+
+                        <el-progress :text-inside="true" :stroke-width="25" :percentage="targetProgress.percentage"
+                            :color="getProgressColor(targetProgress.percentage)" status="success">
+                            <span class="progress-text">{{ targetProgress.percentage }}%</span>
+                        </el-progress>
+
+                        <div class="progress-details">
+                            <p>已完成 <span class="completed">{{ targetProgress.completed }}</span> /
+                                计划 <span class="total">{{ targetProgress.total }}</span> 题目</p>
+                            <p>预计达成目标日期: <span class="estimate-date">{{ targetProgress.estimateDate }}</span></p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 学习建议区域 -->
-        <div class="suggestions-section">
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h2><el-icon name="Lightning" /> 智能学习建议</h2>
-                    <el-button type="primary" text @click="refreshSuggestions">
-                        <el-icon name="Refresh" /> 刷新建议
-                    </el-button>
-                </div>
-
-                <div class="suggestions-container">
-                    <div v-for="(suggestion, index) in suggestions" :key="index" class="suggestion-card">
-                        <div class="suggestion-header">
-                            <el-tag
-                                :type="suggestion.type === 'urgent' ? 'danger' : suggestion.type === 'important' ? 'warning' : 'success'">
-                                {{ getSuggestionTagText(suggestion.type) }}
+        <!-- 错题详情对话框 -->
+        <el-dialog
+            v-model="questionDetailDialogVisible"
+            title="错题详情"
+            width="800px"
+            :close-on-click-modal="false"
+            class="question-detail-dialog"
+        >
+            <div v-if="selectedQuestion" class="question-detail-content">
+                <!-- 题目基本信息 -->
+                <div class="detail-section">
+                    <div class="detail-header">
+                        <h4>题目信息</h4>
+                        <div class="question-meta">
+                            <el-tag v-if="selectedQuestion.subjectNames && selectedQuestion.subjectNames.length > 0"
+                                    type="primary" size="small">
+                                {{ selectedQuestion.subjectNames.join('、') }}
                             </el-tag>
-                            <el-icon :name="suggestion.icon" class="suggestion-icon" />
+                            <el-tag v-if="selectedQuestion.bookNames && selectedQuestion.bookNames.length > 0"
+                                    type="info" size="small" style="margin-left: 8px;">
+                                {{ selectedQuestion.bookNames.join('、') }}
+                            </el-tag>
                         </div>
-                        <h3 class="suggestion-title">{{ suggestion.title }}</h3>
-                        <p class="suggestion-content">{{ suggestion.content }}</p>
-                        <div class="suggestion-actions">
-                            <el-button v-if="suggestion.actionType === 'practice'" type="primary" size="small"
-                                @click="startPractice(suggestion.subjectId)">
-                                立即练习
-                            </el-button>
-                            <el-button v-if="suggestion.actionType === 'review'" type="warning" size="small"
-                                @click="reviewMistakes(suggestion.subjectId)">
-                                复习错题
-                            </el-button>
-                            <el-button v-if="suggestion.actionType === 'exam'" type="success" size="small"
-                                @click="startMockExam">
-                                模拟考试
-                            </el-button>
+                    </div>
+                    <div class="question-body">
+                        <div class="question-text" v-html="renderLatex(selectedQuestion.content)"></div>
+
+                        <!-- 选项（如果有） -->
+                        <div v-if="selectedQuestion.options && selectedQuestion.options.length > 0" class="options-list">
+                            <div v-for="(option, index) in selectedQuestion.options" :key="index" class="option-item">
+                                <span class="option-label">{{ option.label || ['A', 'B', 'C', 'D', 'E', 'F'][index] }}.</span>
+                                <span class="option-text" v-html="renderLatex(option.text)"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- 答案与解析 -->
+                <div class="detail-section">
+                    <div class="detail-header">
+                        <h4>答案与解析</h4>
+                    </div>
+                    <div class="answer-section">
+                        <div class="answer-row">
+                            <span class="answer-label">正确答案：</span>
+                            <span class="answer-value primary latex-answer" v-html="renderLatex(selectedQuestion.answer)"></span>
+                        </div>
+                        <div v-if="selectedQuestion.analysis" class="analysis-row">
+                            <span class="analysis-label">题目解析：</span>
+                            <div class="analysis-content latex-content" v-html="renderLatex(selectedQuestion.analysis)"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 标签（如果有） -->
+                <div v-if="selectedQuestion.tags && selectedQuestion.tags.length > 0" class="detail-section">
+                    <div class="detail-header">
+                        <h4>知识点标签</h4>
+                    </div>
+                    <div class="tags-list">
+                        <el-tag v-for="(tag, index) in selectedQuestion.tags" :key="index" size="small" style="margin-right: 8px; margin-bottom: 8px;">
+                            {{ tag }}
+                        </el-tag>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            <template #footer>
+                <el-button @click="questionDetailDialogVisible = false">关闭</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -289,35 +280,58 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import * as echarts from 'echarts'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElNotification } from 'element-plus'
+import { ElMessage, ElDialog } from 'element-plus'
+import {
+    getHomePageDataApi,
+    getUserStudyStatsApi,
+    getHotMistakesApi,
+    getTodayStatsApi
+} from '@/api/user'
+import { getStudyHeatmap } from '@/api/userProgress'
+import { renderLatex } from '@/utils/latex'
 
 const router = useRouter()
 
 // 用户信息
 const userInfo = ref({
-    nickname: '考研学子',
+    nickname: '',
     avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
     role: 'student',
-    target_school: '清华大学',
-    exam_year: 2026,
-    exam_date: '2025-12-20',
-    target_total_score: 400,
-    exam_subjects: '政治、英语一、数学一、408'
+    target_school: '',
+    exam_year: '',
+    exam_date: '',
+    target_total_score: 0,
+    exam_subjects: ''
 })
 
 // 考试类型计算
 const examType = computed(() => {
-    return userInfo.value.exam_subjects.replace(/、/g, ' + ')
+    return userInfo.value.exam_subjects?.replace(/、/g, ' + ') || ''
+})
+
+// 格式化考试日期
+const formattedExamDate = computed(() => {
+    if (userInfo.value.exam_date) {
+        const date = new Date(userInfo.value.exam_date)
+        return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+    }
+    return '未设置'
+})
+
+// 计算距离考试天数
+const daysToExam = computed(() => {
+    if (userInfo.value.exam_date) {
+        const examDate = new Date(userInfo.value.exam_date)
+        const today = new Date()
+        const diffTime = examDate - today
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        return diffDays > 0 ? diffDays : 0
+    }
+    return 0
 })
 
 // 最后更新时间
-const lastUpdateTime = ref(new Date().toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-}))
+const lastUpdateTime = ref('')
 
 // 日期范围筛选
 const dateRange = ref([
@@ -358,331 +372,266 @@ const shortcuts = ref([
 
 // 科目筛选
 const subjectFilter = ref('all')
-const allSubjects = ref([
-    { id: 1, name: '高等数学' },
-    { id: 2, name: '线性代数' },
-    { id: 3, name: '概率论' },
-    { id: 4, name: '英语' },
-    { id: 5, name: '政治' }
-])
+const allSubjects = ref([])
 
 // 核心统计数据
 const coreStats = ref({
-    totalQuestions: 128,
-    todayQuestions: 15,
-    accuracy: 78,
-    accuracyTrend: 2.5,
-    totalStudyHours: 42,
-    todayStudyHours: 2.5,
-    mistakeCount: 26,
-    newMistakes: 3
+    totalQuestions: 0,
+    todayQuestions: 0,
+    accuracy: 0,
+    accuracyTrend: 0,
+    totalStudyHours: 0,
+    todayStudyHours: 0,
+    mistakeCount: 0,
+    newMistakes: 0
 })
 
 // 目标进度
 const targetProgress = ref({
-    percentage: 65,
-    completed: 1280,
+    percentage: 0,
+    completed: 0,
     total: 2000,
-    estimateDate: '2025-11-30'
+    estimateDate: ''
 })
-
-// 排行榜数据
-const userRanking = ref({
-    position: 42,
-    accuracy: 78,
-    questions: 128
-})
-
-const topRankers = ref([
-    {
-        nickname: '数学大神',
-        avatar: 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png',
-        accuracy: 95,
-        questions: 3200
-    },
-    {
-        nickname: '考研先锋',
-        avatar: 'https://cube.elemecdn.com/e/fd/0fc7d20532fdaf769a25683617711png.png',
-        accuracy: 92,
-        questions: 2850
-    },
-    {
-        nickname: '高分学霸',
-        avatar: 'https://cube.elemecdn.com/9/c2/f0ee8a3c7c9638a54940382568c9dpng.png',
-        accuracy: 90,
-        questions: 2500
-    },
-    {
-        nickname: '努力奋斗',
-        avatar: 'https://cube.elemecdn.com/2/19/a649d2a1e79a99b365f71af988dpng.png',
-        accuracy: 88,
-        questions: 2200
-    },
-    {
-        nickname: '每日一练',
-        avatar: 'https://cube.elemecdn.com/d/5c/39332e6a2c8c6c2f9c863dpng.png',
-        accuracy: 85,
-        questions: 1950
-    }
-])
 
 // 高频错题
-const hotMistakes = ref([
-    {
-        id: 1001,
-        rank: 1,
-        content: '设函数 f(x) = x³ - 3x² + 2，求函数的极值点及极值',
-        subjectName: '高数',
-        errorRate: 85,
-        errorCount: 17
-    },
-    {
-        id: 1002,
-        rank: 2,
-        content: '求矩阵 A = |1 2 3| |0 1 2| |0 0 1| 的特征值',
-        subjectName: '线代',
-        errorRate: 78,
-        errorCount: 15
-    },
-    {
-        id: 1003,
-        rank: 3,
-        content: '设随机变量 X 服从参数为 λ 的泊松分布，求 E(X²)',
-        subjectName: '概率',
-        errorRate: 75,
-        errorCount: 14
-    },
-    {
-        id: 1004,
-        rank: 4,
-        content: '求极限 lim(x→0) (e^x - 1 - x)/x²',
-        subjectName: '高数',
-        errorRate: 70,
-        errorCount: 13
-    },
-    {
-        id: 1005,
-        rank: 5,
-        content: '设 A 为 n 阶矩阵，若 A² = A，则 A 的特征值为',
-        subjectName: '线代',
-        errorRate: 68,
-        errorCount: 12
-    }
-])
+const hotMistakes = ref([])
+
+// 错题详情对话框
+const questionDetailDialogVisible = ref(false)
+const selectedQuestion = ref(null)
 
 // 学习趋势周期
 const trendPeriod = ref('daily')
 
-// 智能学习建议
-const suggestions = ref([
-    {
-        id: 1,
-        type: 'urgent',
-        icon: 'Warning',
-        title: '线性代数基础薄弱',
-        content: '您在线性代数的正确率仅为65%，特别是矩阵特征值相关题目错误率高达78%。建议优先复习特征值、特征向量基础概念。',
-        actionType: 'practice',
-        subjectId: 2
-    },
-    {
-        id: 2,
-        type: 'important',
-        icon: 'Reading',
-        title: '泰勒公式专项突破',
-        content: '最近3次练习中，泰勒公式相关题目全部答错。系统建议进行5道泰勒公式专项练习，巩固这一重要知识点。',
-        actionType: 'practice',
-        subjectId: 1
-    },
-    {
-        id: 3,
-        type: 'normal',
-        icon: 'Document',
-        title: '全真模拟考试',
-        content: '您已覆盖80%的考点，建议进行一次2小时的全真模拟考试，检验整体掌握情况并适应考试节奏。',
-        actionType: 'exam'
-    }
-])
+// 加载状态
+const loading = ref(true)
+const error = ref(null)
 
 // 图表引用
 const radarChart = ref(null)
 const heatMap = ref(null)
 const trendChart = ref(null)
 
-// 进度条颜色
-const getProgressColor = (percentage) => {
-    if (percentage < 30) return '#ff4d4f'
-    if (percentage < 70) return '#faad14'
-    return '#52c41a'
-}
+// 学习统计数据(用于图表)
+const studyStats = ref(null)
+const studyHeatmap = ref([])
 
-// 获取错误标签类型
-const getErrorTagType = (rate) => {
-    if (rate > 70) return 'danger'
-    if (rate > 50) return 'warning'
-    return 'success'
-}
+// 主数据获取函数
+const loadDashboardData = async () => {
+    loading.value = true
+    error.value = null
 
-// 获取建议标签文本
-const getSuggestionTagText = (type) => {
-    switch (type) {
-        case 'urgent': return '紧急'
-        case 'important': return '重要'
-        case 'normal': return '建议'
-        default: return '提示'
-    }
-}
+    try {
+        const userStr = localStorage.getItem('user')
+        if (!userStr) {
+            throw new Error('未获取到用户信息,请先登录')
+        }
 
-// 获取排名位置样式
-const getPositionClass = (position) => {
-    if (position === 1) return 'gold'
-    if (position === 2) return 'silver'
-    if (position === 3) return 'bronze'
-    return ''
-}
+        const user = JSON.parse(userStr)
+        const userId = user.id
 
-// 导航操作
-const goToPractice = () => {
-    router.push('/practice')
-}
-const viewMistakes = () => {
-    router.push('/correction-notebook')
-}
-const startMockExam = () => {
-    router.push('/mock-exam')
-}
-const goToQuestion = (id) => {
-    router.push(`/question/${id}`)
-}
-const viewFullRanking = () => {
-    router.push('/rankings')
-}
-const editTarget = () => {
-    ElMessage.success('跳转到目标设置页面')
-}
-const generateWeaknessReport = () => {
-    ElNotification({
-        title: '报告生成中',
-        message: '正在生成您的弱点分析报告，请稍候...',
-        type: 'info',
-        duration: 2000
-    })
-    setTimeout(() => {
-        ElNotification({
-            title: '报告生成成功',
-            message: '弱点分析报告已生成，点击此处查看',
-            type: 'success',
+        if (!userId) {
+            throw new Error('用户ID不存在,请先登录')
+        }
+
+        // 并行请求所有API
+        const [
+            homeDataRes,
+            studyStatsRes,
+            heatmapRes,
+            todayStatsRes,
+            hotMistakesRes
+        ] = await Promise.all([
+            getHomePageDataApi(userId),
+            getUserStudyStatsApi(userId),
+            getStudyHeatmap(userId, 30),
+            getTodayStatsApi(userId),
+            getHotMistakesApi(userId, 5)
+        ])
+
+        // 数据转换和赋值
+        transformAndAssignData({
+            homeData: homeDataRes.data,
+            studyStats: studyStatsRes.data,
+            heatmap: heatmapRes.data,
+            todayStats: todayStatsRes.data,
+            hotMistakes: hotMistakesRes.data
         })
-    }, 1500)
-}
-const startPractice = (subjectId) => {
-    router.push(`/practice?subject=${subjectId}`)
-}
-const reviewMistakes = (subjectId) => {
-    router.push(`/correction-notebook?subject=${subjectId}`)
-}
-const refreshSuggestions = () => {
-    ElMessage.success('已刷新学习建议')
-}
 
-// 图表操作
-const handleRadarCommand = (command) => {
-    switch (command) {
-        case 'change-metrics':
-            ElMessage.info('切换雷达图指标')
-            break
-        case 'compare-with-avg':
-            ElMessage.info('与平均值对比')
-            break
-        case 'export-data':
-            ElMessage.success('雷达图数据已导出')
-            break
+        // 更新最后更新时间
+        lastUpdateTime.value = new Date().toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        })
+
+    } catch (err) {
+        error.value = err.message || '数据加载失败'
+        console.error('加载Dashboard数据失败:', err)
+        ElMessage.error(error.value)
+    } finally {
+        loading.value = false
     }
 }
 
-const handleHeatmapCommand = (command) => {
-    switch (command) {
-        case 'filter-subject':
-            ElMessage.info('按科目筛选错题分布')
-            break
-        case 'sort-by-errors':
-            ElMessage.info('按错误率排序')
-            hotMistakes.value.sort((a, b) => b.errorRate - a.errorRate)
-            break
-        case 'export-data':
-            ElMessage.success('热力图数据已导出')
-            break
+// 数据转换函数
+const transformAndAssignData = (data) => {
+    // 1. 用户信息
+    userInfo.value = data.homeData?.userInfo || {}
+
+    // 2. 核心统计
+    const stats = data.homeData?.studyStats || {}
+    const todayStats = data.todayStats || {}
+    coreStats.value = {
+        totalQuestions: Number(stats.questionsDone || 0),
+        todayQuestions: Number(todayStats.todayQuestions || 0),
+        accuracy: Math.round(Number(stats.accuracy || 0)),
+        accuracyTrend: 0, // 暂时设为0
+        totalStudyHours: Number(stats.totalStudyHours || 0).toFixed(1),
+        todayStudyHours: Number(todayStats.todayStudyHours || 0).toFixed(1),
+        mistakeCount: Number(stats.mistakesCount || 0),
+        newMistakes: Number(todayStats.newMistakes || 0)
     }
-}
 
-const handleRankingCommand = (command) => {
-    switch (command) {
-        case 'by-correct-rate':
-            ElMessage.info('按正确率排序')
-            break
-        case 'by-total-questions':
-            ElMessage.info('按刷题量排序')
-            break
-        case 'by-study-time':
-            ElMessage.info('按学习时长排序')
-            break
+    // 3. 科目列表
+    allSubjects.value = data.homeData?.subjects || []
+
+    // 4. 高频错题 - 按错误次数排序
+    hotMistakes.value = (data.hotMistakes || [])
+        .sort((a, b) => (b.errorCount || 0) - (a.errorCount || 0))
+        .map((item, index) => {
+            // 获取科目类型（用于样式）
+            const subjectName = item.subjectName || '未分类'
+            let subjectType = 'math'
+            if (subjectName.includes('代数') || subjectName.includes('线代')) {
+                subjectType = 'algebra'
+            } else if (subjectName.includes('概率') || subjectName.includes('统计')) {
+                subjectType = 'probability'
+            }
+
+            // 限制题目文本长度
+            const questionText = item.content || '题目内容加载失败'
+            const truncatedQuestion = questionText.length > 100
+                ? questionText.substring(0, 100) + '...'
+                : questionText
+
+            return {
+                id: item.questionId,
+                rank: index + 1,
+                question: truncatedQuestion,
+                subjectName: subjectName,
+                subjectType: subjectType,
+                knowledgePoint: item.knowledgePoint || '未知知识点',
+                errorCount: Number(item.errorCount || 0),
+                fullData: item // 保存完整数据以便点击时查看详情
+            }
+        })
+
+    // 5. 目标进度 - 从用户信息获取
+    const totalQuestions = Number(coreStats.value.totalQuestions || 0)
+    const targetTotal = 2000 // 可从用户目标获取，暂时硬编码
+    const examDate = userInfo.value.exam_date || new Date().toISOString().split('T')[0]
+
+    targetProgress.value = {
+        percentage: Math.min(100, Math.round((totalQuestions / targetTotal) * 100)),
+        completed: totalQuestions,
+        total: targetTotal,
+        estimateDate: examDate
     }
+
+    // 6. 学习统计数据和热力图
+    studyStats.value = data.studyStats
+    studyHeatmap.value = data.heatmap || []
+
+    // 9. 更新图表
+    setTimeout(() => {
+        updateChartsWithData()
+    }, 100)
 }
 
-const handleDateChange = () => {
-    ElMessage.success('已更新数据范围')
-    // 这里应该重新获取数据
+// 图表数据更新
+const updateChartsWithData = () => {
+    if (!radarChart.value || !heatMap.value || !trendChart.value) {
+        return
+    }
+
+    // 雷达图:从studyStats获取各科目正确率
+    const radarData = getRadarChartData()
+    updateRadarChart(radarData)
+
+    // 热力图:基于错题分布(暂时用模拟数据)
+    const heatmapData = getHeatmapChartData()
+    updateHeatmapChart(heatmapData)
+
+    // 趋势图:从studyHeatmap生成
+    const trendData = getTrendChartData()
+    updateTrendChart(trendData)
 }
 
-const handleSubjectChange = () => {
-    ElMessage.success('已切换科目筛选')
-    // 这里应该重新获取数据
-}
-
-const updateTrendChart = () => {
-    ElMessage.info(`已切换到${trendPeriod.value === 'daily' ? '日' : trendPeriod.value === 'weekly' ? '周' : '月'}视图`)
-    // 这里应该更新趋势图
-}
-
-// 导出报告
-const exportReport = () => {
-    ElNotification({
-        title: '导出成功',
-        message: '学习报告已导出，可在下载文件夹中查看',
-        type: 'success',
-        duration: 3000
+const getRadarChartData = () => {
+    // 从allSubjects获取科目,从studyStats获取正确率
+    return allSubjects.value.map(subject => {
+        const subjectStat = studyStats.value?.subjectStats?.find(
+            s => s.subjectId === subject.id
+        )
+        return {
+            name: subject.name,
+            value: Math.round(subjectStat?.accuracy || 0)
+        }
     })
 }
 
-// 视图操作
-const viewMistakeAnalysis = () => {
-    router.push('/analysis/mistakes')
-}
-const viewStudyTime = () => {
-    router.push('/analysis/study-time')
+const getHeatmapChartData = () => {
+    // 暂时返回模拟数据,实际应该基于错题分布
+    const xAxisData = ['极限', '导数', '积分', '级数', '微分方程', '矩阵', '特征值', '概率分布', '统计推断']
+    const yAxisData = ['基础', '提高', '强化', '冲刺']
+    const heatMapData = []
+
+    for (let i = 0; i < yAxisData.length; i++) {
+        for (let j = 0; j < xAxisData.length; j++) {
+            let val = 20 + Math.floor(Math.random() * 50)
+            heatMapData.push([j, i, val])
+        }
+    }
+
+    return { xAxisData, yAxisData, heatMapData }
 }
 
-// 错题分析
-const viewMistakesAnalysis = () => {
-    router.push('/analysis/mistakes')
+const getTrendChartData = () => {
+    // 从studyHeatmap聚合数据
+    const dates = studyHeatmap.value.map(item => {
+        const date = new Date(item.recordDate)
+        return `${date.getMonth() + 1}/${date.getDate()}`
+    })
+    const questions = studyHeatmap.value.map(item => item.questionCount)
+    const time = studyHeatmap.value.map(item => (item.totalDuration / 3600).toFixed(1))
+
+    return { dates, questions, time }
 }
 
-// 初始化图表
-const initCharts = () => {
-    // 雷达图
-    const radarChartInstance = echarts.init(radarChart.value)
-    const radarOption = {
+// 初始化和更新图表
+let radarChartInstance = null
+let heatMapInstance = null
+let trendChartInstance = null
+
+const updateRadarChart = (data) => {
+    if (!radarChartInstance) {
+        radarChartInstance = echarts.init(radarChart.value)
+    }
+
+    const indicator = data.map(item => ({ name: item.name, max: 100 }))
+    const value = data.map(item => item.value)
+
+    const option = {
         tooltip: {
             trigger: 'axis'
         },
         radar: {
             radius: '65%',
-            indicator: [
-                { name: '高等数学', max: 100 },
-                { name: '线性代数', max: 100 },
-                { name: '概率论', max: 100 },
-                { name: '英语', max: 100 },
-                { name: '政治', max: 100 }
-            ],
+            indicator: indicator,
             axisName: {
                 color: '#666',
                 fontSize: 14
@@ -709,7 +658,7 @@ const initCharts = () => {
             name: '能力分布',
             type: 'radar',
             data: [{
-                value: [92, 65, 78, 85, 70],
+                value: value,
                 name: '你的能力',
                 symbol: 'circle',
                 symbolSize: 8,
@@ -725,55 +674,22 @@ const initCharts = () => {
                     borderColor: '#fff',
                     borderWidth: 2
                 }
-            }, {
-                value: [80, 75, 80, 78, 75],
-                name: '平均能力',
-                symbol: 'rect',
-                symbolSize: 6,
-                lineStyle: {
-                    width: 2,
-                    color: '#909399',
-                    type: 'dashed'
-                },
-                areaStyle: {
-                    color: 'rgba(144, 147, 153, 0.1)'
-                },
-                itemStyle: {
-                    color: '#909399',
-                    borderColor: '#fff',
-                    borderWidth: 1
-                }
             }]
         }]
     }
-    radarChartInstance.setOption(radarOption)
+    radarChartInstance.setOption(option)
+}
 
-    // 热力图
-    const heatMapInstance = echarts.init(heatMap.value)
-    const xAxisData = ['极限', '导数', '积分', '级数', '微分方程', '矩阵', '特征值', '概率分布', '统计推断']
-    const yAxisData = ['基础', '提高', '强化', '冲刺']
-
-    const heatMapData = []
-    for (let i = 0; i < yAxisData.length; i++) {
-        for (let j = 0; j < xAxisData.length; j++) {
-            let val
-            // 模拟一些高错误率的数据
-            if ((j === 5 || j === 6) && i >= 1) { // 矩阵、特征值在提高+级别
-                val = 70 + Math.floor(Math.random() * 20)
-            } else if (j === 2 && i === 2) { // 积分在强化级别
-                val = 65 + Math.floor(Math.random() * 15)
-            } else {
-                val = 20 + Math.floor(Math.random() * 50)
-            }
-            heatMapData.push([j, i, val])
-        }
+const updateHeatmapChart = (data) => {
+    if (!heatMapInstance) {
+        heatMapInstance = echarts.init(heatMap.value)
     }
 
-    const heatMapOption = {
+    const option = {
         tooltip: {
             position: 'top',
             formatter: function (params) {
-                return `${xAxisData[params.value[0]]} - ${yAxisData[params.value[1]]}<br/>错误率: ${params.value[2]}%`
+                return `${data.xAxisData[params.value[0]]} - ${data.yAxisData[params.value[1]]}<br/>错误率: ${params.value[2]}%`
             }
         },
         grid: {
@@ -782,7 +698,7 @@ const initCharts = () => {
         },
         xAxis: {
             type: 'category',
-            data: xAxisData,
+            data: data.xAxisData,
             axisLabel: {
                 rotate: 45,
                 fontSize: 12
@@ -793,7 +709,7 @@ const initCharts = () => {
         },
         yAxis: {
             type: 'category',
-            data: yAxisData,
+            data: data.yAxisData,
             axisLabel: {
                 fontSize: 12
             },
@@ -814,17 +730,12 @@ const initCharts = () => {
             },
             textStyle: {
                 color: '#666'
-            },
-            controller: {
-                inRange: {
-                    color: '#409EFF'
-                }
             }
         },
         series: [{
             name: '错题分布',
             type: 'heatmap',
-            data: heatMapData,
+            data: data.heatMapData,
             label: {
                 show: true,
                 formatter: function (params) {
@@ -841,33 +752,15 @@ const initCharts = () => {
             }
         }]
     }
-    heatMapInstance.setOption(heatMapOption)
+    heatMapInstance.setOption(option)
+}
 
-    // 学习趋势图
-    const trendChartInstance = echarts.init(trendChart.value)
-
-    // 生成最近7天的日期
-    const dates = []
-    const questionsData = []
-    const accuracyData = []
-    const studyTimeData = []
-
-    for (let i = 6; i >= 0; i--) {
-        const date = new Date()
-        date.setDate(date.getDate() - i)
-        dates.push(date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }))
-
-        // 模拟数据，最近表现更好
-        const baseQuestions = 10 + Math.floor(Math.random() * 5)
-        const baseAccuracy = 70 + Math.floor(Math.random() * 10)
-        const baseTime = 1.5 + Math.random() * 1.5
-
-        questionsData.push(baseQuestions + (i > 3 ? Math.floor(Math.random() * 5) : Math.floor(Math.random() * 8)))
-        accuracyData.push(baseAccuracy + (i > 3 ? Math.floor(Math.random() * 3) : Math.floor(Math.random() * 7)))
-        studyTimeData.push(parseFloat((baseTime + (i > 3 ? Math.random() * 0.5 : Math.random() * 1.5)).toFixed(1)))
+const updateTrendChart = (data) => {
+    if (!trendChartInstance) {
+        trendChartInstance = echarts.init(trendChart.value)
     }
 
-    const trendOption = {
+    const option = {
         tooltip: {
             trigger: 'axis',
             axisPointer: {
@@ -875,7 +768,7 @@ const initCharts = () => {
             }
         },
         legend: {
-            data: ['刷题数量', '正确率', '学习时长(h)'],
+            data: ['刷题数量', '学习时长(h)'],
             bottom: 0
         },
         grid: {
@@ -886,7 +779,7 @@ const initCharts = () => {
         },
         xAxis: {
             type: 'category',
-            data: dates,
+            data: data.dates,
             axisLabel: {
                 fontSize: 12
             }
@@ -907,15 +800,6 @@ const initCharts = () => {
             }
         }, {
             type: 'value',
-            name: '正确率(%)',
-            min: 0,
-            max: 100,
-            axisLabel: {
-                fontSize: 12,
-                formatter: '{value}%'
-            }
-        }, {
-            type: 'value',
             name: '时长(h)',
             min: 0,
             axisLabel: {
@@ -927,7 +811,7 @@ const initCharts = () => {
             {
                 name: '刷题数量',
                 type: 'bar',
-                data: questionsData,
+                data: data.questions,
                 itemStyle: {
                     color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                         { offset: 0, color: '#66b1ff' },
@@ -941,33 +825,10 @@ const initCharts = () => {
                 }
             },
             {
-                name: '正确率',
-                type: 'line',
-                yAxisIndex: 1,
-                data: accuracyData,
-                symbol: 'circle',
-                symbolSize: 8,
-                lineStyle: {
-                    width: 3,
-                    color: '#67c23a'
-                },
-                itemStyle: {
-                    color: '#67c23a',
-                    borderColor: '#fff',
-                    borderWidth: 2
-                },
-                areaStyle: {
-                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                        { offset: 0, color: 'rgba(103, 194, 58, 0.5)' },
-                        { offset: 1, color: 'rgba(103, 194, 58, 0.1)' }
-                    ])
-                }
-            },
-            {
                 name: '学习时长(h)',
                 type: 'line',
-                yAxisIndex: 2,
-                data: studyTimeData,
+                yAxisIndex: 1,
+                data: data.time,
                 symbol: 'rect',
                 symbolSize: 6,
                 lineStyle: {
@@ -983,35 +844,128 @@ const initCharts = () => {
             }
         ]
     }
-    trendChartInstance.setOption(trendOption)
+    trendChartInstance.setOption(option)
+}
+
+// 进度条颜色
+const getProgressColor = (percentage) => {
+    if (percentage < 30) return '#ff4d4f'
+    if (percentage < 70) return '#faad14'
+    return '#52c41a'
+}
+
+// 导航操作
+const goToPractice = () => {
+    router.push('/practice')
+}
+const viewMistakes = () => {
+    router.push('/correction-notebook')
+}
+const startMockExam = () => {
+    router.push('/mock-exam')
+}
+const goToQuestion = (id) => {
+    router.push(`/question/${id}`)
+}
+
+// 查看题目详情
+const viewQuestionDetail = (mistake) => {
+    if (mistake.fullData) {
+        selectedQuestion.value = mistake.fullData
+        questionDetailDialogVisible.value = true
+    } else {
+        ElMessage.warning('无法查看题目详情')
+    }
+}
+
+const viewFullRanking = () => {
+    router.push('/rankings')
+}
+const editTarget = () => {
+    router.push('/user/profile')
+}
+
+// 图表操作
+const handleRadarCommand = (command) => {
+    switch (command) {
+        case 'change-metrics':
+            ElMessage.info('切换雷达图指标')
+            break
+        case 'compare-with-avg':
+            ElMessage.info('与平均值对比')
+            break
+        case 'export-data':
+            ElMessage.success('雷达图数据已导出')
+            break
+    }
+}
+
+const handleHeatmapCommand = (command) => {
+    switch (command) {
+        case 'filter-subject':
+            ElMessage.info('按科目筛选错题分布')
+            break
+        case 'sort-by-errors':
+            ElMessage.info('按错误次数排序')
+            hotMistakes.value.sort((a, b) => b.errorCount - a.errorCount)
+            break
+        case 'export-data':
+            ElMessage.success('热力图数据已导出')
+            break
+    }
+}
+
+const handleDateChange = async () => {
+    if (dateRange.value && dateRange.value.length === 2) {
+        await loadDashboardData()
+        ElMessage.success('已更新数据范围')
+    }
+}
+
+const handleSubjectChange = () => {
+    updateChartsWithData()
+    ElMessage.success('已切换科目筛选')
+}
+
+const handleTrendPeriodChange = () => {
+    ElMessage.info(`已切换到${trendPeriod.value === 'daily' ? '日' : trendPeriod.value === 'weekly' ? '周' : '月'}视图`)
+    // 这里应该更新趋势图
+}
+
+// 视图操作
+const viewMistakeAnalysis = () => {
+    router.push('/analysis/mistakes')
+}
+const viewStudyTime = () => {
+    router.push('/analysis/study-time')
+}
+
+// 组件挂载
+onMounted(() => {
+    loadDashboardData()
 
     // 响应窗口大小变化
     const resizeCharts = () => {
-        radarChartInstance.resize()
-        heatMapInstance.resize()
-        trendChartInstance.resize()
+        if (radarChartInstance) radarChartInstance.resize()
+        if (heatMapInstance) heatMapInstance.resize()
+        if (trendChartInstance) trendChartInstance.resize()
     }
 
     window.addEventListener('resize', resizeCharts)
 
-    return () => {
+    // 定时刷新(5分钟)
+    const refreshInterval = setInterval(() => {
+        loadDashboardData()
+    }, 5 * 60 * 1000)
+
+    // 清理函数
+    onUnmounted(() => {
         window.removeEventListener('resize', resizeCharts)
-        radarChartInstance.dispose()
-        heatMapInstance.dispose()
-        trendChartInstance.dispose()
-    }
-}
-
-// 组件挂载
-onMounted(async () => {
-    // 初始化图表
-    const cleanup = initCharts()
-
-    // 模拟数据加载
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    // 在组件卸载时清理
-    onUnmounted(cleanup)
+        if (radarChartInstance) radarChartInstance.dispose()
+        if (heatMapInstance) heatMapInstance.dispose()
+        if (trendChartInstance) trendChartInstance.dispose()
+        clearInterval(refreshInterval)
+    })
 })
 </script>
 
@@ -1021,6 +975,28 @@ onMounted(async () => {
     padding: 20px;
     background-color: #f8fafc;
     min-height: 100vh;
+}
+
+/* 加载状态 */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 50vh;
+    color: #409eff;
+}
+
+.loading-state p {
+    margin-top: 20px;
+    font-size: 16px;
+    color: #606266;
+}
+
+/* 错误状态 */
+.error-state {
+    padding: 40px;
+    text-align: center;
 }
 
 /* 顶部筛选区域 */
@@ -1162,17 +1138,17 @@ onMounted(async () => {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .header-actions {
     width: 100%;
     justify-content: space-between;
     min-width: auto;
   }
-  
+
   :deep(.el-date-editor) {
     width: 200px;
   }
-  
+
   :deep(.el-select) {
     width: 140px;
   }
@@ -1182,29 +1158,29 @@ onMounted(async () => {
   .dashboard-header {
     padding: 20px;
   }
-  
+
   .welcome-section h1 {
     font-size: 28px;
   }
-  
+
   .subtitle {
     font-size: 16px;
   }
-  
+
   :deep(.el-date-editor) {
     width: 180px;
   }
-  
+
   :deep(.el-select) {
     width: 120px;
   }
-  
+
   :deep(.el-button) {
     height: 40px;
     font-size: 14px;
     padding: 0 16px;
   }
-  
+
   :deep(.el-icon) {
     font-size: 16px;
   }
@@ -1214,16 +1190,16 @@ onMounted(async () => {
   :deep(.el-date-editor) {
     width: 100%;
   }
-  
+
   .header-actions {
     flex-direction: column;
     gap: 12px;
   }
-  
+
   :deep(.el-select) {
     width: 100%;
   }
-  
+
   :deep(.el-button) {
     width: 100%;
   }
@@ -1600,5 +1576,287 @@ onMounted(async () => {
     .chart-area {
         height: 300px;
     }
+}
+
+/* 高频错题卡片样式 */
+.hot-mistakes-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.hot-mistakes-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.hot-mistakes-list::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 3px;
+}
+
+.hot-mistakes-list::-webkit-scrollbar-track {
+    background: rgba(209, 213, 219, 0.2);
+}
+
+.hot-mistake-item {
+    display: flex;
+    gap: 12px;
+    padding: 15px;
+    margin-bottom: 12px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(209, 213, 219, 0.3);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.hot-mistake-item:hover {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(59, 130, 246, 0.4);
+    transform: translateX(5px);
+}
+
+.mistake-index {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.mistake-content {
+    flex: 1;
+}
+
+.mistake-subject {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.subject-badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.subject-badge.subject-math {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+.subject-badge.subject-algebra {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.subject-badge.subject-probability {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.knowledge-point {
+    font-size: 12px;
+    color: #6b7280;
+    background: rgba(107, 114, 128, 0.1);
+    padding: 2px 8px;
+    border-radius: 8px;
+}
+
+.error-count {
+    font-size: 12px;
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.mistake-question {
+    color: #374151;
+    line-height: 1.6;
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #10b981;
+    font-size: 16px;
+}
+
+/* 目标进度样式 */
+.progress-section {
+    margin-bottom: 30px;
+}
+
+.progress-section .chart-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.target-info .days-left {
+    font-size: 15px;
+    margin: 5px 0;
+    color: #f56c6c;
+}
+
+.days-count {
+    font-weight: 700;
+    font-size: 18px;
+    color: #f56c6c;
+}
+
+/* 错题详情对话框样式 */
+.question-detail-dialog :deep(.el-dialog__body) {
+    padding: 20px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.question-detail-content {
+    color: #1f2937;
+}
+
+.detail-section {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.detail-section:last-child {
+    border-bottom: none;
+}
+
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.detail-header h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #3b82f6;
+    margin: 0;
+}
+
+.question-meta {
+    display: flex;
+    align-items: center;
+}
+
+.question-body {
+    line-height: 1.8;
+}
+
+.question-text {
+    font-size: 15px;
+    color: #374151;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.options-list {
+    margin-top: 12px;
+}
+
+.option-item {
+    display: flex;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.option-item:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+}
+
+.option-label {
+    font-weight: 600;
+    color: #3b82f6;
+    min-width: 24px;
+}
+
+.option-text {
+    flex: 1;
+    color: #4b5563;
+}
+
+.answer-section {
+    background: #f0f9ff;
+    padding: 16px;
+    border-radius: 8px;
+}
+
+.answer-row,
+.analysis-row {
+    margin-bottom: 12px;
+}
+
+.answer-row:last-child,
+.analysis-row:last-child {
+    margin-bottom: 0;
+}
+
+.answer-label,
+.analysis-label {
+    font-weight: 600;
+    color: #1f2937;
+    margin-right: 8px;
+}
+
+.answer-value {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.answer-value.primary {
+    color: #10b981;
+}
+
+.analysis-content {
+    display: inline-block;
+    color: #4b5563;
+    line-height: 1.8;
+    padding: 8px 0;
+}
+
+.tags-list {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* KaTeX样式优化 */
+.latex-answer :deep(.katex),
+.latex-content :deep(.katex) {
+    font-size: 1.1em;
+}
+
+.latex-content :deep(.katex-display) {
+    margin: 12px 0;
+}
+
+.question-text :deep(.katex) {
+    font-size: 1.05em;
+}
+
+.option-text :deep(.katex) {
+    font-size: 1em;
 }
 </style>

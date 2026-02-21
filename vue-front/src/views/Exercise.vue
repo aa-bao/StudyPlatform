@@ -189,19 +189,13 @@ const submitAnswer = async () => {
     stat.isSubmitted = true;
 
     // --- 调用后端 RecordController ---
-    await request.post('/record/add', {
-        userId: userInfo.id,       // 对应实体类字段
+    await request.post('/record/submit', {
+        userId: userInfo.id,
         questionId: question.id,
         userAnswer: stat.selected,
-        isCorrect: stat.isCorrect ? 1 : 0
+        source: 'exercise',
+        duration: seconds.value // 使用当前计时器时间
     });
-
-    if (!stat.isCorrect) {
-        await request.post('/question/saveWrong', {
-            userId: userInfo.id,
-            questionId: question.id
-        });
-    }
 }
 
 const nextQuestion = () => {

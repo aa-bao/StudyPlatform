@@ -390,7 +390,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
                 session.getCreateTime() != null && session.getSubmitTime() != null ?
                         java.time.Duration.between(session.getCreateTime(), session.getSubmitTime()).toMinutes() : 0,
                 session.getSwitchCount()));
-        summary.append("\nAI 批改反馈：\n");
+        summary.append("\n建议：\n");
 
         for (int i = 0; i < details.size(); i++) {
             ExamRecord detail = details.get(i);

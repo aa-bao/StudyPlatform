@@ -12,17 +12,19 @@ body,
   width: 100%;
 }
 
-/* 滚动条 */
+/* 隐藏滚动条但保留滚动功能 */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 0px;
+  background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
+/* Firefox */
+* {
+  scrollbar-width: none;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(37, 99, 235, 0.4);
+/* IE and Edge */
+html {
+  -ms-overflow-style: none;
 }
 </style>

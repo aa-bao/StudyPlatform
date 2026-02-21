@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.kaoyanplatform.common.Result;
 import org.example.kaoyanplatform.entity.ExamRecord;
+import org.example.kaoyanplatform.entity.dto.ExamRecordDetailDTO;
 import org.example.kaoyanplatform.entity.dto.SubjectiveQuestionDetailDTO;
 import org.example.kaoyanplatform.entity.dto.UserGradingDTO;
 import org.example.kaoyanplatform.service.ExamRecordService;
@@ -89,14 +90,11 @@ public class ExamRecordController {
     }
 
     @GetMapping("/session/{sessionId}")
-    @Operation(summary = "获取会话答题详情", description = "获取指定考试会话的所有答题记录")
-    public Result<List<ExamRecord>> getSessionDetails(
+    @Operation(summary = "获取会话答题详情", description = "获取指定考试会话的所有答题记录（包含题目信息）")
+    public Result<List<ExamRecordDetailDTO>> getSessionDetails(
             @Parameter(description = "考试会话ID", required = true) @PathVariable Long sessionId) {
         try {
-            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ExamRecord> wrapper =
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-            wrapper.eq(ExamRecord::getSessionId, sessionId);
-            List<ExamRecord> records = examRecordService.list(wrapper);
+            List<ExamRecordDetailDTO> records = examRecordService.getSessionExamDetailList(sessionId);
             return Result.success(records);
         } catch (Exception e) {
             return Result.error(e.getMessage());

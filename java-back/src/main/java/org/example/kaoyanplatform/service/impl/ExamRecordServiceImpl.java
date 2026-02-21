@@ -4,11 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.example.kaoyanplatform.entity.*;
+import org.example.kaoyanplatform.entity.dto.ExamRecordDetailDTO;
 import org.example.kaoyanplatform.entity.dto.SubjectiveQuestionDetailDTO;
 import org.example.kaoyanplatform.entity.dto.UserGradingDTO;
 import org.example.kaoyanplatform.mapper.ExamRecordMapper;
 import org.example.kaoyanplatform.mapper.QuestionPaperRelMapper;
 import org.example.kaoyanplatform.service.ExamRecordService;
+import org.example.kaoyanplatform.mapper.ExamSessionMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,12 @@ public class ExamRecordServiceImpl extends ServiceImpl<ExamRecordMapper, ExamRec
 
     @Autowired
     private QuestionPaperRelMapper questionPaperRelMapper;
+
+    @Autowired
+    private org.example.kaoyanplatform.mapper.QuestionMapper questionMapper;
+
+    @Autowired
+    private ExamSessionMapper examSessionMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -79,29 +87,60 @@ public class ExamRecordServiceImpl extends ServiceImpl<ExamRecordMapper, ExamRec
             return Collections.emptyList();
         }
 
-        // 查询该会话的所有主观题记录
-        LambdaQueryWrapper<ExamRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ExamRecord::getSessionId, sessionId)
-               .in(ExamRecord::getIsCorrect, Arrays.asList(3, null)); // 3表示待批改（主观题）
+        // 查询考试会话获取paperId
+        ExamSession examSession = examSessionMapper.selectById(sessionId);
+        if (examSession == null || examSession.getPaperId() == null) {
+            return Collections.emptyList();
+        }
+        Long paperId = examSession.getPaperId();
 
+        // 查询该会话的所有答题记录
+        LambdaQueryWrapper<ExamRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ExamRecord::getSessionId, sessionId);
         List<ExamRecord> records = this.list(wrapper);
+
         if (records.isEmpty()) {
             return Collections.emptyList();
         }
 
-        return records.stream().map(record -> {
-            SubjectiveQuestionDetailDTO dto = new SubjectiveQuestionDetailDTO();
-            dto.setQuestionId(record.getQuestionId());
-            dto.setUserAnswer(record.getUserAnswer());
-            dto.setUserProcessGrading(record.getUserProcessGrading());
-            dto.setUserResultGrading(record.getUserResultGrading());
+        return records.stream()
+            .filter(record -> {
+                // 查询题目类型，筛选出主观题（type=4）
+                Question question = questionMapper.selectById(record.getQuestionId());
+                return question != null && question.getType() == 4;
+            })
+            .map(record -> {
+                SubjectiveQuestionDetailDTO dto = new SubjectiveQuestionDetailDTO();
+                dto.setQuestionId(record.getQuestionId());
+                dto.setUserAnswer(record.getUserAnswer());
+                dto.setUserProcessGrading(record.getUserProcessGrading());
+                dto.setUserResultGrading(record.getUserResultGrading());
 
-            // 查询题目和试卷关联信息
-            // 这里需要关联查询，简化处理
-            // TODO: 实际实现需要从 Question 和 QuestionPaperRel 表获取完整信息
+                // 查询题目信息
+                Question question = questionMapper.selectById(record.getQuestionId());
+                if (question != null) {
+                    dto.setQuestionContent(question.getContent());
+                    dto.setStandardAnswer(question.getAnswer());
+                    dto.setQuestionType(question.getType());
+                }
 
-            return dto;
-        }).collect(Collectors.toList());
+                // 查询试卷关联信息
+                LambdaQueryWrapper<QuestionPaperRel> relWrapper = new LambdaQueryWrapper<>();
+                relWrapper.eq(QuestionPaperRel::getPaperId, paperId)
+                          .eq(QuestionPaperRel::getQuestionId, record.getQuestionId());
+                QuestionPaperRel rel = questionPaperRelMapper.selectOne(relWrapper);
+
+                if (rel != null) {
+                    dto.setSortOrder(rel.getSortOrder());
+                    dto.setTotalScore(rel.getScoreValue());
+                    dto.setProcessScoreValue(rel.getProcessScoreValue());
+                    dto.setResultScoreValue(rel.getResultScoreValue());
+                    dto.setProcessRatio(rel.getProcessRatio());
+                    dto.setResultRatio(rel.getResultRatio());
+                }
+
+                return dto;
+            }).collect(Collectors.toList());
     }
 
     @Override
@@ -141,6 +180,85 @@ public class ExamRecordServiceImpl extends ServiceImpl<ExamRecordMapper, ExamRec
         result.put("objectiveCount", objectiveRecords.size());
         result.put("subjectiveCount", subjectiveRecords.size());
 
+        return result;
+    }
+
+    @Override
+    public List<ExamRecordDetailDTO> getSessionExamDetailList(Long sessionId) {
+        if (sessionId == null) {
+            return Collections.emptyList();
+        }
+
+        log.info("获取会话答题详情 - sessionId: {}", sessionId);
+
+        // 查询考试会话获取paperId
+        ExamSession examSession = examSessionMapper.selectById(sessionId);
+        if (examSession == null || examSession.getPaperId() == null) {
+            log.warn("考试会话不存在或paperId为空 - sessionId: {}", sessionId);
+            return Collections.emptyList();
+        }
+        Long paperId = examSession.getPaperId();
+        log.info("获取到paperId: {}", paperId);
+
+        // 查询该会话的所有答题记录
+        LambdaQueryWrapper<ExamRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ExamRecord::getSessionId, sessionId);
+        List<ExamRecord> records = this.list(wrapper);
+
+        if (records.isEmpty()) {
+            log.warn("没有找到答题记录 - sessionId: {}", sessionId);
+            return Collections.emptyList();
+        }
+
+        log.info("找到 {} 条答题记录", records.size());
+
+        List<ExamRecordDetailDTO> result = records.stream().map(record -> {
+            ExamRecordDetailDTO dto = new ExamRecordDetailDTO();
+            dto.setId(record.getId());
+            dto.setSessionId(record.getSessionId());
+            dto.setQuestionId(record.getQuestionId());
+            dto.setUserAnswer(record.getUserAnswer());
+            dto.setIsCorrect(record.getIsCorrect());
+            dto.setScoreEarned(record.getScoreEarned());
+            dto.setDurationSeconds(record.getDurationSeconds());
+            dto.setAiFeedback(record.getAiFeedback());
+            dto.setKnowledgePointId(record.getKnowledgePointId());
+            dto.setUserProcessGrading(record.getUserProcessGrading());
+            dto.setUserResultGrading(record.getUserResultGrading());
+            dto.setGradingTime(record.getGradingTime());
+            dto.setCreateTime(record.getCreateTime());
+
+            // 查询题目信息
+            Question question = questionMapper.selectById(record.getQuestionId());
+            if (question != null) {
+                dto.setQuestionContent(question.getContent());
+                String answer = question.getAnswer();
+                dto.setStandardAnswer(answer);
+                dto.setQuestionType(question.getType());
+                log.debug("题目ID: {}, 标准答案: {}, 题型: {}", record.getQuestionId(), answer, question.getType());
+            } else {
+                log.warn("未找到题目 - questionId: {}", record.getQuestionId());
+            }
+
+            // 查询试卷关联信息
+            LambdaQueryWrapper<QuestionPaperRel> relWrapper = new LambdaQueryWrapper<>();
+            relWrapper.eq(QuestionPaperRel::getPaperId, paperId)
+                      .eq(QuestionPaperRel::getQuestionId, record.getQuestionId());
+            QuestionPaperRel rel = questionPaperRelMapper.selectOne(relWrapper);
+
+            if (rel != null) {
+                dto.setSortOrder(rel.getSortOrder());
+                dto.setTotalScore(rel.getScoreValue());
+                dto.setProcessScoreValue(rel.getProcessScoreValue());
+                dto.setResultScoreValue(rel.getResultScoreValue());
+                dto.setProcessRatio(rel.getProcessRatio());
+                dto.setResultRatio(rel.getResultRatio());
+            }
+
+            return dto;
+        }).collect(Collectors.toList());
+
+        log.info("返回 {} 条答题详情", result.size());
         return result;
     }
 }

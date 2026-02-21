@@ -28,6 +28,9 @@
                             <el-button type="primary" @click="loadData">查询</el-button>
                             <el-button @click="resetSearch" plain>重置</el-button>
                         </el-form-item>
+                        <el-form-item style="float: right;">
+                            <el-button type="success" @click="handleAdd" :icon="Plus">新增用户</el-button>
+                        </el-form-item>
                     </el-form>
                 </div>
                 
@@ -120,10 +123,16 @@
                     </el-table-column>
 
                     <!-- 编辑对话框 -->
-                    <el-dialog v-model="editDialogVisible" title="编辑用户信息" width="500px" append-to-body>
+                    <el-dialog v-model="editDialogVisible" :title="isAddMode ? '新增用户' : '编辑用户信息'" width="500px" append-to-body>
                         <el-form :model="editForm" label-width="80px" style="padding: 0 20px">
-                            <el-form-item label="用户名">
+                            <el-form-item label="用户名" v-if="isAddMode">
+                                <el-input v-model="editForm.username" placeholder="请输入用户名" />
+                            </el-form-item>
+                            <el-form-item label="用户名" v-else>
                                 <el-input v-model="editForm.username" disabled />
+                            </el-form-item>
+                            <el-form-item label="密码" v-if="isAddMode">
+                                <el-input v-model="editForm.password" type="password" placeholder="请输入密码" show-password />
                             </el-form-item>
                             <el-form-item label="昵称">
                                 <el-input v-model="editForm.nickname" placeholder="请输入昵称" />
@@ -140,10 +149,17 @@
                                     <el-option label="管理员" value="admin" />
                                 </el-select>
                             </el-form-item>
+                            <el-form-item label="考研年份">
+                                <el-input v-model="editForm.examYear" placeholder="请输入考研年份" />
+                            </el-form-item>
                         </el-form>
                         <template #footer>
-                            <el-button @click="editDialogVisible = false">取消</el-button>
-                            <el-button type="primary" @click="submitEdit" :loading="submitLoading">保存修改</el-button>
+                            <div style="display: flex; justify-content: space-between; width: 100%;">
+                                <el-button v-if="!isAddMode" type="danger" @click="handleDelete" :loading="submitLoading">删除用户</el-button>
+                                <div style="flex: 1;"></div>
+                                <el-button @click="editDialogVisible = false">取消</el-button>
+                                <el-button type="primary" @click="submitEdit" :loading="submitLoading">{{ isAddMode ? '确认添加' : '保存修改' }}</el-button>
+                            </div>
                         </template>
                     </el-dialog>
 
@@ -212,7 +228,8 @@
 
 <script setup>
 import { ref, onMounted, nextTick, onUnmounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus' 
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import request from '@/utils/request'
 
@@ -235,9 +252,18 @@ const searchForm = ref({ role: '', keyword: '' })
 const editDialogVisible = ref(false)
 const pwdDialogVisible = ref(false)
 const submitLoading = ref(false)
+const isAddMode = ref(false)
 
 // 表单数据
-const editForm = ref({})
+const editForm = ref({
+    username: '',
+    password: '',
+    nickname: '',
+    phone: '',
+    email: '',
+    role: 'student',
+    examYear: '27考研'
+})
 const pwdForm = ref({ newPassword: '' })
 
 // 数据加载
@@ -258,23 +284,83 @@ const loadData = async () => {
     }
 }
 
+// 打开新增
+const handleAdd = () => {
+    isAddMode.value = true
+    editForm.value = {
+        username: '',
+        password: '',
+        nickname: '',
+        phone: '',
+        email: '',
+        role: 'student',
+        examYear: '27考研'
+    }
+    editDialogVisible.value = true
+}
+
 // 打开编辑
 const handleEdit = (row) => {
+    isAddMode.value = false
     editForm.value = { ...row }
     editDialogVisible.value = true
 }
 
-// 提交编辑
+// 提交编辑/新增
 const submitEdit = async () => {
+    // 表单验证
+    if (!editForm.value.username) {
+        ElMessage.warning('请输入用户名')
+        return
+    }
+    if (isAddMode.value && !editForm.value.password) {
+        ElMessage.warning('请输入密码')
+        return
+    }
+
     submitLoading.value = true
     try {
-        // 假设后端接口为 /user/update
-        await request.post('/user/update', editForm.value)
-        ElMessage.success('更新成功')
+        if (isAddMode.value) {
+            // 新增用户
+            await request.post('/user/register', editForm.value)
+            ElMessage.success('添加成功')
+        } else {
+            // 更新用户
+            await request.post('/user/update', editForm.value)
+            ElMessage.success('更新成功')
+        }
         editDialogVisible.value = false
         loadData() // 刷新列表
     } catch (e) {
-        ElMessage.error('更新失败')
+        ElMessage.error(isAddMode.value ? '添加失败：' + (e.message || '用户名可能已存在') : '更新失败')
+    } finally {
+        submitLoading.value = false
+    }
+}
+
+// 删除用户
+const handleDelete = async () => {
+    try {
+        await ElMessageBox.confirm(
+            `确定要删除用户 "${editForm.value.nickname || editForm.value.username}" 吗？此操作不可恢复！`,
+            '删除确认',
+            {
+                confirmButtonText: '确定删除',
+                cancelButtonText: '取消',
+                type: 'warning',
+                confirmButtonClass: 'el-button--danger'
+            }
+        )
+
+        submitLoading.value = true
+        await request.delete(`/user/delete/${editForm.value.id}`)
+        ElMessage.success('删除成功')
+        editDialogVisible.value = false
+        loadData() // 刷新列表
+    } catch (e) {
+        if (e !== 'cancel') {
+            ElMessage.error('删除失败')
+        }
     } finally {
         submitLoading.value = false
     }

@@ -29,21 +29,21 @@
 
         <div class="nav-right">
           <div class="top-tools">
-            <button @click="openDraft" class="nav-tool-btn">📝 草稿纸</button>
+            <button @click="openDraft" class="nav-tool-btn">
+              <img :src="draftIcon" alt="草稿纸" class="nav-tool-icon" />
+              草稿纸
+            </button>
           </div>
 
           <div class="timer-box">
             <button @click="toggleFullScreen" class="fullscreen-btn">
-              <span class="icon">全屏</span>
+              <img :src="fullScreenIcon" alt="全屏" class="fullscreen-icon" />
             </button>
             <span class="timer-label">倒计时</span>
             <span class="timer-value">{{ formatTime }}</span>
           </div>
           <button v-if="isSubmitted" @click="viewReport" class="view-report-btn">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" stroke-width="2"/>
-              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke="currentColor" stroke-width="2"/>
-            </svg>
+            <img :src="eyesIcon" alt="查看报告" class="btn-icon" />
             查看报告
           </button>
           <button v-else @click="handleSubmit" :disabled="submitting" class="submit-btn"
@@ -73,9 +73,9 @@
                 <div class="notice-box">
                   <p class="notice-title">考生注意事项：</p>
                   <ol class="notice-list">
-                    <li>答题前，考生务必将自己的姓名、准考证号填写在答题卡上。</li>
                     <li>选择题每小题选出答案后，请在系统中点击对应选项。</li>
                     <li>主观题请在输入框内作答，或使用草稿纸记录思路。</li>
+                    <li>公式编辑器中先点击行内公式按钮，出现$  $后再输入公式。</li>
                   </ol>
                 </div>
               </header>
@@ -85,7 +85,7 @@
                 <!-- 题型标题 -->
                 <div v-if="q.sectionTitle" class="section-banner">{{ q.sectionTitle }}</div>
 
-                <!-- 题目内容（跳过sectionTitle对象） -->
+                <!-- 题目内容 -->
                 <template v-else>
                   <!-- 题号和题目内容 -->
                   <p class="question-title">
@@ -125,6 +125,12 @@
                       rows="4"
                       placeholder="请输入你的答案..."
                     ></textarea>
+
+                    <!-- LaTeX 预览区 -->
+                    <div v-if="!isSubmitted && answers[q.id] && hasLatex(answers[q.id])" class="latex-preview">
+                      <div class="preview-label">公式预览：</div>
+                      <div class="preview-content" v-html="renderLatex(answers[q.id])"></div>
+                    </div>
 
                     <!-- LaTeX 快捷输入面板 -->
                     <LatexShortcuts
@@ -201,7 +207,7 @@
             <h3 class="modal-title">确认提交试卷</h3>
             <p class="modal-tips">
               当前已完成 <span class="highlight">{{ doneCount }}</span> 题，剩余 <span class="highlight">{{ totalCount - doneCount }}</span> 题未作答。
-              提交后将无法修改答案，并立即生成 AI 阅卷报告。
+              提交后将无法修改答案，并随后生成阅卷报告。
             </p>
             <div class="modal-btns">
               <button @click="showConfirmModal = false" class="modal-btn cancel">返回检查</button>
@@ -234,8 +240,7 @@
         <div v-if="showResultModal" class="modal-overlay">
           <div class="modal-content report-modal card-glow">
             <div class="modal-header">
-              <div class="modal-icon success">🎉</div>
-              <h3 class="modal-title">AI 智能阅卷报告</h3>
+              <h3 class="modal-title">试卷分析报告</h3>
             </div>
 
             <div class="report-body">
@@ -246,7 +251,7 @@
                   <span class="score-total">/ {{ paperInfo.totalScore || 150 }}</span>
                 </div>
                 <div class="analysis-box">
-                  <h4>💡 AI 总结</h4>
+                  <h4>总结</h4>
                   <p style="white-space: pre-line;">{{ examResult.aiSummary || '暂无总结' }}</p>
                 </div>
               </div>
@@ -265,7 +270,6 @@
     <transition name="fab-appear">
       <div v-if="isSubmitted" class="home-fab" @click="goBackToHome">
         <div class="fab-content">
-          <img :src="homeIcon" alt="主页" class="home-icon" />
           <span class="fab-text">返回首页</span>
         </div>
       </div>
@@ -282,7 +286,9 @@ import 'katex/dist/katex.min.css';
 import { startExam, saveSnapshot, recordSwitch, submitExam as submitExamApi, getSessionDetail } from '@/api/examSession';
 import { getPaperDetail } from '@/api/paper';
 import { getSessionExamRecords } from '@/api/examRecord';
-import homeIcon from '@/assets/icons/home.svg?url';
+import draftIcon from '@/assets/icons/draft.svg?url';
+import eyesIcon from '@/assets/icons/eyes.svg?url';
+import fullScreenIcon from '@/assets/icons/full-screen.svg?url';
 import UserGradingDialog from '@/components/UserGradingDialog.vue';
 import LatexShortcuts from '@/components/LatexShortcuts.vue';
 
@@ -649,6 +655,12 @@ const renderLatex = (latex) => {
     console.error('LaTeX 渲染失败:', e);
     return latex;
   }
+};
+
+// 检测是否包含 LaTeX 公式
+const hasLatex = (text) => {
+  if (!text) return false;
+  return /\$[^$]+\$/.test(text);
 };
 
 // 计时器
@@ -1276,6 +1288,16 @@ onUnmounted(() => {
   color: #1e293b;
 }
 
+.nav-tool-icon {
+  width: 18px;
+  height: 18px;
+  filter: brightness(0.6);
+}
+
+.nav-tool-btn:hover .nav-tool-icon {
+  filter: brightness(0.4);
+}
+
 .timer-box {
   display: flex;
   align-items: center;
@@ -1311,19 +1333,27 @@ button {
   background: none;
   border: none;
   color: #64748b;
-  font-size: 14px;
-  padding: 0 8px;
+  padding: 4px 8px;
   margin-right: 8px;
   border-right: 1px solid #e2e8f0;
   cursor: pointer;
   display: flex;
   align-items: center;
-  height: 100%;
+  justify-content: center;
+}
+
+.fullscreen-icon {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0.6);
+}
+
+.fullscreen-btn:hover .fullscreen-icon {
+  filter: brightness(0.4);
 }
 
 .fullscreen-btn:hover {
   background: #e5e7eb;
-  color: #111827;
 }
 
 .submit-btn {
@@ -1571,6 +1601,31 @@ button {
   width: 100%;
 }
 
+.latex-preview {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+}
+
+.preview-label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.preview-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #334155;
+  padding: 8px;
+  background-color: #ffffff;
+  border-radius: 4px;
+  min-height: 24px;
+}
+
 .paper-footer {
   margin-top: auto;
   padding: 20px 0;
@@ -1759,11 +1814,6 @@ button {
   text-align: center;
   width: 400px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-}
-
-.modal-icon {
-  font-size: 48px;
-  margin-bottom: 15px;
 }
 
 .modal-title {
@@ -1992,22 +2042,10 @@ button {
 .fab-content {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 0;
   position: relative;
   z-index: 1;
-}
-
-/* 图标 */
-.home-icon {
-  width: 24px;
-  height: 24px;
-  fill: rgb(255, 255, 255);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
-  transition: transform 0.3s ease;
-}
-
-.home-fab:hover .home-icon {
-  transform: rotate(-10deg) scale(1.1);
 }
 
 /* 文字 */
@@ -2058,21 +2096,9 @@ button {
 }
 
 .view-report-btn .btn-icon {
-  width: 16px;
-  height: 16px;
-}
-
-/* 题目批改状态 */
-.question-item.is-correct {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%);
-  border-radius: 8px;
-  padding: 8px;
-}
-
-.question-item.is-wrong {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(239, 68, 68, 0.02) 100%);
-  border-radius: 8px;
-  padding: 8px;
+  width: 18px;
+  height: 18px;
+  fill: white;
 }
 
 /* 选择题选项批改样式 */
@@ -2130,22 +2156,10 @@ button {
 .fab-content {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 0;
   position: relative;
   z-index: 1;
-}
-
-/* 图标 */
-.home-icon {
-  width: 24px;
-  height: 24px;
-  fill: rgb(255, 255, 255);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
-  transition: transform 0.3s ease;
-}
-
-.home-fab:hover .home-icon {
-  transform: rotate(-10deg) scale(1.1);
 }
 
 /* 文字 */

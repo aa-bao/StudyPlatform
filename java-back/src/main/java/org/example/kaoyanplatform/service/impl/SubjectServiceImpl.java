@@ -536,4 +536,116 @@ public class SubjectServiceImpl extends ServiceImpl<SubjectMapper, Subject> impl
 
         return resultRoots;
     }
+
+    @Override
+    public List<SubjectDTO> getKnowledgePoints(Integer examSpecId) {
+        // 1. 如果没有提供 examSpecId，返回所有 Level 3+ 的科目
+        if (examSpecId == null) {
+            QueryWrapper<Subject> wrapper = new QueryWrapper<>();
+            // 尝试匹配多种可能的 level 值格式
+            wrapper.in("level", Arrays.asList("3", "4", "5", 3, 4, 5));
+            wrapper.orderByAsc("sort");
+            List<Subject> allSubjects = list(wrapper);
+
+            System.out.println("【知识点查询】未指定考试规格，查询到 Level 3+ 科目数: " + allSubjects.size());
+
+            if (allSubjects.isEmpty()) {
+                return new ArrayList<>();
+            }
+
+            return buildKnowledgePointTree(allSubjects);
+        }
+
+        // 2. 如果提供了 examSpecId，先获取该考试规格下的所有科目
+        List<SubjectDTO> examSpecTree = getTreeByExamSpec(examSpecId, null);
+        System.out.println("【知识点查询】考试规格 " + examSpecId + " 的子树节点数: " + examSpecTree.size());
+
+        if (examSpecTree.isEmpty()) {
+            System.out.println("【知识点查询】考试规格 " + examSpecId + " 下没有子节点");
+            return new ArrayList<>();
+        }
+
+        // 3. 递归收集所有节点ID
+        Set<Integer> allRelatedIds = new HashSet<>();
+        for (SubjectDTO root : examSpecTree) {
+            collectAllIds(root, allRelatedIds);
+        }
+        System.out.println("【知识点查询】收集到的关联节点ID数: " + allRelatedIds.size());
+
+        // 4. 查询所有这些节点中的 Level 3+ 科目
+        List<Subject> allRelatedSubjects = listByIds(new ArrayList<>(allRelatedIds));
+        System.out.println("【知识点查询】查询到的关联科目总数: " + allRelatedSubjects.size());
+
+        // 5. 过滤出 Level 3+ 的节点
+        List<Subject> level3PlusSubjects = allRelatedSubjects.stream()
+            .filter(s -> {
+                try {
+                    int level = Integer.parseInt(s.getLevel());
+                    return level >= 3;
+                } catch (NumberFormatException e) {
+                    return false;
+                }
+            })
+            .collect(Collectors.toList());
+        System.out.println("【知识点查询】过滤后的 Level 3+ 科目数: " + level3PlusSubjects.size());
+
+        if (level3PlusSubjects.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return buildKnowledgePointTree(level3PlusSubjects);
+    }
+
+    /**
+     * 构建知识点树
+     */
+    private List<SubjectDTO> buildKnowledgePointTree(List<Subject> subjects) {
+        // 1. 转换为 DTO
+        Map<Integer, SubjectDTO> dtoMap = new HashMap<>();
+        for (Subject s : subjects) {
+            SubjectDTO dto = new SubjectDTO();
+            BeanUtils.copyProperties(s, dto);
+            dto.setChildren(new ArrayList<>());
+            dtoMap.put(s.getId(), dto);
+        }
+
+        // 2. 构建树形结构（只保留 Level 3+ 的父子关系）
+        List<SubjectDTO> resultRoots = new ArrayList<>();
+        for (Subject s : subjects) {
+            SubjectDTO dto = dtoMap.get(s.getId());
+
+            // 如果父节点存在且也在当前列表中，建立父子关系
+            if (s.getParentId() != null && s.getParentId() != 0) {
+                SubjectDTO parent = dtoMap.get(s.getParentId());
+                if (parent != null) {
+                    parent.getChildren().add(dto);
+                }
+            }
+
+            // 如果父节点不在列表中（或父节点是 Level 1-2），则作为根节点
+            if (s.getParentId() == null || s.getParentId() == 0 || !dtoMap.containsKey(s.getParentId())) {
+                resultRoots.add(dto);
+            }
+        }
+
+        // 3. 排序
+        sortTree(resultRoots);
+
+        return resultRoots;
+    }
+
+    /**
+     * 递归收集树中所有节点的ID
+     */
+    private void collectAllIds(SubjectDTO node, Set<Integer> idSet) {
+        if (node == null) {
+            return;
+        }
+        idSet.add(node.getId());
+        if (node.getChildren() != null) {
+            for (SubjectDTO child : node.getChildren()) {
+                collectAllIds(child, idSet);
+            }
+        }
+    }
 }

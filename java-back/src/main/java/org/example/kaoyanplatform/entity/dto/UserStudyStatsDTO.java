@@ -35,6 +35,21 @@ public class UserStudyStatsDTO {
     private String examYear;
 
     /**
+     * 累计刷题数
+     */
+    private Integer questionsDone;
+
+    /**
+     * 正确率（百分比）
+     */
+    private Double accuracy;
+
+    /**
+     * 总学习时长（小时）
+     */
+    private Double studyHours;
+
+    /**
      * 各科目统计数据
      */
     private List<SubjectStats> subjectStats;

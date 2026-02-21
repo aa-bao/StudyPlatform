@@ -1,1026 +1,1668 @@
 <template>
-  <div class="profile-container">
-    <div class="profile-content">
-      <el-row :gutter="24">
-        <!-- 左侧个人信息卡片 -->
-        <el-col :xs="24" :sm="6" :md="6" :lg="6" class="left-col">
-          <el-card class="user-card animate-card" :body-style="{ padding: '0px' }">
-            <div class="user-card-top">
-              <div class="role-badge" :class="userInfo.role">
-                {{ userInfo.role === 'admin' ? '管理员' : '正式学员' }}
-              </div>
-              <el-upload class="avatar-uploader" action="#" :show-file-list="false" :auto-upload="false"
-                :on-change="handleAvatarChange">
-                <div class="avatar-wrapper">
-                  <el-avatar :size="100" class="user-avatar"
-                    :src="userInfo.avatar || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png '" />
-                  <div class="avatar-mask">
-                    <el-icon class="camera-icon">
-                      <Camera />
-                    </el-icon>
-                    <span class="upload-text">更换</span>
-                  </div>
+    <div class="dashboard-page">
+        <header class="hero-header">
+            <div class="noise-bg"></div>
+            <div class="container hero-content">
+                <div class="user-profile">
+                    <div class="avatar-container">
+                        <div class="avatar-box" @click="handleAvatarClick" style="cursor: pointer;">
+                            <img :src="userInfo.avatar || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'"
+                                alt="Avatar">
+                            <div class="avatar-overlay">更换头像</div>
+                        </div>
+                        <input type="file" ref="fileInputRef" @change="handleAvatarChange" accept="image/*" style="display: none;">
+                    </div>
+                    <div class="user-text">
+                        <div class="name-line">
+                            <h1>{{ userInfo.nickname || '用户' }}</h1>
+                            <span class="year-badge">{{ userInfo.examYear || '未设置' }}</span>
+                        </div>
+                        <p class="motto">{{ userInfo.motto || '不要放弃自己的梦想！' }}</p>
+                        <div class="stats-row">
+                            <div class="stat-cell"><span>{{ progress[0].current || 0 }}</span> 刷题</div>
+                            <div class="v-line"></div>
+                            <div class="stat-cell"><span>{{ progress[1].percent || 0 }}%</span> 正确率</div>
+                            <div class="v-line"></div>
+                            <div class="stat-cell"><span>{{ progress[2].current || 0 }}h</span> 学习时长</div>
+                        </div>
+                    </div>
                 </div>
-              </el-upload>
-              <h2 class="user-name">{{ userInfo.nickname || userInfo.username || '考研战士' }}</h2>
-              <p class="user-slogan">道阻且长，行则将至</p>
 
-              <!-- 倒计时小组件 -->
-              <div class="countdown-badge" v-if="daysToExam && daysToExam > 0">
-                <span class="label">距离考研</span>
-                <span class="number">{{ daysToExam }}</span>
-                <span class="unit">天</span>
-              </div>
-            </div>
-
-            <div class="user-bio">
-              <div class="bio-item">
-                <span class="label">用户名</span>
-                <span class="value">{{ userInfo.username || '未加载' }}</span>
-              </div>
-              <div class="bio-item">
-                <span class="label">目标年份</span>
-                <span class="value">{{ userInfo.examYear || '未设置' }}</span>
-              </div>
-              <div class="bio-item">
-                <span class="label">公共课</span>
-                <div class="subject-tags" v-if="userInfo.examSubjects">
-                  <el-tag v-for="tag in userInfo.examSubjects.split(',')" :key="tag" size="small" effect="plain" round
-                    class="custom-tag">
-                    {{ tag }}
-                  </el-tag>
+                <div class="header-cards">
+                    <div class="glass-card">
+                        <div class="icon-wrap sky">
+                            <img :src="calendarIcon" alt="clock">
+                        </div>
+                        <div class="card-info">
+                            <label>连续打卡</label>
+                            <p>15天</p>
+                        </div>
+                    </div>
+                    <div class="glass-card">
+                        <div class="icon-wrap sky">
+                            <img :src="trophyIcon" alt="trophy">
+                        </div>
+                        <div class="card-info">
+                            <label>今日排名</label>
+                            <p>TOP 5%</p>
+                        </div>
+                    </div>
                 </div>
-              </div>
             </div>
-          </el-card>
+        </header>
 
-          <!-- 近期目标 -->
-          <el-card class="memo-card animate-card">
-            <div class="memo-header">
-              <span class="memo-title">近期目标</span>
-              <el-icon class="memo-icon">
-                <EditPen />
-              </el-icon>
-            </div>
-            <div class="memo-list">
-              <div class="memo-item">
-                <el-checkbox v-model="memo1">背诵英语单词 50 个</el-checkbox>
-              </div>
-              <div class="memo-item">
-                <el-checkbox v-model="memo2">复习政治马原第一章</el-checkbox>
-              </div>
-              <div class="memo-item">
-                <el-checkbox v-model="memo3">做一套数学模拟卷</el-checkbox>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
+        <main class="container main-layout">
+            <div class="col-left">
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title-with-icon">
+                            <img :src="userSettingIcon" alt="setting">
+                            个人资料
+                        </h2>
+                    </div>
+                    <div class="tabs">
+                        <button :class="{ active: activeTab === 'basic' }" @click="activeTab = 'basic'">基本信息</button>
+                        <button :class="{ active: activeTab === 'security' }"
+                            @click="activeTab = 'security'">安全设置</button>
+                    </div>
 
-        <!-- 中间设置面板 -->
-        <el-col :xs="24" :sm="12" :md="11" :lg="10" class="center-col">
-          <el-card class="settings-card animate-card">
-            <template #header>
-              <div class="card-header">
-                <span class="header-title">个人设置</span>
-                <span class="header-desc">完善个人信息，定制专属复习计划</span>
-              </div>
-            </template>
-
-            <el-tabs v-model="activeTab" class="custom-tabs">
-              <el-tab-pane label="基本资料" name="info">
-                <div class="tab-content-wrapper">
-                  <el-form :model="infoForm" :rules="infoRules" ref="infoFormRef" label-width="80px"
-                    class="profile-form" label-position="top">
-
-                    <el-form-item label="昵称" prop="nickname">
-                      <el-input v-model="infoForm.nickname" placeholder="请输入昵称" size="large">
-                        <template #prefix><el-icon>
-                            <User />
-                          </el-icon></template>
-                      </el-input>
-                    </el-form-item>
-
-                    <el-form-item label="考研年份" prop="examYear">
-                      <el-select v-model="infoForm.examYear" placeholder="请选择目标年份" style="width: 100%" size="large">
-                        <el-option label="27考研 (2026年12月考)" value="27考研" />
-                        <el-option label="28考研 (2027年12月考)" value="28考研" />
-                        <el-option label="29考研 (2028年12月考)" value="29考研" />
-                      </el-select>
-                    </el-form-item>
-
-                    <el-form-item label="报考科目设置" class="subject-form-item">
-                      <div class="subject-selection-card">
-                        <div class="subject-group">
-                          <div class="group-title">公共课 · 政治</div>
-                          <div class="group-content">
-                            <el-checkbox v-model="infoForm.politics" disabled border
-                              class="fixed-subject">思想政治理论</el-checkbox>
-                          </div>
+                    <!-- 基本信息表单 -->
+                    <form v-if="activeTab === 'basic'" class="profile-form" @submit.prevent>
+                        <div class="form-row">
+                            <div class="form-item">
+                                <label>昵称 <span class="req">*</span></label>
+                                <input type="text" v-model="userInfo.nickname" placeholder="请输入昵称">
+                            </div>
+                            <div class="form-item">
+                                <label>考研年份 <span class="req">*</span></label>
+                                <div class="custom-select">
+                                    <select v-model="userInfo.examYear">
+                                        <option value="">请选择</option>
+                                        <option value="27考研">27考研</option>
+                                        <option value="28考研">28考研</option>
+                                        <option value="29考研">29考研</option>
+                                        <option value="30考研">30考研</option>
+                                    </select>
+                                    <span class="select-arrow">▼</span>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="subject-divider"></div>
-
-                        <div class="subject-group">
-                          <div class="group-title">公共课 · 外语</div>
-                          <div class="group-content">
-                            <el-radio-group v-model="infoForm.english">
-                              <el-radio label="英语一" border>英语一</el-radio>
-                              <el-radio label="英语二" border>英语二</el-radio>
-                            </el-radio-group>
-                          </div>
+                        <div class="form-item">
+                            <label>期语</label>
+                            <div class="textarea-box">
+                                <textarea v-model="userInfo.motto" placeholder="写一句话激励自己..." maxlength="100"></textarea>
+                                <span class="count">{{ userInfo.motto.length }} / 100</span>
+                            </div>
                         </div>
 
-                        <div class="subject-divider"></div>
-
-                        <div class="subject-group">
-                          <div class="group-title">公共课 · 数学</div>
-                          <div class="group-content">
-                            <el-radio-group v-model="infoForm.math">
-                              <el-radio label="数学一" border>数学一</el-radio>
-                              <el-radio label="数学二" border>数学二</el-radio>
-                              <el-radio label="数学三" border>数学三</el-radio>
-                              <el-radio label="无" border>不考数学</el-radio>
-                            </el-radio-group>
-                          </div>
+                        <div class="form-item">
+                            <label>报考公共课</label>
+                            <div class="subject-panel">
+                                <div class="subject-item">
+                                    <div class="subject-input disabled">
+                                        <span>思想政治理论</span>
+                                        <span class="mini-tag">必考</span>
+                                    </div>
+                                </div>
+                                <div class="radio-groups">
+                                    <div class="radio-row">
+                                        <label v-for="opt in ['英语一', '英语二']" :key="opt" class="custom-radio"
+                                            :class="{ selected: userInfo.examSubjects.english === opt }">
+                                            <input type="radio" :value="opt" v-model="userInfo.examSubjects.english"> {{ opt }}
+                                        </label>
+                                    </div>
+                                    <div class="radio-row">
+                                        <label v-for="opt in ['数学一', '数学二', '数学三', '不考数学']" :key="opt"
+                                            class="custom-radio" :class="{ selected: userInfo.examSubjects.math === opt }">
+                                            <input type="radio" :value="opt" v-model="userInfo.examSubjects.math"> {{ opt }}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                      </div>
-                    </el-form-item>
+                        <button type="button" class="btn-save" @click="handleSaveBasicInfo">保存修改</button>
+                    </form>
 
-                    <el-form-item class="form-actions">
-                      <el-button type="primary" size="large" @click="handleUpdateInfo" :loading="loading"
-                        class="submit-btn" round>
-                        保存修改
-                      </el-button>
-                    </el-form-item>
-                  </el-form>
-                </div>
-              </el-tab-pane>
+                    <!-- 安全设置表单 -->
+                    <form v-else class="profile-form" @submit.prevent="handleUpdatePassword">
+                        <div class="form-item">
+                            <label>原密码 <span class="req">*</span></label>
+                            <input
+                                type="password"
+                                v-model="passwordForm.oldPassword"
+                                placeholder="请输入原密码"
+                                @blur="validateOldPassword"
+                            >
+                            <span v-if="passwordError.oldPassword" class="error-text">{{ passwordError.oldPassword }}</span>
+                        </div>
 
-              <el-tab-pane label="安全设置" name="security">
-                <div class="tab-content-wrapper security-wrapper">
-                  <el-form :model="pwdForm" :rules="pwdRules" ref="pwdFormRef" label-width="100px"
-                    class="profile-form security-form" label-position="top">
-                    <el-form-item label="旧密码" prop="oldPassword">
-                      <el-input v-model="pwdForm.oldPassword" type="password" show-password placeholder="请输入当前密码"
-                        size="large" />
-                    </el-form-item>
-                    <el-form-item label="新密码" prop="newPassword">
-                      <el-input v-model="pwdForm.newPassword" type="password" show-password placeholder="请输入新密码"
-                        size="large" />
-                    </el-form-item>
-                    <el-form-item label="确认密码" prop="confirmPassword">
-                      <el-input v-model="pwdForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码"
-                        size="large" />
-                    </el-form-item>
-                    <el-form-item class="form-actions">
-                      <el-button type="primary" size="large" @click="handleChangePassword" :loading="loading"
-                        class="submit-btn" round>
-                        修改密码
-                      </el-button>
-                    </el-form-item>
-                  </el-form>
-                </div>
-              </el-tab-pane>
-            </el-tabs>
-          </el-card>
-        </el-col>
+                        <div class="form-item">
+                            <label>新密码 <span class="req">*</span></label>
+                            <input
+                                type="password"
+                                v-model="passwordForm.newPassword"
+                                placeholder="请输入新密码（6-20位）"
+                                @blur="validateNewPassword"
+                            >
+                            <span v-if="passwordError.newPassword" class="error-text">{{ passwordError.newPassword }}</span>
+                        </div>
 
-        <!-- 右侧统计面板 -->
-        <el-col :xs="24" :sm="6" :md="6" :lg="8" class="right-col">
-          <div class="stats-column">
-            <!-- 统计卡片 -->
-            <div class="stat-card-vertical stat-gradient-blue">
-              <div class="stat-icon-v icon-blue"><el-icon>
-                  <Timer />
-                </el-icon></div>
-              <div class="stat-info-v">
-                <div class="stat-value-v color-blue">126</div>
-                <div class="stat-label-v">累计学习(小时)</div>
-              </div>
+                        <div class="form-item">
+                            <label>确认密码 <span class="req">*</span></label>
+                            <input
+                                type="password"
+                                v-model="passwordForm.confirmPassword"
+                                placeholder="请再次输入新密码"
+                                @blur="validateConfirmPassword"
+                                @input="validateConfirmPassword"
+                            >
+                            <span v-if="passwordError.confirmPassword" class="error-text">{{ passwordError.confirmPassword }}</span>
+                        </div>
+
+                        <div class="form-item">
+                            <label>绑定邮箱</label>
+                            <div class="input-with-action">
+                                <input type="email" v-model="userInfo.email" placeholder="请输入邮箱地址">
+                                <button type="button" class="btn-verify" @click="handleEmailVerify">验证</button>
+                            </div>
+                        </div>
+
+                        <div class="form-item">
+                            <label>绑定手机</label>
+                            <div class="input-with-action">
+                                <input type="tel" v-model="userInfo.phone" placeholder="请输入手机号">
+                                <button type="button" class="btn-verify" @click="handlePhoneModify">修改</button>
+                            </div>
+                        </div>
+
+                        <div class="security-tips">
+                            <div class="tip-icon">💡</div>
+                            <div class="tip-content">
+                                <h4>安全建议</h4>
+                                <ul>
+                                    <li>建议定期更换密码，保护账户安全</li>
+                                    <li>密码应包含字母、数字和特殊字符</li>
+                                    <li>不要在多个网站使用相同密码</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-save">保存修改</button>
+                    </form>
+                </section>
+
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title-with-icon">
+                        <img :src="chartIcon" alt="chart">
+                            学习进度
+                        </h2>
+                        <a href="#" class="link">查看详情</a>
+                    </div>
+                    <div class="progress-stack">
+                        <div v-for="item in progress" :key="item.label" class="progress-group">
+                            <div class="progress-labels">
+                                <span>{{ item.label }} ({{ item.current }}/{{ item.total }} {{ item.unit }})</span>
+                                <span class="percent" :style="{ color: item.color }">{{ item.percent }}%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="fill"
+                                    :style="{ width: item.percent + '%', backgroundColor: item.color, boxShadow: `0 0 10px ${item.color}4d` }">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title-with-icon">
+                            <img :src="clockIcon" alt="notebook">
+                            最近学习
+                        </h2>
+                        <a href="#" class="link">查看全部</a>
+                    </div>
+                    <div class="learning-list">
+                        <div v-for="i in 3" :key="i" class="learning-item">
+                            <div class="item-left">
+                                <div class="item-icon" :class="['green', 'amber', 'blue'][i - 1]">
+                                    <img :src="notebookIcon" alt="learning">
+                                </div>
+                                <div class="item-info">
+                                    <h3>高等数学 - 第{{ i + 1 }}章练习</h3>
+                                    <p>完成 20 题 · 正确率 85%</p>
+                                </div>
+                            </div>
+                            <span class="time">2小时前</span>
+                        </div>
+                    </div>
+                </section>
             </div>
 
-            <div class="stat-card-vertical stat-gradient-green">
-              <div class="stat-icon-v icon-green"><el-icon>
-                  <Collection />
-                </el-icon></div>
-              <div class="stat-info-v">
-                <div class="stat-value-v color-green">382</div>
-                <div class="stat-label-v">刷题数量(道)</div>
-              </div>
+            <div class="col-right">
+                <section class="card target-card">
+                    <div class="card-header">
+                        <h2 class="card-title-with-icon">
+                            <img :src="circleIcon" alt="badge">
+                            考研目标
+                        </h2>
+                    </div>
+                    <div class="target-content" title="点击可编辑">
+                        <div class="target-box">
+                            <p>目标院校</p>
+                            <input
+                                v-if="editingTarget === 'school'"
+                                ref="schoolInputRef"
+                                type="text"
+                                v-model="tempTargetSchool"
+                                @blur="handleSaveTargetSchool"
+                                @keyup.enter.prevent="$event.target.blur()"
+                                class="target-input"
+                            />
+                            <h3 v-else @click="startEditTarget('school')" class="editable">{{ userInfo.targetSchool || '点击设置' }}</h3>
+                        </div>
+                        <div class="h-line"></div>
+                        <div class="target-box">
+                            <p>目标分数</p>
+                            <input
+                                v-if="editingTarget === 'score'"
+                                ref="scoreInputRef"
+                                type="number"
+                                v-model="tempTargetScore"
+                                @blur="handleSaveTargetScore"
+                                @keyup.enter.prevent="$event.target.blur()"
+                                class="target-input score-input"
+                            />
+                            <h3 v-else @click="startEditTarget('score')" class="score editable">{{ userInfo.targetTotalScore || 420 }}</h3>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title-with-icon">
+                            <img :src="medalIcon" alt="badge">
+                            成就徽章
+                        </h2>
+                    </div>
+                    <div class="badge-grid">
+                        <div class="badge-item active-badge">
+                            <span>🔥</span>
+                            <p>连续7天</p>
+                        </div>
+                        <div class="badge-item active-badge">
+                            <span>💯</span>
+                            <p>首次满分</p>
+                        </div>
+                        <div class="badge-item gray-badge">
+                            <img :src="chartIcon" alt="chart">
+                            <p>刷题1000</p>
+                        </div>
+                        <div class="badge-item gray-badge">
+                            <img :src="medalIcon" alt="trophy">
+                            <p>模考冠军</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title-with-icon">
+                            <img :src="chartIcon" alt="chart">
+                            学习打卡
+                        </h2>
+                    </div>
+                    <div v-if="!userInfo.id" style="padding: 20px; text-align: center; color: #999;">
+                        正在加载用户数据...
+                    </div>
+                    <StudyHeatmap v-if="userInfo.id" :userId="userInfo.id" :days="180" />
+                </section>
             </div>
-
-            <div class="stat-card-vertical stat-gradient-orange">
-              <div class="stat-icon-v icon-orange"><el-icon>
-                  <Trophy />
-                </el-icon></div>
-              <div class="stat-info-v">
-                <div class="stat-value-v color-orange">78%</div>
-                <div class="stat-label-v">平均正确率</div>
-              </div>
-            </div>
-
-            <!-- 目标设置卡片 -->
-            <el-card class="goals-setting-card animate-card">
-              <div class="goal-header">
-                <span class="title">我的目标</span>
-                <el-button type="primary" link @click="handleUpdateInfo">保存</el-button>
-              </div>
-
-              <div class="target-form-mini">
-                <div class="form-item-mini">
-                  <div class="label">目标院校</div>
-                  <el-input v-model="infoForm.targetSchool" placeholder="请输入目标院校" class="school-input">
-                    <template #prefix><el-icon>
-                        <School />
-                      </el-icon></template>
-                  </el-input>
-                </div>
-
-                <div class="form-item-mini">
-                  <div class="label">目标分数 (总分)</div>
-                  <div class="score-input-wrapper-single">
-                    <el-input-number v-model="infoForm.targetTotalScore" :min="0" :max="500" :controls="false"
-                      class="mini-input-large" placeholder="0" />
-                    <span class="unit">分</span>
-                  </div>
-                </div>
-              </div>
-            </el-card>
-          </div>
-        </el-col>
-      </el-row>
+        </main>
     </div>
-  </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
-import { User, Camera, Calendar, Reading, Timer, Collection, Trophy, Flag, EditPen, School } from '@element-plus/icons-vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useUserStore } from '../stores/user'
-import { updateUserApi, uploadAvatarApi, updatePwdApi } from '../api/user'
-import { useRouter } from 'vue-router'
+import chartIcon from '@/assets/icons/chart-no-axis.svg?url'
+import userSettingIcon from '@/assets/icons/user-setting.svg?url'
+import medalIcon from '@/assets/icons/medal.svg?url'
+import calendarIcon from '@/assets/icons/calendar.svg?url'
+import clockIcon from '@/assets/icons/clock.svg?url'
+import notebookIcon from '@/assets/icons/correction-notebook.svg?url'
+import circleIcon from '@/assets/icons/circle.svg?url'
+import trophyIcon from '@/assets/icons/trophy.svg?url'
+import { useUserStore } from '@/stores/user'
+import { getUserInfoApi, updateUserApi, updatePwdApi, uploadAvatarApi } from '@/api/user'
+import StudyHeatmap from '@/components/chart/StudyHeatmap.vue'
 
-const router = useRouter()
 const userStore = useUserStore()
-const userInfo = ref({})
-const loading = ref(false)
-const activeTab = ref('info')
-const infoFormRef = ref(null)
-const pwdFormRef = ref(null)
+const activeTab = ref('basic')
+const fileInputRef = ref(null)
+const schoolInputRef = ref(null)
+const scoreInputRef = ref(null)
+const editingTarget = ref(null)
+const tempTargetSchool = ref('')
+const tempTargetScore = ref(null)
 
-// 1. 表单数据
-const infoForm = reactive({
-  nickname: '',
-  examYear: '',
-  politics: true,
-  english: '',
-  math: '',
-  targetSchool: '',
-  targetTotalScore: 0
+
+// 用户信息
+const userInfo = reactive({
+    id: null,
+    nickname: '',
+    examYear: '',
+    motto: '',
+    avatar: '',
+    phone: '',
+    email: '',
+    targetSchool: '',
+    targetTotalScore: null,
+    examSubjects: {
+        politics: '政治',
+        english: '英语一',
+        math: '数学一'
+    }
 })
 
-const pwdForm = reactive({
-  oldPassword: '',
-  newPassword: '',
-  confirmPassword: ''
+// 密码修改表单
+const passwordForm = reactive({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
 })
 
-// 2. 校验规则
-const infoRules = {
-  nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }],
-  examYear: [{ required: true, message: '请选择年份', trigger: 'change' }]
+// 密码验证错误信息
+const passwordError = reactive({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+})
+
+// 验证原密码
+const validateOldPassword = () => {
+    if (!passwordForm.oldPassword) {
+        passwordError.oldPassword = '请输入原密码'
+    } else {
+        passwordError.oldPassword = ''
+    }
 }
 
-const pwdRules = {
-  oldPassword: [{ required: true, message: '请输入旧密码', trigger: 'blur' }],
-  newPassword: [{ required: true, min: 6, message: '新密码至少6位', trigger: 'blur' }],
-  confirmPassword: [{
-    validator: (rule, value, callback) => {
-      if (value !== pwdForm.newPassword) callback(new Error('两次输入不一致'))
-      else callback()
-    },
-    trigger: 'blur'
-  }]
+// 验证新密码
+const validateNewPassword = () => {
+    if (!passwordForm.newPassword) {
+        passwordError.newPassword = '请输入新密码'
+    } else if (passwordForm.newPassword.length < 6 || passwordForm.newPassword.length > 20) {
+        passwordError.newPassword = '新密码长度应为6-20位'
+    } else {
+        passwordError.newPassword = ''
+    }
 }
 
-// 3. 计算属性
-const examSubjectsStr = computed(() => {
-  const res = ['政治']
-  if (infoForm.english) res.push(infoForm.english)
-  if (infoForm.math && infoForm.math !== '无') res.push(infoForm.math)
-  return res.join(',')
-})
-
-// 倒计时计算
-const daysToExam = computed(() => {
-  if (!userInfo.value.examYear) return null
-  const yearMap = {
-    '27考研': 2026,
-    '28考研': 2027,
-    '29考研': 2028
-  }
-  const targetYear = yearMap[userInfo.value.examYear]
-  if (!targetYear) return null
-
-  // 假设考试日期为当年的12月20日左右
-  const examDate = new Date(targetYear, 11, 20)
-  const today = new Date()
-
-  // 如果已经过了，就不显示或者显示0
-  if (today > examDate) return 0
-
-  const diff = examDate - today
-  return Math.ceil(diff / (1000 * 60 * 60 * 24))
-})
-
-// 计算颜色类名
-const getColorClass = (value) => {
-  const colors = ['color-blue', 'color-green', 'color-orange']
-  return colors[value % colors.length]
+// 验证确认密码
+const validateConfirmPassword = () => {
+    if (!passwordForm.confirmPassword) {
+        passwordError.confirmPassword = '请再次输入新密码'
+    } else if (passwordForm.confirmPassword !== passwordForm.newPassword) {
+        passwordError.confirmPassword = '两次输入的密码不一致'
+    } else {
+        passwordError.confirmPassword = ''
+    }
 }
 
-// 4. 加载数据逻辑
-const loadUserData = () => {
-  const userStr = localStorage.getItem('user') || localStorage.getItem('userInfo')
-  if (userStr) {
-    const user = JSON.parse(userStr)
-    userInfo.value = user
-
-    infoForm.nickname = user.nickname || ''
-    infoForm.examYear = user.examYear || ''
-    infoForm.targetSchool = user.targetSchool || ''
-    infoForm.targetTotalScore = user.targetTotalScore || 0
-
-    const subjects = user.examSubjects ? user.examSubjects.split(',') : []
-    infoForm.english = subjects.find(s => s.includes('英语')) || ''
-    infoForm.math = subjects.find(s => s.includes('数学')) || '无'
-  }
-}
-
-onMounted(loadUserData)
-
-// 目标设置表单
-const miniForm = reactive({
-  targetSchool: '',
-  targetScore: 370
+// 考研目标表单（用于弹窗编辑）
+const targetForm = reactive({
+    targetSchool: '',
+    targetTotalScore: null
 })
 
-// 近期目标复选框
-const memo1 = ref(true)
-const memo2 = ref(false)
-const memo3 = ref(false)
+// 学习进度数据
+const progress = ref([
+    { label: '今日目标', current: 13, total: 20, unit: '题', percent: 65, color: '#2563eb' },
+    { label: '本周目标', current: 16, total: 35, unit: '小时', percent: 48, color: '#10b981' },
+    { label: '总体目标', current: 320, total: 1000, unit: '题目', percent: 32, color: '#f59e0b' }
+])
 
-// 5. 修改基本资料
-const handleUpdateInfo = async () => {
-  if (!infoFormRef.value) return
+// 成就徽章数据
+const badges = ref([
+    { icon: '🔥', name: '连续7天', unlocked: true },
+    { icon: '💯', name: '首次满分', unlocked: true },
+    { icon: '📊', name: '刷题1000', unlocked: false },
+    { icon: '🏆', name: '模考冠军', unlocked: false }
+])
 
-  await infoFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true
-      try {
-        const submitData = {
-          id: userInfo.value.id,
-          nickname: infoForm.nickname,
-          examYear: infoForm.examYear,
-          examSubjects: examSubjectsStr.value,
-          targetSchool: infoForm.targetSchool,
-          targetTotalScore: infoForm.targetTotalScore
+
+// 获取用户数据
+const fetchUserData = async () => {
+    try {
+        // 从store获取userId
+        const userId = userStore.userInfo?.id
+
+        if (!userId) {
+            ElMessage.error('用户未登录，请先登录')
+            return
         }
 
-        const res = await updateUserApi(submitData)
+        const response = await getUserInfoApi(userId)
+        if (response.code === 200) {
+            const data = response.data
+            userInfo.id = data.id
+            userInfo.nickname = data.nickname || ''
+            userInfo.examYear = data.examYear || ''
+            userInfo.motto = data.motto || ''
+            userInfo.avatar = data.avatar || ''
+            userInfo.phone = data.phone || ''
+            userInfo.email = data.email || ''
+            userInfo.targetSchool = data.targetSchool || ''
+            userInfo.targetTotalScore = data.targetTotalScore || 420
 
-        if (res.code === 200) {
-          ElMessage.success('信息更新成功')
-          const newUser = { ...userInfo.value, ...submitData }
-          localStorage.setItem('user', JSON.stringify(newUser))
-          userStore.setUserInfo(newUser)
-          userInfo.value = newUser
+            // 解析examSubjects JSON字符串或逗号分隔字符串
+            if (data.examSubjects) {
+                try {
+                    let subjects
+                    if (typeof data.examSubjects === 'string') {
+                        // 尝试解析为JSON
+                        try {
+                            subjects = JSON.parse(data.examSubjects)
+                        } catch (e) {
+                            // 如果JSON解析失败，尝试按逗号分隔
+                            const parts = data.examSubjects.split(',').map(s => s.trim())
+                            subjects = {
+                                politics: (parts[0] && parts[0] !== 'undefined') ? parts[0] : '政治',
+                                english: parts[1] || '英语一',
+                                math: parts[2] || '数学一'
+                            }
+                        }
+                    } else {
+                        subjects = data.examSubjects
+                    }
+                    userInfo.examSubjects = subjects
+                } catch (e) {
+                    console.error('解析examSubjects失败:', e)
+                    // 使用默认值
+                    userInfo.examSubjects = {
+                        politics: '政治',
+                        english: '英语一',
+                        math: '数学一'
+                    }
+                }
+            } else {
+                userInfo.examSubjects = {
+                    politics: '政治',
+                    english: '英语一',
+                    math: '数学一'
+                }
+            }
+
+            // 更新store
+            userStore.setUserInfo(data)
         }
-      } catch (error) {
-        console.error("更新失败:", error)
-      } finally {
-        loading.value = false
-      }
+    } catch (error) {
+        console.error('获取用户信息失败:', error)
+        ElMessage.error('获取用户信息失败')
     }
-  })
 }
 
-// 6. 更换头像
-const handleAvatarChange = async (uploadFile) => {
-  const rawFile = uploadFile.raw
-  if (!['image/jpeg', 'image/png'].includes(rawFile.type)) {
-    return ElMessage.error('图片格式错误')
-  }
-
-  try {
-    const formData = new FormData()
-    formData.append('file', rawFile)
-
-    const res = await uploadAvatarApi(formData)
-    const url = res.data
-
-    if (!url) {
-      ElMessage.error('头像上传失败')
-      return
-    }
-
-    await updateUserApi({ id: userInfo.value.id, avatar: url })
-
-    const newUser = { ...userInfo.value, avatar: url }
-    userInfo.value = newUser
-    localStorage.setItem('user', JSON.stringify(newUser))
-    userStore.setUserInfo(newUser)
-
-    ElMessage.success('头像更换成功')
-  } catch (e) {
-    console.error('更换头像异常:', e)
-    ElMessage.error('更换头像失败')
-  }
+// 点击头像触发文件选择
+const handleAvatarClick = () => {
+    fileInputRef.value?.click()
 }
 
-// 7. 修改密码
-const handleChangePassword = async () => {
-  await pwdFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true
-      try {
-        const res = await updatePwdApi({
-          userId: userInfo.value.id,
-          oldPassword: pwdForm.oldPassword,
-          newPassword: pwdForm.newPassword
+// 处理头像上传
+const handleAvatarChange = async (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+
+    // 验证文件类型
+    if (!file.type.startsWith('image/')) {
+        ElMessage.error('请选择图片文件')
+        return
+    }
+
+    // 验证文件大小（限制2MB）
+    if (file.size > 2 * 1024 * 1024) {
+        ElMessage.error('图片大小不能超过2MB')
+        return
+    }
+
+    try {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await uploadAvatarApi(formData)
+        if (response.code === 200) {
+            const avatarUrl = response.data
+
+            // 更新用户头像
+            await updateUserInfo({ avatar: avatarUrl })
+
+            ElMessage.success('头像更新成功')
+        }
+    } catch (error) {
+        console.error('上传头像失败:', error)
+        ElMessage.error('上传头像失败')
+    }
+}
+
+// 更新用户信息
+const updateUserInfo = async (updateData, showMessage = true) => {
+    try {
+        const response = await updateUserApi({
+            id: userInfo.id,
+            ...updateData
         })
-        if (res.code === 200) {
-          ElMessage.success('密码修改成功，请重新登录')
-          localStorage.clear()
-          router.push('/login')
+
+        if (response.code === 200) {
+            // 更新本地数据（排除 examSubjects，它需要保持对象结构）
+            const { examSubjects, ...otherData } = updateData
+            Object.assign(userInfo, otherData)
+
+            // 如果有motto更新，需要单独处理
+            if (updateData.motto !== undefined) {
+                userInfo.motto = updateData.motto
+            }
+
+            if (showMessage) {
+                ElMessage.success('保存成功')
+            }
+            return true
         }
-      } catch (e) {
-        console.error(e)
-      } finally {
-        loading.value = false
-      }
+        return false
+    } catch (error) {
+        console.error('更新用户信息失败:', error)
+        if (showMessage) {
+            ElMessage.error('保存失败')
+        }
+        return false
     }
-  })
 }
+
+// 保存基本信息
+const handleSaveBasicInfo = async () => {
+    // 验证必填字段
+    if (!userInfo.nickname || !userInfo.nickname.trim()) {
+        ElMessage.warning('请输入昵称')
+        return
+    }
+
+    if (!userInfo.examYear) {
+        ElMessage.warning('请选择考研年份')
+        return
+    }
+
+    // 准备更新数据
+    const updateData = {
+        id: userInfo.id,
+        nickname: userInfo.nickname,
+        motto: userInfo.motto,
+        examYear: userInfo.examYear,
+        // 确保政治课固定为"政治"
+        examSubjects: `政治,${userInfo.examSubjects.english || '英语一'},${userInfo.examSubjects.math || '数学一'}`
+    }
+
+    await updateUserInfo(updateData)
+}
+
+// 修改密码
+const handleUpdatePassword = async () => {
+    // 清空之前的错误信息
+    Object.keys(passwordError).forEach(key => passwordError[key] = '')
+
+    // 验证输入
+    if (!passwordForm.oldPassword) {
+        passwordError.oldPassword = '请输入原密码'
+        ElMessage.warning('请输入原密码')
+        return
+    }
+
+    if (!passwordForm.newPassword) {
+        passwordError.newPassword = '请输入新密码'
+        ElMessage.warning('请输入新密码')
+        return
+    }
+
+    if (passwordForm.newPassword.length < 6 || passwordForm.newPassword.length > 20) {
+        passwordError.newPassword = '新密码长度应为6-20位'
+        ElMessage.warning('新密码长度应为6-20位')
+        return
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+        passwordError.confirmPassword = '两次输入的密码不一致'
+        ElMessage.warning('两次输入的密码不一致')
+        return
+    }
+
+    try {
+        const response = await updatePwdApi({
+            userId: userInfo.id.toString(),
+            oldPassword: passwordForm.oldPassword,
+            newPassword: passwordForm.newPassword
+        })
+
+        if (response.code === 200) {
+            ElMessage.success('密码修改成功，请重新登录')
+
+            // 清空表单和错误信息
+            passwordForm.oldPassword = ''
+            passwordForm.newPassword = ''
+            passwordForm.confirmPassword = ''
+            Object.keys(passwordError).forEach(key => passwordError[key] = '')
+
+            // 可以在这里添加跳转到登录页的逻辑
+        } else {
+            // 显示后端返回的具体错误信息
+            const errorMsg = response.msg || '密码修改失败'
+            ElMessage.error(errorMsg)
+
+            // 根据错误信息判断是哪个字段错了
+            if (errorMsg.includes('原密码')) {
+                passwordError.oldPassword = errorMsg
+            }
+        }
+    } catch (error) {
+        console.error('修改密码失败:', error)
+        // 处理网络错误或其他异常
+        if (error.response && error.response.data && error.response.data.msg) {
+            ElMessage.error(error.response.data.msg)
+        } else {
+            ElMessage.error('网络错误，请稍后重试')
+        }
+    }
+}
+
+// 开始编辑考研目标
+const startEditTarget = (field) => {
+    editingTarget.value = field
+    if (field === 'school') {
+        tempTargetSchool.value = userInfo.targetSchool || ''
+    } else if (field === 'score') {
+        tempTargetScore.value = userInfo.targetTotalScore || 420
+    }
+
+    // 自动聚焦输入框
+    setTimeout(() => {
+        if (field === 'school') {
+            schoolInputRef.value?.focus()
+        } else if (field === 'score') {
+            scoreInputRef.value?.focus()
+        }
+    }, 0)
+}
+
+// 保存目标院校
+const handleSaveTargetSchool = async () => {
+    if (!tempTargetSchool.value || !tempTargetSchool.value.trim()) {
+        tempTargetSchool.value = userInfo.targetSchool || ''
+        editingTarget.value = null
+        return
+    }
+
+    editingTarget.value = null
+    await updateUserInfo({
+        targetSchool: tempTargetSchool.value.trim()
+    }, false)
+    ElMessage.success('目标院校更新成功')
+}
+
+// 保存目标分数
+const handleSaveTargetScore = async () => {
+    const score = parseInt(tempTargetScore.value)
+    if (!score || score < 0 || score > 750) {
+        ElMessage.warning('请输入有效的分数（0-750）')
+        tempTargetScore.value = userInfo.targetTotalScore || 420
+        editingTarget.value = null
+        return
+    }
+
+    editingTarget.value = null
+    await updateUserInfo({
+        targetTotalScore: score
+    }, false)
+    ElMessage.success('目标分数更新成功')
+}
+
+// 点击邮箱验证
+const handleEmailVerify = () => {
+    ElMessage.info('验证码已发送至您的邮箱，请查收')
+}
+
+// 点击手机修改
+const handlePhoneModify = () => {
+    ElMessage.info('功能开发中')
+}
+
+// 在 onMounted 中获取用户数据
+onMounted(async () => {
+    await fetchUserData()
+})
 </script>
 
 <style scoped>
-/* 整体布局 */
-.profile-container {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
-  padding: 20px;
+/* 基础重置 */
+.dashboard-page {
+    background-color: #f9fafb;
+    min-height: 100vh;
+    color: #4b5563;
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding-bottom: 3rem;
 }
 
-.profile-content {
-  max-width: 1400px;
-  margin: 0 auto;
+.container {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0 1rem;
 }
 
-/* 卡片通用样式 */
-.animate-card {
-  transition: all 0.3s ease;
-  border-radius: 14px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(229, 231, 235, 0.3);
-  overflow: hidden;
+/* Header 样式 */
+.hero-header {
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #0ea5e9 100%);
+    padding: 3rem 0 6rem;
+    position: relative;
+    color: white;
+    overflow: hidden;
 }
 
-.animate-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+.noise-bg {
+    position: absolute;
+    inset: 0;
+    opacity: 0.05;
+    mix-blend-mode: soft-light;
+    background: 
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(255,255,255,0.03) 2px,
+            rgba(255,255,255,0.03) 4px
+        );
 }
 
-/* 左侧用户卡片 */
-.user-card {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(5px);
+.hero-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    flex-wrap: wrap;
+    gap: 2rem;
 }
 
-.user-card-top {
-  padding: 40px 20px 30px;
-  background: linear-gradient(180deg, #e6f7ff 0%, rgba(255, 255, 255, 0.9) 100%);
-  position: relative;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
 }
 
-.role-badge {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
+.avatar-box {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+    position: relative;
 }
 
-.role-badge.admin {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+.avatar-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
-.role-badge:not(.admin) {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+.avatar-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    font-size: 0.7rem;
+    padding: 4px 0;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s;
 }
 
-.avatar-wrapper {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  margin: 0 auto 15px;
-  cursor: pointer;
-  border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s;
+.avatar-box:hover .avatar-overlay {
+    opacity: 1;
 }
 
-.avatar-wrapper:hover {
-  transform: scale(1.05);
+.avatar-container {
+    position: relative;
 }
 
-.avatar-mask {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  border-radius: 50%;
-  opacity: 0;
-  transition: all 0.3s;
+.crown-icon {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #fbbf24;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
 }
 
-.avatar-wrapper:hover .avatar-mask {
-  opacity: 1;
+.crown-icon img {
+    width: 16px;
+    height: 16px;
+    filter: brightness(0) saturate(100%) invert(9%) sepia(75%) saturate(1582%) hue-rotate(354deg) brightness(93%) contrast(93%);
 }
 
-.camera-icon {
-  font-size: 20px;
+.user-text h1 {
+    font-size: 1.8rem;
+    margin: 0;
 }
 
-.upload-text {
-  font-size: 12px;
+.name-line {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
 }
 
-.user-name {
-  font-size: 20px;
-  color: #1f2937;
-  margin: 10px 0 5px;
-  font-weight: 600;
+.year-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.2rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
 }
 
-.user-slogan {
-  color: #6b7280;
-  font-size: 13px;
-  margin: 0 0 15px;
+.motto {
+    margin: 0.5rem 0 1rem;
+    opacity: 0.9;
 }
 
-/* 倒计时徽章 */
-.countdown-badge {
-  display: inline-flex;
-  align-items: baseline;
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  padding: 4px 12px;
-  border-radius: 20px;
-  margin-top: 5px;
-  font-size: 12px;
+.stats-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.85rem;
 }
 
-.countdown-badge .number {
-  font-size: 16px;
-  font-weight: bold;
-  margin: 0 3px;
+.stats-row span {
+    font-weight: 600;
+    font-size: 1.1rem;
 }
 
-.countdown-badge .unit {
-  font-size: 12px;
+.v-line {
+    width: 1px;
+    height: 15px;
+    background: rgba(255, 255, 255, 0.3);
 }
 
-/* 个人信息列表 */
-.user-bio {
-  padding: 20px 25px;
+.header-cards {
+    display: flex;
+    gap: 1rem;
 }
 
-.bio-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.5);
-  font-size: 14px;
+.glass-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem 1.5rem;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 160px;
 }
 
-.bio-item:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
+.icon-wrap {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.bio-item .label {
-  color: #6b7280;
+.icon-wrap img {
+    width: 20px;
+    height: 20px;
 }
 
-.bio-item .value {
-  color: #1f2937;
-  font-weight: 500;
+.icon-wrap.sky {
+    background: rgba(56, 189, 248, 0.2);
 }
 
-.subject-tags {
-  margin-top: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-  flex: 1;
+.icon-wrap.sky img {
+    filter: brightness(0) saturate(100%) invert(92%) sepia(39%) saturate(1754%) hue-rotate(185deg) brightness(96%) contrast(91%);
 }
 
-/* 近期目标卡片 */
-.memo-card {
-  margin-top: 20px;
-  background: linear-gradient(135deg, #fffef0 0%, #ffffff 100%) !important;
-  border: 1px solid #f9f2d0 !important;
+.icon-wrap.amber {
+    background: rgba(245, 158, 11, 0.2);
 }
 
-.memo-header {
-  padding: 15px 20px;
-  color: #854d0e;
-  font-weight: 600;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.icon-wrap.amber img {
+    filter: brightness(0) saturate(100%) invert(75%) sepia(89%) saturate(495%) hue-rotate(358deg) brightness(102%) contrast(97%);
 }
 
-.memo-title {
-  font-size: 16px;
+.card-info label {
+    font-size: 0.75rem;
+    display: block;
+    opacity: 0.8;
 }
 
-.memo-icon {
-  color: #f59e0b;
+.card-info p {
+    font-weight: 600;
+    margin: 0;
+    font-size: 1.1rem;
 }
 
-.memo-list {
-  padding: 0 20px 20px;
+/* 布局 */
+.main-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin-top: -3rem;
+    position: relative;
 }
 
-.memo-item {
-  padding: 8px 0;
+@media (min-width: 1024px) {
+    .main-layout {
+        grid-template-columns: 8fr 4fr;
+    }
 }
 
-/* 中间设置面板 */
-.settings-card {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(5px);
+/* 卡片通用 */
+.card {
+    background: white;
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .card-header {
-  display: flex;
-  flex-direction: column;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
 }
 
-.header-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
+.card-header h2 {
+    font-size: 1.1rem;
+    margin: 0;
+    color: #111827;
 }
 
-.header-desc {
-  font-size: 13px;
-  color: #6b7280;
+.card-title-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-/* 自定义Tabs */
-:deep(.el-tabs__nav-wrap::after) {
-  height: 1px;
-  background-color: rgba(229, 231, 235, 0.5);
+.card-title-with-icon img {
+    width: 20px;
+    height: 20px;
+    filter: brightness(0) saturate(100%) invert(27%) sepia(96%) saturate(4257%) hue-rotate(217deg) brightness(95%) contrast(95%);
 }
 
-:deep(.el-tabs__item) {
-  font-size: 15px;
-  height: 45px;
-  line-height: 45px;
-  color: #6b7280;
+.link {
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
 }
 
-:deep(.el-tabs__item.is-active) {
-  color: #3b82f6;
-  font-weight: 600;
+/* 进度条 */
+.progress-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
-.tab-content-wrapper {
-  padding: 20px 0;
+.progress-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
 }
 
-.security-wrapper {
-  max-width: 400px;
+.progress-bar {
+    height: 10px;
+    background: #f3f4f6;
+    border-radius: 10px;
+    overflow: hidden;
 }
 
-/* 表单样式 */
+.fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.5s;
+}
+
+/* 标签页 */
+.tabs {
+    display: flex;
+    gap: 2rem;
+    border-bottom: 2px solid #f3f4f6;
+    margin-bottom: 2rem;
+}
+
+.tabs button {
+    background: none;
+    border: none;
+    padding: 0.8rem 0;
+    color: #6b7280;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.tabs button:hover {
+    color: #3b82f6;
+}
+
+.tabs button.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+}
+
+.tabs button.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #3b82f6;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
+}
+
+/* 表单 */
 .profile-form {
-  margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.8rem;
 }
 
-.profile-form :deep(.el-input),
-.profile-form :deep(.el-select) {
-  width: 100%;
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
 }
 
-.submit-btn {
-  width: 100%;
-  height: 48px;
-  font-size: 16px;
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  border: none;
-  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
-  transition: all 0.3s;
-}
-
-.submit-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-}
-
-/* 科目选择卡片 */
-.subject-selection-card {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(229, 231, 235, 0.5);
-  border-radius: 8px;
-  padding: 0;
-  overflow: hidden;
-  transition: border-color 0.3s;
-}
-
-.subject-selection-card:hover {
-  border-color: rgba(191, 219, 254, 0.7);
-}
-
-.subject-group {
-  padding: 15px 20px;
-}
-
-.group-title {
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.group-content {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.subject-divider {
-  height: 1px;
-  background: rgba(229, 231, 235, 0.5);
-  margin: 0;
-}
-
-.fixed-subject {
-  margin-right: 0 !important;
-  width: 100%;
-  background-color: #f9fafb;
-  border-color: #e5e7eb !important;
-}
-
-:deep(.el-radio),
-:deep(.el-checkbox) {
-  margin-right: 15px;
-  margin-bottom: 10px;
-  height: 36px;
-}
-
-:deep(.el-radio.is-bordered),
-:deep(.el-checkbox.is-bordered) {
-  padding: 0 15px;
-  border-radius: 8px;
-  border-color: #d1d5db;
-}
-
-:deep(.el-radio.is-bordered.is-checked) {
-  background: rgba(59, 130, 246, 0.1);
-  border-color: #3b82f6;
-}
-
-.form-actions {
-  margin-top: 30px;
-  text-align: left;
-}
-
-/* 右侧统计面板 */
-.right-col {
-  padding-left: 10px;
-}
-
-.stats-column {
-  margin-top: 0;
-}
-
-/* 统计卡片样式 */
-.stat-card-vertical {
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 16px;
-  padding: 20px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s;
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(229, 231, 235, 0.3);
-}
-
-.stat-card-vertical:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.1);
-}
-
-.stat-gradient-blue {
-  background: linear-gradient(135deg, #e6f7ff 0%, rgba(255, 255, 255, 0.9) 100%);
-  border: 1px solid #bae7ff;
-}
-
-.stat-gradient-green {
-  background: linear-gradient(135deg, #f6ffed 0%, rgba(255, 255, 255, 0.9) 100%);
-  border: 1px solid #d9f7be;
-}
-
-.stat-gradient-orange {
-  background: linear-gradient(135deg, #fff7e6 0%, rgba(255, 255, 255, 0.9) 100%);
-  border: 1px solid #ffe7ba;
-}
-
-.stat-icon-v {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 24px;
-  margin-right: 18px;
-  flex-shrink: 0;
-  box-shadow: 0 5px 15px -3px currentColor;
-}
-
-.icon-blue {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-}
-
-.icon-green {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-}
-
-.icon-orange {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-}
-
-.stat-info-v {
-  flex: 1;
-}
-
-.stat-value-v {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: #1f2937;
-}
-
-.stat-label-v {
-  font-size: 13px;
-  color: #6b7280;
-  margin-top: 4px;
-}
-
-/* 目标设置卡片 */
-.goals-setting-card {
-  margin-top: 20px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(5px);
-}
-
-.goal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.5);
-}
-
-.goal-header .title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.target-form-mini {
-  padding: 20px;
-}
-
-.form-item-mini {
-  margin-bottom: 16px;
-}
-
-.form-item-mini .label {
-  font-size: 13px;
-  color: #6b7280;
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-
-.school-input :deep(.el-input__wrapper) {
-  background: rgba(255, 255, 255, 0.5);
-  box-shadow: none !important;
-  border: 1px solid rgba(229, 231, 235, 0.5);
-}
-
-.school-input :deep(.el-input__wrapper.is-focus) {
-  border-color: #3b82f6;
-  background: rgba(255, 255, 255, 0.8);
-}
-
-.score-input-wrapper-single {
-  background: rgba(239, 68, 68, 0.05);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 8px;
-  padding: 8px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mini-input-large :deep(.el-input__wrapper) {
-  padding: 0;
-  box-shadow: none !important;
-  background: transparent;
-}
-
-.mini-input-large :deep(.el-input__inner) {
-  text-align: center;
-  font-weight: 700;
-  color: #ef4444;
-  font-size: 24px;
-  height: 40px;
-  line-height: 40px;
-}
-
-.unit {
-  color: #ef4444;
-  font-size: 14px;
-  margin-left: 4px;
-  font-weight: 500;
-}
-
-/* 响应式调整 */
 @media (max-width: 768px) {
-  .profile-container {
-    padding: 15px;
-  }
+    .form-row {
+        grid-template-columns: 1fr;
+    }
 
-  .left-col {
-    margin-bottom: 20px;
-  }
+    .tabs {
+        gap: 1rem;
+    }
 
-  .right-col {
-    padding-left: 0;
-    margin-top: 20px;
-  }
+    .tabs button {
+        font-size: 0.85rem;
+        padding: 0.7rem 0;
+    }
 
-  .submit-btn {
+    .input-with-action {
+        flex-direction: column;
+    }
+
+    .btn-verify {
+        width: 100%;
+    }
+
+    .security-tips {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .tip-content ul {
+        padding-left: 1rem;
+    }
+}
+
+.form-item label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.02em;
+}
+
+.req {
+    color: #ef4444;
+    margin-left: 2px;
+}
+
+.form-item input,
+.form-item select,
+textarea {
     width: 100%;
-  }
+    max-width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.6rem;
+    background: #f9fafb;
+    outline: none;
+    transition: all 0.2s;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+    color: #1f2937;
+}
 
-  :deep(.el-radio.is-bordered) {
+.form-item input::placeholder,
+textarea::placeholder {
+    color: #9ca3af;
+}
+
+.form-item input:hover,
+.form-item select:hover,
+textarea:hover {
+    border-color: #d1d5db;
+    background: #f3f4f6;
+}
+
+.form-item input:focus,
+textarea:focus {
+    border-color: #3b82f6;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 错误提示文本 */
+.error-text {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+    color: #ef4444;
+}
+
+/* 自定义下拉框样式 */
+.custom-select {
+    position: relative;
     width: 100%;
-    margin-right: 0;
-    margin-bottom: 8px;
-  }
+}
 
-  .group-content {
+.custom-select select {
+    width: 100%;
+    padding: 0.7rem 2.5rem 0.7rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.6rem;
+    background: #f9fafb;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    color: #1f2937;
+}
+
+.custom-select select:hover {
+    border-color: #d1d5db;
+    background: #f3f4f6;
+}
+
+.custom-select select:focus {
+    border-color: #3b82f6;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.custom-select select option {
+    padding: 0.5rem;
+    background: white;
+}
+
+.custom-select .select-arrow {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 0.7rem;
+    color: #6b7280;
+    transition: transform 0.2s;
+}
+
+.custom-select:hover .select-arrow {
+    color: #3b82f6;
+}
+
+/* 输入框+按钮组合 */
+.input-with-action {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.input-with-action input {
+    flex: 1;
+    padding-right: 1rem;
+}
+
+.btn-verify {
+    padding: 0.7rem 1.2rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.6rem;
+    background: white;
+    color: #6b7280;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-verify:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+    background: #eff6ff;
+}
+
+/* 安全提示 */
+.security-tips {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border-radius: 0.8rem;
+    border: 1px solid #bfdbfe;
+    margin-bottom: 1rem;
+}
+
+.tip-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.tip-content h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1e40af;
+}
+
+.tip-content ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    list-style-type: disc;
+}
+
+.tip-content li {
+    font-size: 0.8rem;
+    color: #3b82f6;
+    margin-bottom: 0.3rem;
+    line-height: 1.4;
+}
+
+.form-item input:focus,
+textarea:focus {
+    border-color: #2563eb;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.textarea-box {
+    position: relative;
+}
+
+textarea {
+    height: 100px;
+    resize: none;
+}
+
+.count {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 0.7rem;
+    color: #9ca3af;
+}
+
+.subject-panel {
+    border: 1px solid #fef3c7;
+    background: #fffbeb;
+    border-radius: 1rem;
+    padding: 1.2rem;
+}
+
+.subject-item {
+    margin-bottom: 1rem;
+}
+
+.subject-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.6rem;
+    background: #f9fafb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 500;
+    box-sizing: border-box;
+    transition: all 0.2s;
+}
+
+.subject-input.disabled {
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+    color: #6b7280;
+    cursor: not-allowed;
+    border-color: #d1d5db;
+}
+
+.mini-tag {
+    background: #fde68a;
+    color: #92400e;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+.radio-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.radio-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+}
+
+.custom-radio {
+    padding: 0.65rem 1.2rem;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 0.6rem;
+    background: white;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.custom-radio input {
+    display: none;
+}
+
+.custom-radio.selected {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border-color: #3b82f6;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.custom-radio:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.custom-radio.selected:hover {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+.btn-save {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border: none;
+    padding: 0.8rem 2rem;
+    border-radius: 0.6rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    align-self: flex-start;
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+    transition: all 0.3s ease;
+}
+
+.btn-save:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-save:active {
+    transform: translateY(0);
+}
+
+/* 最近学习 */
+.learning-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.learning-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 0.8rem;
+    border: 1px solid transparent;
+    transition: 0.2s;
+}
+
+.learning-item:hover {
+    background: white;
+    border-color: #e5e7eb;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+}
+
+.item-left {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.item-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
     justify-content: center;
-  }
 }
 
-@media (max-width: 900px) {
-  .center-col {
-    margin-bottom: 20px;
-  }
+.item-icon img {
+    width: 20px;
+    height: 20px;
 }
+
+.item-icon.green {
+    background: #ecfdf5;
+}
+
+.item-icon.green img {
+    filter: brightness(0) saturate(100%) invert(67%) sepia(98%) saturate(444%) hue-rotate(122deg) brightness(91%) contrast(90%);
+}
+
+.item-icon.amber {
+    background: #fffbeb;
+}
+
+.item-icon.amber img {
+    filter: brightness(0) saturate(100%) invert(75%) sepia(89%) saturate(495%) hue-rotate(358deg) brightness(102%) contrast(97%);
+}
+
+.item-icon.blue {
+    background: #eff6ff;
+}
+
+.item-icon.blue img {
+    filter: brightness(0) saturate(100%) invert(27%) sepia(96%) saturate(4257%) hue-rotate(217deg) brightness(95%) contrast(95%);
+}
+
+.item-info h3 {
+    font-size: 0.9rem;
+    margin: 0;
+    color: #111827;
+}
+
+.item-info p {
+    font-size: 0.75rem;
+    margin: 0.2rem 0 0;
+    color: #6b7280;
+}
+
+.time {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+/* 右侧边栏专有 */
+.target-card {
+    text-align: center;
+}
+
+.target-card label {
+    font-size: 0.9rem;
+    color: #9ca3af;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.target-card label img {
+    width: 18px;
+    height: 18px;
+    filter: brightness(0) saturate(100%) invert(72%) sepia(77%) saturate(365%) hue-rotate(212deg) brightness(93%) contrast(88%);
+}
+
+.target-content {
+    margin-top: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.target-content:hover {
+    transform: translateY(-2px);
+}
+
+.target-box {
+    margin-bottom: 24px;
+}
+
+.target-box p {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-bottom: 0.4rem;
+}
+
+.target-box h3 {
+    font-size: 1.8rem;
+    margin: 0;
+    color: #111827;
+}
+
+.target-box h3.editable {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.target-box h3.editable:hover {
+    color: #2563eb;
+}
+
+.target-input {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin: 0;
+    color: #111827;
+    border: 2px solid #2563eb;
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    outline: none;
+    background: white;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.target-input.score-input {
+    font-size: 2.2rem;
+}
+
+.target-input:focus {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.target-box h3.score {
+    font-size: 2.2rem;
+}
+
+.h-line {
+    height: 1px;
+    background: #f3f4f6;
+    width: 60px;
+    margin: 1.5rem auto;
+}
+
+.badge-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+}
+
+.badge-item {
+    padding: 1rem;
+    border-radius: 1rem;
+    text-align: center;
+    border: 1px solid #f3f4f6;
+}
+
+.active-badge {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+.badge-item img {
+    width: 28px;
+    height: 28px;
+    display: block;
+    margin: 0 auto;
+}
+
+.active-badge img {
+    filter: brightness(0) saturate(100%) invert(55%) sepia(87%) saturate(468%) hue-rotate(7deg) brightness(101%) contrast(93%);
+}
+
+.gray-badge img {
+    filter: grayscale(1) brightness(0) saturate(100%) invert(73%) sepia(15%) saturate(389%) hue-rotate(181deg) brightness(91%) contrast(87%);
+}
+
+.active-badge p {
+    font-size: 0.7rem;
+    color: #92400e;
+    margin: 0.5rem 0 0;
+    font-weight: 500;
+}
+
+.gray-badge {
+    background: #f9fafb;
+    opacity: 0.6;
+}
+
+.gray-badge p {
+    font-size: 0.7rem;
+    margin: 0.5rem 0 0;
+}
+
+
 </style>

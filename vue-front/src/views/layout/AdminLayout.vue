@@ -103,9 +103,7 @@
                     <div class="header-left">
                         <div class="welcome-section">
                             <div class="welcome-icon">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 2L13.09 8.26L19 7L14.74 11.74L21 14L14.74 15.5L19 20L13.09 18.26L12 24L10.91 18.26L5 20L9.26 15.5L3 14L9.26 11.74L5 7L10.91 8.26L12 2Z" fill="currentColor" fill-opacity="0.8"/>
-                                </svg>
+                                <img :src="currentIcon" class="time-icon" />
                             </div>
                             <div class="welcome-content">
                                 <span class="welcome-label">{{ greetingLabel }}</span>
@@ -171,25 +169,50 @@ import userIcon from '@/assets/icons/user-manage.svg?url'
 import testBaseIcon from '@/assets/icons/test-base.svg?url'
 import examinationRecordIcon from '@/assets/icons/examination-record.svg?url'
 
+// 导入时间段图标
+import morningIcon from '@/assets/icons/morning.svg?url'
+import noonIcon from '@/assets/icons/noon.svg?url'
+import afternoonIcon from '@/assets/icons/afternoon.svg?url'
+import eveningIcon from '@/assets/icons/evening.svg?url'
+import nightIcon from '@/assets/icons/night.svg?url'
+
 const router = useRouter()
 const userStore = useUserStore()
 const transitionStore = useTransitionStore()
 
-// 动态问候语
+// 动态问候语 - 根据时间段显示不同的关心话语
 const greetingLabel = computed(() => {
     const hour = new Date().getHours()
-    if (hour >= 5 && hour < 9) {
-        return '早上好'
+    if (hour >= 6 && hour < 9) {
+        return '新的一天，记得吃早餐哦~💋'
     } else if (hour >= 9 && hour < 12) {
-        return '上午好'
+        return '忙碌了一上午，记得休息一下🍚'
     } else if (hour >= 12 && hour < 14) {
-        return '中午好'
-    } else if (hour >= 14 && hour < 18) {
-        return '下午好'
-    } else if (hour >= 18 && hour < 22) {
-        return '晚上好'
+        return '午休时光，给自己充充电🔋'
+    } else if (hour >= 14 && hour < 19) {
+        return '下午时光，继续加油🔥'
+    } else if (hour >= 19 && hour < 24) {
+        return '辛苦了一整天，早点休息💤'
     } else {
-        return '夜深了'
+        return '夜深了，注意身体🌃'
+    }
+})
+
+// 动态图标 - 根据时间段显示对应的图标
+const currentIcon = computed(() => {
+    const hour = new Date().getHours()
+    if (hour >= 6 && hour < 9) {
+        return morningIcon
+    } else if (hour >= 9 && hour < 12) {
+        return noonIcon
+    } else if (hour >= 12 && hour < 14) {
+        return noonIcon
+    } else if (hour >= 14 && hour < 19) {
+        return afternoonIcon
+    } else if (hour >= 19 && hour < 24) {
+        return eveningIcon
+    } else {
+        return nightIcon
     }
 })
 
@@ -429,14 +452,7 @@ onMounted(() => {
     gap: 12px;
     padding: 8px 16px;
     border-radius: 12px;
-    background: linear-gradient(135deg, rgba(64, 158, 255, 0.05) 0%, rgba(64, 158, 255, 0.02) 100%);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.welcome-section:hover {
-    background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, rgba(64, 158, 255, 0.05) 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1);
 }
 
 .welcome-icon {
@@ -451,10 +467,10 @@ onMounted(() => {
     box-shadow: 0 4px 8px rgba(64, 158, 255, 0.2);
 }
 
-.welcome-icon svg {
+.welcome-icon img {
     width: 20px;
     height: 20px;
-    animation: rotate 20s linear infinite;
+    filter: brightness(0) invert(1);
 }
 
 @keyframes rotate {

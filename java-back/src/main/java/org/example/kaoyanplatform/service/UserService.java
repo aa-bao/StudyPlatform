@@ -6,6 +6,9 @@ import org.example.kaoyanplatform.entity.dto.HomePageDataDTO;
 import org.example.kaoyanplatform.entity.dto.UserStudyStatsDTO;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 用户服务类：继承 IService 获得 count, list, save 等内置方法
  */
@@ -25,4 +28,11 @@ public interface UserService extends IService<User> {
      * @return 首页数据
      */
     HomePageDataDTO getHomePageData(Long userId);
+
+    /**
+     * 获取智能学习建议
+     * @param userId 用户ID
+     * @return 学习建议列表
+     */
+    List<Map<String, Object>> getRecommendations(Long userId);
 }

@@ -2,6 +2,7 @@ package org.example.kaoyanplatform.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.example.kaoyanplatform.entity.ExamRecord;
+import org.example.kaoyanplatform.entity.dto.ExamRecordDetailDTO;
 import org.example.kaoyanplatform.entity.dto.SubjectiveQuestionDetailDTO;
 import org.example.kaoyanplatform.entity.dto.UserGradingDTO;
 
@@ -24,6 +25,13 @@ public interface ExamRecordService extends IService<ExamRecord> {
      * @return 主观题详情列表
      */
     List<SubjectiveQuestionDetailDTO> getSubjectiveQuestionsBySessionId(Long sessionId);
+
+    /**
+     * 获取指定考试会话的答题记录详情（包含题目信息）
+     * @param sessionId 考试会话ID
+     * @return 答题记录详情列表
+     */
+    List<ExamRecordDetailDTO> getSessionExamDetailList(Long sessionId);
 
     /**
      * 计算考试会话的分数统计

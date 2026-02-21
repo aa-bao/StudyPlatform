@@ -7,6 +7,25 @@ spring:
     jdbc-url: jdbc:mysql://localhost:3306/kaoyan_platform?serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=utf-8
     username: root
     password: 123456
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: 2847202298@qq.com
+    password: sskpeupsllwoddbj
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+# 邮件验证码配置
+mail:
+  code:
+    expireMinutes: 5
+    maxSendCount: 5
+    intervalSeconds: 60
 
 mybatis-plus:
   configuration:

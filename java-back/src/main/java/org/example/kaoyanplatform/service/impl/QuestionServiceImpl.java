@@ -1,12 +1,15 @@
 package org.example.kaoyanplatform.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.example.kaoyanplatform.client.PythonBackendClient;
 import org.example.kaoyanplatform.entity.*;
 import org.example.kaoyanplatform.entity.dto.QuestionDTO;
 import org.example.kaoyanplatform.entity.dto.QuestionExportDTO;
+import org.example.kaoyanplatform.entity.dto.QuestionImportDTO;
 import org.example.kaoyanplatform.mapper.QuestionBookRelMapper;
 import org.example.kaoyanplatform.mapper.QuestionMapper;
 import org.example.kaoyanplatform.mapper.QuestionSubjectRelMapper;
@@ -14,6 +17,7 @@ import org.example.kaoyanplatform.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -45,6 +49,9 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
 
     @Autowired
     private QuestionPaperRelService mapPaperQuestionService;
+
+    @Autowired
+    private PythonBackendClient pythonBackendClient;
 
     @Override
     public List<Question> getQuestionsBySubjectIds(List<Integer> subjectIds) {
@@ -404,23 +411,288 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
 
     @Override
     public List<Question> getErrorQuestionsWithTime(Integer userId) {
+        // 查询错题记录，按update_time降序排列，只取最近5条
         List<ErrorQuestion> list = mistakeRecordService.list(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ErrorQuestion>()
-                        .eq(ErrorQuestion::getUserId, userId));
+                        .eq(ErrorQuestion::getUserId, userId)
+                        .orderByDesc(ErrorQuestion::getUpdateTime)
+                        .last("LIMIT 5"));
 
         if (list.isEmpty()) return new ArrayList<>();
 
         List<Integer> qIds = list.stream().map(ErrorQuestion::getQuestionId).collect(Collectors.toList());
         List<Question> questions = listByIds(qIds);
 
-        // 将错题时间合并到题目对象中
+        // 将错题时间和详细信息合并到题目对象中
         questions.forEach(q -> {
             list.stream()
                     .filter(m -> m.getQuestionId().longValue() == q.getId())
                     .findFirst()
-                    .ifPresent(m -> q.setMistakeTime(m.getUpdateTime() != null ? m.getUpdateTime() : m.getCreateTime()));
+                    .ifPresent(m -> {
+                        q.setMistakeTime(m.getUpdateTime() != null ? m.getUpdateTime() : m.getCreateTime());
+
+                        // 填充科目信息
+                        List<Integer> subjectIds = mapQuestionSubjectService.getSubjectIdsByQuestionId(q.getId());
+                        q.setSubjectIds(subjectIds != null ? subjectIds : Collections.emptyList());
+
+                        if (subjectIds != null && !subjectIds.isEmpty()) {
+                            List<String> subjectNames = new ArrayList<>();
+                            for (Integer subjectId : subjectIds) {
+                                Subject subject = subjectService.getById(subjectId);
+                                if (subject != null) {
+                                    subjectNames.add(subject.getName());
+                                }
+                            }
+                            q.setSubjectNames(subjectNames);
+                            q.setSubjectName(subjectNames.isEmpty() ? null : subjectNames.get(0));
+                        } else {
+                            q.setSubjectNames(Collections.emptyList());
+                            q.setSubjectName(null);
+                        }
+
+                        // 填充习题册信息
+                        List<Integer> bookIds = mapQuestionBookService.getBookIdsByQuestionId(q.getId());
+                        q.setBookIds(bookIds != null ? bookIds : Collections.emptyList());
+
+                        if (bookIds != null && !bookIds.isEmpty()) {
+                            List<String> bookNames = new ArrayList<>();
+                            for (Integer bookId : bookIds) {
+                                ExerciseBook book = bookService.getById(bookId);
+                                if (book != null) {
+                                    bookNames.add(book.getName());
+                                }
+                            }
+                            q.setBookNames(bookNames);
+                            q.setBookName(bookNames.isEmpty() ? null : bookNames.get(0));
+                        } else {
+                            q.setBookNames(Collections.emptyList());
+                            q.setBookName(null);
+                        }
+                    });
+        });
+
+        // 按错题时间倒序排列
+        questions.sort((a, b) -> {
+            if (a.getMistakeTime() == null || b.getMistakeTime() == null) return 0;
+            return b.getMistakeTime().compareTo(a.getMistakeTime());
         });
 
         return questions;
+    }
+
+    @Override
+    public List<Question> getQuestionsByKnowledgePoint(Integer subjectId) {
+        List<Integer> subjectIds = subjectService.getDescendantIds(subjectId);
+        return getQuestionsBySubjectIds(subjectIds);
+    }
+
+    @Override
+    public List<Question> getQuestionsBySubjectOrBook(Integer subjectId, Integer bookId) {
+        List<Long> questionIds = null;
+        if (subjectId != null) {
+            questionIds = mapQuestionSubjectService.getQuestionIdsBySubjectId(subjectId);
+        } else if (bookId != null) {
+            questionIds = mapQuestionBookService.getQuestionIdsByBookId(bookId);
+        }
+
+        if (questionIds == null || questionIds.isEmpty()) {
+            return subjectId != null || bookId != null ? new ArrayList<>() : list();
+        }
+
+        List<Question> questions = listByIds(questionIds);
+        questions.sort((a, b) -> a.getId().compareTo(b.getId()));
+        return questions;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean saveWrongQuestion(Integer userId, Long questionId) {
+        if (userId == null || questionId == null) {
+            return false;
+        }
+        
+        LambdaQueryWrapper<ErrorQuestion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ErrorQuestion::getUserId, userId)
+                .eq(ErrorQuestion::getQuestionId, questionId);
+
+        if (mistakeRecordService.count(wrapper) == 0) {
+            ErrorQuestion mistakeRecord = new ErrorQuestion();
+            mistakeRecord.setUserId(userId);
+            mistakeRecord.setQuestionId(Math.toIntExact(questionId));
+            return mistakeRecordService.save(mistakeRecord);
+        }
+        return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String importQuestions(QuestionImportDTO importDTO) {
+        if (importDTO.getQuestions() == null || importDTO.getQuestions().isEmpty()) {
+            throw new IllegalArgumentException("题目列表不能为空");
+        }
+
+        if (importDTO.getSubjectIds() == null || importDTO.getSubjectIds().isEmpty()) {
+            throw new IllegalArgumentException("科目ID不能为空");
+        }
+
+        // 验证科目是否存在
+        for (Integer subjectId : importDTO.getSubjectIds()) {
+            if (subjectService.getById(subjectId) == null) {
+                throw new IllegalArgumentException("科目ID: " + subjectId + " 不存在");
+            }
+        }
+
+        try {
+            Integer bookId = importDTO.getBookId();
+
+            // 如果新建习题册
+            if (bookId == null && importDTO.getNewBookName() != null && !importDTO.getNewBookName().trim().isEmpty()) {
+                ExerciseBook newBook = new ExerciseBook();
+                newBook.setName(importDTO.getNewBookName().trim());
+                newBook.setDescription("通过JSON导入自动创建");
+                bookService.save(newBook);
+                bookId = newBook.getId();
+            } else if (bookId != null) {
+                // 验证书本是否存在
+                if (bookService.getById(bookId) == null) {
+                    throw new IllegalArgumentException("习题册不存在");
+                }
+            }
+
+            // 最终使用的习题册ID
+            Integer finalBookId = bookId;
+
+            // 去重检查，默认启用
+            boolean checkDuplicate = importDTO.getCheckDuplicate() != null && importDTO.getCheckDuplicate();
+
+            // 批量保存题目
+            int successCount = 0;
+            int duplicateCount = 0;
+            int failCount = 0;
+            List<String> errorMessages = new ArrayList<>();
+
+            for (QuestionImportDTO.QuestionImportItem item : importDTO.getQuestions()) {
+                try {
+                    // 去重检查
+                    if (checkDuplicate && isQuestionExist(item.getContent())) {
+                        duplicateCount++;
+                        continue;
+                    }
+
+                    // 构造 QuestionDTO
+                    QuestionDTO questionDTO = new QuestionDTO();
+                    questionDTO.setType(item.getType());
+                    questionDTO.setContent(item.getContent());
+
+                    // 处理选项：支持旧格式（字符串数组）和新格式（对象数组）
+                    if (item.getOptions() != null) {
+                        // 如果传入的是字符串数组，转换为对象数组格式
+                        if (item.getOptions() instanceof List) {
+                            List<?> optionsList = (List<?>) item.getOptions();
+                            if (!optionsList.isEmpty() && optionsList.get(0) instanceof String) {
+                                // 旧格式：["选项1", "选项2", "选项3", "选项4"]
+                                // 转换为新格式：[{"label": "A", "text": "选项1"}, ...]
+                                List<Map<String, String>> formattedOptions = new ArrayList<>();
+                                String[] labels = {"A", "B", "C", "D", "E", "F"};
+                                for (int i = 0; i < optionsList.size() && i < labels.length; i++) {
+                                    Map<String, String> option = new java.util.HashMap<>();
+                                    option.put("label", labels[i]);
+                                    option.put("text", (String) optionsList.get(i));
+                                    formattedOptions.add(option);
+                                }
+                                questionDTO.setOptions(formattedOptions);
+                            } else if (optionsList.get(0) instanceof Map) {
+                                // 新格式：已经是对象数组，直接使用
+                                questionDTO.setOptions((List<Map<String, String>>) (List<?>) optionsList);
+                            }
+                        }
+                    }
+
+                    questionDTO.setAnswer(item.getAnswer());
+                    questionDTO.setAnalysis(item.getAnalysis());
+                    questionDTO.setTags(item.getTags());
+                    questionDTO.setSource(item.getSource());
+                    questionDTO.setSubjectIds(importDTO.getSubjectIds());
+
+                    // 只有在有习题册ID时才设置
+                    if (finalBookId != null) {
+                        questionDTO.setBookIds(Collections.singletonList(finalBookId));
+                    }
+
+                    // 保存题目
+                    boolean success = saveQuestionWithRelations(questionDTO);
+                    if (success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                        String content = item.getContent() != null
+                            ? item.getContent().substring(0, Math.min(50, item.getContent().length()))
+                            : "(无内容)";
+                        errorMessages.add("题目保存失败: " + content);
+                    }
+                } catch (Exception e) {
+                    failCount++;
+                    errorMessages.add("题目导入失败: " + e.getMessage());
+                }
+            }
+
+            String resultMessage = String.format("导入完成！成功: %d, 跳过重复: %d, 失败: %d", successCount, duplicateCount, failCount);
+            if (!errorMessages.isEmpty()) {
+                resultMessage += "\n错误信息:\n" + String.join("\n", errorMessages.subList(0, Math.min(5, errorMessages.size())));
+                if (errorMessages.size() > 5) {
+                    resultMessage += "\n...还有 " + (errorMessages.size() - 5) + " 条错误";
+                }
+            }
+
+            return resultMessage;
+        } catch (Exception e) {
+            throw new RuntimeException("导入失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<Question> previewExportQuestions(List<Question> questions) {
+        // 加载题目详情（科目、书本等）
+        for (Question question : questions) {
+            List<Integer> bookIds = mapQuestionBookService.getBookIdsByQuestionId(question.getId());
+            question.setBookIds(bookIds != null ? bookIds : Collections.emptyList());
+
+            if (bookIds != null && !bookIds.isEmpty()) {
+                List<String> bookNames = new ArrayList<>();
+                for (Integer bookIdTemp : bookIds) {
+                    ExerciseBook book = bookService.getById(bookIdTemp);
+                    if (book != null) {
+                        bookNames.add(book.getName());
+                    }
+                }
+                question.setBookNames(bookNames);
+            }
+
+            List<Integer> subjectIds = mapQuestionSubjectService.getSubjectIdsByQuestionId(question.getId());
+            question.setSubjectIds(subjectIds != null ? subjectIds : Collections.emptyList());
+
+            if (subjectIds != null && !subjectIds.isEmpty()) {
+                List<String> subjectNames = new ArrayList<>();
+                for (Integer subjectIdTemp : subjectIds) {
+                    Subject subject = subjectService.getById(subjectIdTemp);
+                    if (subject != null) {
+                        subjectNames.add(subject.getName());
+                    }
+                }
+                question.setSubjectNames(subjectNames);
+            }
+        }
+        return questions;
+    }
+
+    @Override
+    public QuestionDTO recognizeQuestion(MultipartFile file) {
+        try {
+            return pythonBackendClient.recognizeQuestion(file);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new RuntimeException("AI识别失败: " + e.getMessage(), e);
+        }
     }
 }

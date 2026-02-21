@@ -14,15 +14,7 @@
 
                     <span class="separator">/</span>
 
-                    <span class="current-crumb clickable" :class="{ 'active': currentLevel === 1 }"
-                        @click="jumpToLevel(1)">
-                        {{ selectedSubject?.name }}
-                    </span>
-
-                    <template v-if="currentLevel > 1">
-                        <span class="separator">/</span>
-                        <span class="current-crumb">{{ selectedModeName }}</span>
-                    </template>
+                    <span class="current-crumb">{{ selectedSubject?.name }}习题库</span>
                 </div>
             </div>
 
@@ -67,27 +59,8 @@
                     </div>
                 </div>
 
-                <!-- Level 1: 模式选择 -->
-                <div v-else-if="currentLevel === 1" class="level-wrapper mode-view">
-                    <div class="sub-header">
-                        <h2 class="sub-title">{{ selectedSubject.name }}</h2>
-                        <p class="sub-subtitle">请选择练习模式</p>
-                    </div>
-
-                    <div class="mode-grid">
-                        <div v-for="(mode, index) in modes" :key="mode.id" class="mode-card" :class="`delay-${index}`"
-                            @click="handleModeSelect(mode)">
-                            <div class="mode-icon-box" :style="{ background: mode.color }">
-                                <img :src="mode.icon" class="mode-icon-img" />
-                            </div>
-                            <h3>{{ mode.name }}</h3>
-                            <p>{{ mode.desc }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Level 2: 详细习题集选择 (仅针对逐题精练) -->
-                <div v-else-if="currentLevel === 2" class="level-wrapper book-view">
+                <!-- Level 1: 详细习题集选择 -->
+                <div v-else-if="currentLevel === 1" class="level-wrapper book-view">
                     <div class="sub-header">
                         <h2 class="sub-title">{{ selectedSubject.name }}习题库</h2>
                         <p class="sub-subtitle">共找到 {{ bookList.length }} 本相关习题集</p>
@@ -126,18 +99,15 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
-import {
-    Notebook, Right, Flag, Reading, Histogram, Cpu,
-    HomeFilled, Trophy
-} from '@element-plus/icons-vue'
 
 // 导入自定义图标
 import politicsIcon from '@/assets/icons/politics.svg?url'
 import englishIcon from '@/assets/icons/english.svg?url'
-import mathIcon from '@/assets/icons/math_1.svg?url'
+import mathIcon from '@/assets/icons/math.svg?url'
 import csIcon from '@/assets/icons/408.svg?url'
 import singlePracticeIcon from '@/assets/icons/single-practice.svg?url'
 import topicDrillIcon from '@/assets/icons/topic-drill.svg?url'
@@ -150,7 +120,7 @@ const userStore = useUserStore()
 // 状态管理
 const currentLevel = ref(0) // 0:科目, 1:模式, 2:书本
 const selectedSubject = ref(null) // 包含 {id, name}
-const selectedModeName = ref('')
+
 const bookList = ref([])
 
 
@@ -218,8 +188,7 @@ const modes = [
     { id: 'mock', name: '真题模考', desc: '全真模拟考试环境', icon: mockExamIcon, color: '#E6A23C' }
 ]
 
-const handleSubjectSelect = (category) => {
-    // 根据大类获取用户的具体科目配置
+const handleSubjectSelect = async (category) => {
     const specificSubject = getSpecificSubject(category)
     console.log('=== handleSubjectSelect ===')
     console.log('点击的大类:', category)
@@ -227,7 +196,24 @@ const handleSubjectSelect = (category) => {
     if (specificSubject) {
         selectedSubject.value = specificSubject
         console.log('已设置 selectedSubject:', selectedSubject.value)
-        currentLevel.value = 1
+        
+        try {
+            const res = await request.get('/book/list-by-subject', {
+                params: {
+                    subjectId: specificSubject.id
+                }
+            })
+
+            if (res.code === 200) {
+                bookList.value = res.data
+                currentLevel.value = 1
+            } else {
+                ElMessage.error(res.msg || '获取练习册失败')
+            }
+        } catch (error) {
+            console.error('获取练习册异常:', error)
+            ElMessage.error('网络异常，请检查后端服务')
+        }
     }
 }
 
@@ -281,33 +267,37 @@ const goToPractice = (book) => {
 }
 
 
-// 修改 resetLevel 为更灵活的跳转函数
 const jumpToLevel = (level) => {
     if (level === 0) {
-        // 回到科目选择首页
         currentLevel.value = 0
         selectedSubject.value = null
-        selectedModeName.value = ''
-        bookList.value = []
-    } else if (level === 1) {
-        // 回到模式选择页
-        currentLevel.value = 1
-        selectedModeName.value = ''
         bookList.value = []
     }
 }
 
-onMounted(() => {
+onMounted(async () => {
     console.log('SubjectList mounted. userStore.userInfo:', userStore.userInfo)
 
-    const { backToLevel, subjectId, subjectName } = route.query // 确保解构了 subjectName
+    const { backToLevel, subjectId, subjectName } = route.query
 
     if (backToLevel === '1' && subjectId) {
         const target = Object.values(allSubjectsConfig).find(s => s.id == subjectId)
         if (target) {
             selectedSubject.value = target
-            currentLevel.value = 1
-            // 注意：这里建议给 selectedModeName 一个默认值或保持为空
+            try {
+                const res = await request.get('/book/list-by-subject', {
+                    params: {
+                        subjectId: target.id
+                    }
+                })
+
+                if (res.code === 200) {
+                    bookList.value = res.data
+                    currentLevel.value = 1
+                }
+            } catch (error) {
+                console.error('获取练习册异常:', error)
+            }
         }
     }
 
@@ -315,7 +305,20 @@ onMounted(() => {
         const target = Object.values(allSubjectsConfig).find(m => m.name === subjectName)
         if (target) {
             selectedSubject.value = target
-            currentLevel.value = 1
+            try {
+                const res = await request.get('/book/list-by-subject', {
+                    params: {
+                        subjectId: target.id
+                    }
+                })
+
+                if (res.code === 200) {
+                    bookList.value = res.data
+                    currentLevel.value = 1
+                }
+            } catch (error) {
+                console.error('获取练习册异常:', error)
+            }
         }
     }
 })

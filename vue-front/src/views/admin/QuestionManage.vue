@@ -133,31 +133,48 @@
                     <!-- 第一行：基础属性配置 -->
                     <div class="config-panel">
                         <el-row :gutter="20">
-                            <el-col :span="6">
-                                <el-form-item label="所属科目" prop="subjectIds">
-                                    <el-tree-select v-model="form.subjectIds" :data="subjects"
-                                        :props="{ label: 'name', value: 'id', children: 'children' }"
-                                        placeholder="请选择所属科目" check-strictly filterable multiple
-                                        collapse-tags collapse-tags-tooltip style="width: 100%"
-                                        :render-after-expand="false" default-expand-all
-                                        @change="handleSubjectIdsChange">
-                                        <template #default="{ node, data }">
-                                            <span class="tree-node-label">
-                                                <span>{{ node.label }}</span>
-                                                <el-checkbox
-                                                    v-if="data.children && data.children.length > 0"
-                                                    :model-value="isNodeFullySelected(data)"
-                                                    :indeterminate="isNodePartiallySelected(data)"
-                                                    @change="handleSelectAll(data)"
-                                                    @click.stop
-                                                    class="select-all-checkbox"
-                                                >全选</el-checkbox>
-                                            </span>
-                                        </template>
-                                    </el-tree-select>
+                            <!-- 统一使用两级选择器 -->
+                            <el-col :span="4">
+                                <el-form-item label="考试规格" required>
+                                    <el-select
+                                        v-model="selectedExamSpec"
+                                        placeholder="请先选择考试规格"
+                                        @change="handleExamSpecChange"
+                                        style="width: 100%"
+                                    >
+                                        <el-option
+                                            v-for="spec in examSpecList"
+                                            :key="spec.id"
+                                            :label="spec.name"
+                                            :value="spec.id"
+                                        />
+                                    </el-select>
                                 </el-form-item>
                             </el-col>
-                            <el-col :span="6">
+                            <el-col :span="8">
+                                <el-form-item label="知识点" prop="subjectIds" required>
+                                    <el-cascader
+                                        v-model="form.subjectIds"
+                                        :options="knowledgePointTree"
+                                        :props="{
+                                            value: 'id',
+                                            label: 'name',
+                                            children: 'children',
+                                            multiple: true,
+                                            checkStrictly: true,
+                                            emitPath: false
+                                        }"
+                                        placeholder="请选择知识点（可多选）"
+                                        :disabled="!selectedExamSpec"
+                                        clearable
+                                        filterable
+                                        collapse-tags
+                                        style="width: 100%"
+                                    />
+                                </el-form-item>
+                            </el-col>
+
+                            <el-col :span="4">
                                 <el-form-item label="所属书本" prop="bookIds">
                                     <el-select v-model="form.bookIds" placeholder="选择习题册" style="width: 100%" filterable multiple collapse-tags collapse-tags-tooltip>
                                         <el-option v-for="book in books" :key="book.id" :label="book.name"
@@ -165,14 +182,14 @@
                                     </el-select>
                                 </el-form-item>
                             </el-col>
-                            <el-col :span="6">
+                            <el-col :span="4">
                                 <el-form-item label="题目类型" prop="type">
                                     <el-select v-model="form.type" placeholder="选择类型" style="width: 100%">
                                         <el-option v-for="type in questionTypesList" :key="type.code" :label="type.name" :value="type.code" />
                                     </el-select>
                                 </el-form-item>
                             </el-col>
-                            <el-col :span="6">
+                            <el-col :span="4">
                                 <el-form-item label="难度等级" prop="difficulty">
                                     <el-rate v-model="form.difficulty" show-score
                                         :colors="['#99A9BF', '#F7BA2A', '#FF9900']"
@@ -347,7 +364,7 @@ import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import katex from 'katex'
-import { getQuestionTypesBySubject } from '@/api/subject'
+import { getQuestionTypesBySubject, getKnowledgePointsApi } from '@/api/subject'
 import { loadQuestionTypes } from '@/utils/questionTypes'
 
 // 数据定义
@@ -365,11 +382,16 @@ const viewDialogVisible = ref(false)
 const formRef = ref(null)
 
 const searchForm = ref({ subjectIds: [], bookId: null })
-const subjects = ref([]) 
+const subjects = ref([])
 const books = ref([])
 const viewQuestion = ref(null)
 const recognizing = ref(false)
 const uploadRef = ref(null)
+
+// 新增：知识点选择相关
+const examSpecList = ref([]) // 考试规格列表
+const selectedExamSpec = ref(null) // 选中的考试规格
+const knowledgePointTree = ref([]) // 知识点树
 
 const form = ref({
     id: null,
@@ -440,6 +462,49 @@ const rules = {
     content: [{ required: true, message: '请输入题干内容', trigger: 'blur' }],
     answer: [{ required: true, message: '请输入正确答案', trigger: 'blur' }],
     difficulty: [{ required: true, message: '请选择难度', trigger: 'change' }]
+}
+
+// 加载考试规格列表
+const loadExamSpecs = async () => {
+    try {
+        const res = await request.get('/subject/exam-specs')
+        examSpecList.value = res.data || res || []
+    } catch (e) {
+        ElMessage.error('获取考试规格列表失败')
+        console.error(e)
+    }
+}
+
+// 考试规格变化时，加载对应的知识点树
+const handleExamSpecChange = async (examSpecId) => {
+    console.log('【前端调试】考试规格变化，examSpecId:', examSpecId)
+
+    if (!examSpecId) {
+        knowledgePointTree.value = []
+        form.value.subjectIds = []
+        return
+    }
+
+    try {
+        const res = await getKnowledgePointsApi(examSpecId)
+        console.log('【前端调试】接口返回数据:', res)
+        knowledgePointTree.value = res.data || []
+        console.log('【前端调试】知识点树赋值后:', knowledgePointTree.value)
+
+        // 只在新增模式下清空知识点，编辑模式下保留
+        // 但如果用户主动切换了考试规格，也需要清空
+        // 这里简化处理：只在考试规格改变时清空
+        if (form.value.id && selectedExamSpec.value !== examSpecId) {
+            // 编辑模式且考试规格改变，清空知识点选择
+            form.value.subjectIds = []
+        } else if (!form.value.id) {
+            // 新增模式，清空知识点选择
+            form.value.subjectIds = []
+        }
+    } catch (e) {
+        ElMessage.error('获取知识点树失败')
+        console.error('【前端调试】获取知识点树失败:', e)
+    }
 }
 
 // 获取科目列表
@@ -599,6 +664,9 @@ const resetForm = () => {
         difficulty: 3,
         tags: []
     }
+    // 重置知识点选择相关状态
+    selectedExamSpec.value = null
+    knowledgePointTree.value = []
     formRef.value?.clearValidate()
 }
 
@@ -651,6 +719,78 @@ const handleEdit = (row) => {
     // 加载该科目对应的题型
     if (form.value.subjectIds && form.value.subjectIds.length > 0) {
         loadQuestionTypesForSubjects(form.value.subjectIds)
+        // 尝试根据已有的科目ID推断考试规格
+        inferExamSpecFromSubjects(form.value.subjectIds)
+    }
+}
+
+// 根据科目ID推断考试规格
+const inferExamSpecFromSubjects = async (subjectIds) => {
+    if (!subjectIds || subjectIds.length === 0) return
+
+    console.log('【推断考试规格】subjectIds:', subjectIds)
+
+    // 方法1：从科目树中查找 level = 2 的考试规格
+    const findAllExamSpecs = (nodes) => {
+        const specs = []
+        const findInNodes = (nodeList) => {
+            for (const node of nodeList) {
+                if (node.level === '2' || node.level === 2) {
+                    specs.push(node)
+                }
+                if (node.children && node.children.length > 0) {
+                    findInNodes(node.children)
+                }
+            }
+        }
+        findInNodes(nodes)
+        return specs
+    }
+
+    // 方法2：检查某个考试规格是否包含目标科目ID
+    const checkExamSpecContainsSubjects = (examSpec, targetIds) => {
+        // 收集该考试规格下的所有子孙节点ID
+        const collectDescendantIds = (node) => {
+            const ids = [node.id]
+            if (node.children && node.children.length > 0) {
+                for (const child of node.children) {
+                    ids.push(...collectDescendantIds(child))
+                }
+            }
+            return ids
+        }
+
+        const allDescendantIds = collectDescendantIds(examSpec)
+        console.log(`【推断考试规格】检查考试规格 ${examSpec.name}(ID=${examSpec.id})，包含的子节点数:`, allDescendantIds.length)
+
+        // 检查是否有交集
+        const hasIntersection = targetIds.some(id => allDescendantIds.includes(id))
+        return hasIntersection
+    }
+
+    // 获取所有考试规格
+    const allExamSpecs = findAllExamSpecs(subjects.value)
+    console.log('【推断考试规格】找到的所有考试规格:', allExamSpecs.map(s => ({ id: s.id, name: s.name })))
+
+    // 找到包含目标科目ID的考试规格
+    let matchedExamSpec = null
+    for (const examSpec of allExamSpecs) {
+        if (checkExamSpecContainsSubjects(examSpec, subjectIds)) {
+            matchedExamSpec = examSpec
+            console.log('【推断考试规格】匹配的考试规格:', examSpec.name, 'ID:', examSpec.id)
+            break
+        }
+    }
+
+    if (matchedExamSpec) {
+        selectedExamSpec.value = matchedExamSpec.id
+        // 加载对应的知识点树
+        await handleExamSpecChange(matchedExamSpec.id)
+    } else {
+        console.warn('【推断考试规格】未能推断出考试规格，subjectIds:', subjectIds)
+        // 备用方案：不自动加载知识点树，让用户手动选择
+        selectedExamSpec.value = null
+        knowledgePointTree.value = []
     }
 }
 
@@ -899,6 +1039,7 @@ onMounted(async () => {
     console.log('页面已挂载')
     loadSubjects()
     loadBooks()
+    loadExamSpecs() // 加载考试规格列表
     loadData()
     // 初始化题型列表
     questionTypesList.value = await loadQuestionTypes()
