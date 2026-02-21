@@ -10,9 +10,12 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.kaoyanplatform.common.Result;
+import org.example.kaoyanplatform.entity.MailCode;
 import org.example.kaoyanplatform.entity.User;
 import org.example.kaoyanplatform.entity.dto.UserStudyStatsDTO;
+import org.example.kaoyanplatform.mapper.MailCodeMapper;
 import org.example.kaoyanplatform.service.UserService;
+import org.example.kaoyanplatform.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -34,23 +38,36 @@ public class UserController {
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private MailCodeMapper mailCodeMapper;
+
     @PostMapping("/login")
-    @Operation(summary = "用户登录", description = "验证用户名密码，成功后返回用户信息")
+    @Operation(summary = "用户登录", description = "验证用户名密码，成功后返回用户信息和 JWT token")
     @ApiResponse(responseCode = "200", description = "登录成功")
     public Result login(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "登录参数",
-                    content = @Content(examples = @ExampleObject(value = "{\"username\": \"admin\", \"password\": \"123456\"}"))
+                    content = @Content(examples = @ExampleObject(value = "{\"username\": \"admin\", \"password\": \"123456\", \"remember\": false}"))
             )
-            @RequestBody Map<String, String> loginData) {
-        String username = loginData.get("username");
-        String password = loginData.get("password");
+            @RequestBody Map<String, Object> loginData) {
+        String username = (String) loginData.get("username");
+        String password = (String) loginData.get("password");
+        boolean remember = loginData.get("remember") != null ? (Boolean) loginData.get("remember") : false;
 
         User user = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
 
         if (user != null && passwordEncoder.matches(password, user.getPassword())) {
             user.setPassword(null);
-            return Result.success(user);
+            // 生成 JWT token
+            String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole(), remember);
+            // 返回用户信息和 token
+            return Result.success(Map.of(
+                    "userInfo", user,
+                    "token", token
+            ));
         } else {
             return Result.error("用户名或密码错误");
         }
@@ -61,19 +78,117 @@ public class UserController {
     public Result register(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "注册用户信息",
-                    content = @Content(examples = @ExampleObject(value = "{\"username\": \"testuser\", \"password\": \"123456\", \"nickname\": \"考研加油\"}"))
+                    content = @Content(examples = @ExampleObject(value = "{\"username\": \"test@example.com\", \"password\": \"123456\", \"code\": \"123456\", \"nickname\": \"考研加油\"}"))
             )
-            @RequestBody User user) {
-        if (StrUtil.isBlank(user.getUsername()) || StrUtil.isBlank(user.getPassword())) {
-            return Result.error("用户名或密码不能为空");
+            @RequestBody RegisterRequest request) {
+        if (StrUtil.isBlank(request.getUsername()) || StrUtil.isBlank(request.getPassword())) {
+            return Result.error("邮箱或密码不能为空");
         }
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        if (StrUtil.isBlank(request.getCode())) {
+            return Result.error("验证码不能为空");
+        }
+
+        // 校验邮箱格式
+        String emailPattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
+        if (!request.getUsername().matches(emailPattern)) {
+            return Result.error("邮箱格式不正确");
+        }
+
+        // 校验验证码
+        MailCode lastCode = mailCodeMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MailCode>()
+                .eq(MailCode::getEmail, request.getUsername())
+                .eq(MailCode::getBizType, "register")
+                .orderByDesc(MailCode::getSendTime)
+                .last("LIMIT 1"));
+
+        if (lastCode == null) {
+            return Result.error("未发送验证码");
+        }
+
+        if (lastCode.getExpireTime().isBefore(LocalDateTime.now())) {
+            return Result.error("验证码已过期，请重新获取");
+        }
+
+        if (lastCode.getStatus() == 1) {
+            return Result.error("验证码已使用");
+        }
+
+        if (!lastCode.getCode().equals(request.getCode())) {
+            return Result.error("验证码不正确");
+        }
+
+        // 标记验证码为已使用
+        lastCode.setStatus(1);
+        mailCodeMapper.updateById(lastCode);
+
+        // 提取邮箱前缀作为默认用户名和昵称
+        String email = request.getUsername();
+        String emailPrefix = email.split("@")[0];
+
+        // 创建用户对象
+        User user = new User();
+        user.setUsername(emailPrefix);
+        user.setPassword(request.getPassword());
+        user.setEmail(email);
+        user.setNickname(request.getNickname() != null ? request.getNickname() : emailPrefix);
+        user.setExamYear(request.getExamYear() != null ? request.getExamYear() : "27考研");
+
+        // 密码加密在 UserServiceImpl 中处理，这里不再重复加密
         boolean success = userService.register(user);
-        return success ? Result.success("注册成功") : Result.error("用户名已存在");
+        return success ? Result.success("注册成功") : Result.error("邮箱已存在");
+    }
+
+    // 注册请求参数类
+    public static class RegisterRequest {
+        private String username;
+        private String password;
+        private String code;
+        private String nickname;
+        private String examYear;
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public String getCode() {
+            return code;
+        }
+
+        public void setCode(String code) {
+            this.code = code;
+        }
+
+        public String getNickname() {
+            return nickname;
+        }
+
+        public void setNickname(String nickname) {
+            this.nickname = nickname;
+        }
+
+        public String getExamYear() {
+            return examYear;
+        }
+
+        public void setExamYear(String examYear) {
+            this.examYear = examYear;
+        }
     }
 
     @PostMapping("/update")
-    @Operation(summary = "更新个人信息", description = "根据ID更新用户的昵称、头像、目标院校等非敏感信息。")
+    @Operation(summary = "更新用户信息", description = "根据ID更新用户的昵称、头像、目标院校等非敏感信息。")
     public Result update(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "更新数据（必须包含id）",
@@ -95,6 +210,10 @@ public class UserController {
         if (user.getExamSubjects() != null) dbUser.setExamSubjects(user.getExamSubjects());
         if (user.getTargetSchool() != null) dbUser.setTargetSchool(user.getTargetSchool());
         if (user.getTargetTotalScore() != null) dbUser.setTargetTotalScore(user.getTargetTotalScore());
+        if (user.getMotto() != null) dbUser.setMotto(user.getMotto());
+
+        // 显式设置更新时间
+        dbUser.setUpdateTime(LocalDateTime.now());
 
         boolean success = userService.updateById(dbUser);
         if (success) {
@@ -105,7 +224,7 @@ public class UserController {
     }
 
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
-    @Operation(summary = "上传头像", description = "上传图片文件并返回静态资源访问URL。")
+    @Operation(summary = "上传用户头像", description = "上传图片文件并返回静态资源访问URL。")
     public Result upload(
             @Parameter(description = "要上传的头像图片文件", required = true)
             @RequestParam("file") MultipartFile file) {
@@ -140,17 +259,18 @@ public class UserController {
         String newPassword = params.get("newPassword");
 
         if (StrUtil.hasBlank(userId, oldPassword, newPassword)) {
-            return Result.error("参数缺失");
+            return Result.error("请填写完整的密码信息");
         }
 
         User user = userService.getById(userId);
         if (user == null) return Result.error("用户不存在");
 
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
-            return Result.error("旧密码错误");
+            return Result.error("原密码错误，请重新输入");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setUpdateTime(LocalDateTime.now());
         return userService.updateById(user) ? Result.success("密码修改成功") : Result.error("更新失败");
     }
 
@@ -173,6 +293,7 @@ public class UserController {
         if (user == null) return Result.error("用户不存在");
 
         user.setPassword(passwordEncoder.encode(password));
+        user.setUpdateTime(LocalDateTime.now());
         return userService.updateById(user) ? Result.success("密码重置成功") : Result.error("更新失败");
     }
 
@@ -202,7 +323,7 @@ public class UserController {
     }
 
     @GetMapping("userInfo")
-    @Operation(summary = "根据用户ID获取用户信息", description = "通过传入的用户ID查询并返回对应的用户详细信息")
+    @Operation(summary = "获取用户信息", description = "通过传入的用户ID查询并返回对应的用户详细信息")
     @ApiResponse(responseCode = "200", description = "成功返回用户信息")
     public Result getUserInfo(
             @Parameter(description = "用户唯一标识 ID", required = true, example = "12345")
@@ -212,7 +333,7 @@ public class UserController {
     }
 
     @GetMapping("/studyStats/{userId}")
-    @Operation(summary = "获取用户学习统计数据", description = "获取指定用户的总答题量、正确率、连续打卡天数等统计信息。")
+    @Operation(summary = "获取单个用户学习统计数据", description = "获取指定用户的总答题量、正确率、连续打卡天数等统计信息。")
     public Result getUserStudyStats(
             @Parameter(description = "用户ID", required = true, example = "1")
             @PathVariable Long userId) {
@@ -233,5 +354,30 @@ public class UserController {
             return Result.error("用户不存在");
         }
         return Result.success(homeData);
+    }
+
+    @GetMapping("/recommendations/{userId}")
+    @Operation(summary = "获取智能学习建议", description = "基于学习数据生成个性化建议")
+    public Result getRecommendations(
+            @Parameter(description = "用户ID", required = true, example = "1")
+            @PathVariable Long userId) {
+        var recommendations = userService.getRecommendations(userId);
+        if (recommendations == null) {
+            return Result.error("用户不存在");
+        }
+        return Result.success(recommendations);
+    }
+
+    @DeleteMapping("/delete/{id}")
+    @Operation(summary = "删除用户", description = "根据用户ID删除用户，仅管理员可用")
+    public Result deleteUser(
+            @Parameter(description = "用户ID", required = true, example = "1")
+            @PathVariable Long id) {
+        User user = userService.getById(id);
+        if (user == null) {
+            return Result.error("用户不存在");
+        }
+        boolean success = userService.removeById(id);
+        return success ? Result.success("删除成功") : Result.error("删除失败");
     }
 }

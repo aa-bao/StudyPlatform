@@ -4,22 +4,14 @@
         <div class="sidebar" :class="{ 'sidebar-exiting': isSidebarExiting }">
             <div class="logo-section">
                 <div class="logo-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
+                    <span class="logo-letter">Y</span>
                 </div>
-                <span class="logo-text">考研刷题平台</span>
+                <span class="logo-text">考研全流程学习平台</span>
             </div>
 
             <div class="user-profile-section">
                 <el-avatar :size="70" :src="userInfo.avatar" class="user-avatar" />
                 <h3>{{ userInfo.nickname }}</h3>
-                <p class="user-role">{{ userInfo.role === 'admin' ? '管理员' : '考研学子' }}</p>
-
                 <div class="quick-stats">
                     <div class="stat-item">
                         <span class="stat-number">{{ userStats.questionsDone }}</span>
@@ -41,54 +33,49 @@
                 <el-menu :default-active="$route.path" class="el-menu-vertical" @select="handleMenuNavigation">
                     <el-menu-item index="/user/dashboard">
                         <el-icon>
-                            <PieChart />
+                            <img :src="dashboardIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>备考看板</span>
                     </el-menu-item>
                     <el-menu-item index="subject">
                         <el-icon>
-                            <Reading />
+                            <img :src="singlePracticeIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>科目练习</span>
                     </el-menu-item>
                     <el-menu-item index="/user/correction-notebook">
                         <el-icon>
-                            <Failed />
+                            <img :src="correctionNotebookIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>错题本</span>
                     </el-menu-item>
                     <el-menu-item index="/user/paper-list">
                         <el-icon>
-                            <Document />
+                            <img :src="mockExamIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>真题模考</span>
                     </el-menu-item>
                     <el-menu-item index="/user/topic-drill?rootId=1">
                         <el-icon>
-                            <svg class="icon" viewBox="0 0 1024 1024" version="1.1"
-                                xmlns="http://www.w3.org/2000/svg" width="18" height="18">
-                                <path
-                                    d="M726.521506 0a35.929459 35.929459 0 0 1 35.677952 31.761642L762.450965 35.929459v74.841063h166.065959a35.929459 35.929459 0 0 1 4.203747 71.607412l-4.203747 0.251506h-193.695713l-167.036055 133.442011 31.114911 233.541483 128.016663-98.662295a35.139011 35.139011 0 0 1 17.21021-7.149962l4.70676-0.323365h131.861114a35.929459 35.929459 0 0 1 4.167817 71.607412l-4.167817 0.251506h-119.645098l-133.945023 103.297194a36.145036 36.145036 0 0 1-18.036589 7.257751l43.510575 326.239488H978.027718a35.929459 35.929459 0 0 1 4.203747 71.607411L978.027718 1023.98958H43.861785a35.929459 35.929459 0 0 1-4.203746-71.607411L43.861785 952.130663h324.910098l21.701393-222.51114-77.499843-59.714761-128.411886 0.03593a35.965388 35.965388 0 0 1-35.713883-31.761642l-0.215576-4.167817a35.929459 35.929459 0 0 1 31.725712-35.713882l4.203747-0.215577h140.699761a35.929459 35.929459 0 0 1 18.000659 4.814547l3.916311 2.65878 51.522844 39.702053 15.95268-163.622757-132.651563-53.031881a35.929459 35.929459 0 0 1-16.56348-13.509477l-2.227627-3.808522L201.268745 287.435672H79.791244a35.929459 35.929459 0 0 1-4.203746-71.607412L79.791244 215.576754h85.548042L119.493296 123.848845a35.929459 35.929459 0 0 1 62.193894-35.785741l2.119838 3.664805 137.573898 275.219655 100.530626 40.169136 16.276045-166.892337-134.879189-103.979855a35.929459 35.929459 0 0 1 40.133206-59.427325l3.736664 2.515062 99.237165 76.529748 12.036369-123.417692a35.929459 35.929459 0 0 1 70.529528-5.748713l0.826378 4.491182 26.875235 201.743912L690.592047 125.968683V35.929459a35.929459 35.929459 0 0 1 35.929459-35.929459"
-                                    fill="currentColor"></path>
-                            </svg>
+                            <img :src="treeIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>知识体系树</span>
                     </el-menu-item>
                     <el-menu-item index="/rankings">
                         <el-icon>
-                            <Trophy />
+                            <img :src="trophyIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>排行榜</span>
                     </el-menu-item>
                     <el-menu-item index="/user/profile">
                         <el-icon>
-                            <User />
+                            <img :src="userSettingIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>个人中心</span>
                     </el-menu-item>
                     <el-menu-item index="/user/community">
                         <el-icon>
-                            <School />
+                            <img :src="communityIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>学习社区</span>
                     </el-menu-item>
@@ -110,9 +97,9 @@
             <!-- 顶部欢迎区域 -->
             <div class="dashboard-header">
                 <div class="welcome-section">
-                    <h1 class="welcome-title">你好，{{ userInfo.nickname }}！今天也要加油哦！</h1>
+                    <h1 class="welcome-title">你好，{{ userInfo.nickname }}！今天也要加油哦~</h1>
                     <p class="target-text">
-                        🎯 考研目标：
+                        目标：
                         <span class="target-school">{{ userInfo.targetSchool }}</span> 
                         <span class="custom-tag">{{ userInfo.examYear }}</span>
                     </p>
@@ -124,23 +111,35 @@
                 <div class="quick-actions">
                     <el-button type="primary" size="large" @click="startPractice" class="action-button">
                         <el-icon :size="18">
-                            <Reading />
+                            <img :src="singlePracticeIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>刷书</span>
                     </el-button>
 
                     <el-button size="large" @click="startTopicDrill" class="action-button">
                         <el-icon :size="18">
-                            <Failed />
+                            <img :src="testBaseIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>刷题</span>
                     </el-button>
 
                     <el-button size="large" @click="startMockExam" class="action-button">
                         <el-icon :size="18">
-                            <DocumentChecked />
+                            <img :src="mockExamIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>刷卷</span>
+                    </el-button>
+
+                    <el-button
+                        size="large"
+                        @click="startDailyTest"
+                        class="action-button"
+                        :class="{ 'is-daily-active': remainingCount > 0 }"
+                    >
+                        <el-icon :size="18">
+                            <img :src="dailyTestIcon" style="width: 18px; height: 18px;">
+                        </el-icon>
+                        <span>每日测试</span>
                     </el-button>
                 </div>
             </div>
@@ -150,7 +149,7 @@
                 <div class="stat-card primary-card" @click="ViewDashboard()">
                     <div class="stat-icon bg-primary">
                         <el-icon :size="24">
-                            <Collection />
+                            <img :src="testBaseIcon" style="width: 24px; height: 24px;">
                         </el-icon>
                     </div>
                     <div class="stat-content">
@@ -162,7 +161,7 @@
                 <div class="stat-card success-card" @click="ViewDashboard()">
                     <div class="stat-icon bg-success">
                         <el-icon :size="24">
-                            <Timer />
+                            <img :src="clockIcon" style="width: 24px; height: 24px;">
                         </el-icon>
                     </div>
                     <div class="stat-content">
@@ -174,7 +173,7 @@
                 <div class="stat-card warning-card" @click="ViewDashboard()">
                     <div class="stat-icon bg-warning">
                         <el-icon :size="24">
-                            <Promotion />
+                            <img :src="lineChartIcon" style="width: 24px; height: 24px;">
                         </el-icon>
                     </div>
                     <div class="stat-content">
@@ -186,7 +185,7 @@
                 <div class="stat-card danger-card" @click="viewMistakes()">
                     <div class="stat-icon bg-danger">
                         <el-icon :size="24">
-                            <Failed />
+                            <img :src="correctionNotebookIcon" style="width: 24px; height: 24px;">
                         </el-icon>
                     </div>
                     <div class="stat-content">
@@ -196,17 +195,95 @@
                 </div>
             </div>
 
-            <!-- 图表区域 -->
+            <!-- 数据展示区域 -->
             <div class="charts-section">
-                <div class="chart-container">
-                    <h3 class="chart-title">学科能力雷达图</h3>
-                    <div ref="radarChart" class="chart-area" style="width: 100%; height: 320px;"></div>
-                    <p class="chart-tip">💡 你的<strong>高等数学</strong>能力突出，<strong>线性代数</strong>需要加强练习</p>
+                <!-- 最近错题模块 -->
+                <div class="chart-container feature-card">
+                    <div class="feature-header">
+                        <h3>
+                            <el-icon>
+                                <img :src="correctionNotebookIcon" style="width: 20px; height: 20px;">
+                            </el-icon>
+                            最近错题
+                        </h3>
+                        <el-button type="primary" text @click="viewMistakes()">查看全部</el-button>
+                    </div>
+                    <div class="mistakes-list">
+                        <div class="mistake-item" v-for="(mistake, index) in recentMistakes" :key="index"
+                             @click="goToQuestion(mistake)">
+                            <div class="mistake-index">{{ index + 1 }}</div>
+                            <div class="mistake-content">
+                                <div class="mistake-subject">
+                                    <span class="subject-badge" :class="'subject-' + mistake.subjectType">
+                                        {{ mistake.subjectName }}
+                                    </span>
+                                    <span class="mistake-time">{{ mistake.timeAgo }}</span>
+                                </div>
+                                <div class="mistake-question" v-html="renderLatex(mistake.question)"></div>
+                            </div>
+                        </div>
+                        <div v-if="recentMistakes.length === 0" class="empty-state">
+                            <p>🎉 太棒了！最近没有错题</p>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="chart-container">
-                    <h3 class="chart-title">错题热力分布</h3>
-                    <div ref="heatMap" class="chart-area" style="width: 100%; height: 320px;"></div>
+                <!-- 数学能力雷达图 -->
+                <div class="chart-container feature-card">
+                    <div class="feature-header">
+                        <h3>
+                            <el-icon>
+                                <img :src="testBaseIcon" style="width: 20px; height: 20px;">
+                            </el-icon>
+                            数学能力雷达图
+                        </h3>
+                    </div>
+                    <div ref="radarChart" class="chart-area" style="width: 100%; height: 280px;"></div>
+                    <p class="chart-tip">💡 你的<strong>高等数学</strong>能力突出，<strong>线性代数</strong>需要加强练习</p>
+                </div>
+            </div>
+
+            <!-- 数据展示区域2 -->
+            <div class="charts-section">
+                <!-- 每日测试模块 -->
+                <div class="chart-container feature-card">
+                    <div class="feature-header">
+                        <h3>
+                            <el-icon>
+                                <img :src="lineChartIcon" style="width: 20px; height: 20px;">
+                            </el-icon>
+                            每日测试正确率
+                        </h3>
+                        <span class="test-period">最近7天</span>
+                    </div>
+                    <div ref="dailyTestChart" class="daily-test-chart" style="width: 100%; height: 280px;"></div>
+                    <div class="test-summary">
+                        <div class="summary-item">
+                            <span class="summary-label">平均正确率</span>
+                            <span class="summary-value">{{ dailyTestStats.averageAccuracy }}%</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">最高正确率</span>
+                            <span class="summary-value">{{ dailyTestStats.maxAccuracy }}%</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">测试次数</span>
+                            <span class="summary-value">{{ dailyTestStats.totalTests }}次</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 错题分布热力图 -->
+                <div class="chart-container feature-card">
+                    <div class="feature-header">
+                        <h3>
+                            <el-icon>
+                                <img :src="chartNoAxisIcon" style="width: 20px; height: 20px;">
+                            </el-icon>
+                            错题分布
+                        </h3>
+                    </div>
+                    <div ref="heatMap" class="chart-area" style="width: 100%; height: 280px;"></div>
                     <p class="chart-tip">🔥 <strong>泰勒公式</strong>相关题目错误率高达65%，建议优先复习</p>
                 </div>
             </div>
@@ -276,70 +353,85 @@
             </div>
         </div>
 
-        <!-- 首次用户引导层 -->
-        <div v-if="isNewUser" class="onboarding-overlay" @click="finishOnboarding">
-            <div class="onboarding-card" @click.stop>
-                <div class="onboarding-header">
-                    <h2>欢迎使用考研刷题平台</h2>
-                    <p>让我们快速了解如何高效备考</p>
-                </div>
 
-                <div class="onboarding-steps">
-                    <div class="step-item" v-for="(step, index) in onboardingSteps" :key="index"
-                        :class="{ active: currentStep === index }">
-                        <div class="step-number">{{ index + 1 }}</div>
-                        <div class="step-content">
-                            <h4>{{ step.title }}</h4>
-                            <p>{{ step.description }}</p>
+        <!-- 错题详情对话框 -->
+        <el-dialog
+            v-model="questionDetailDialogVisible"
+            title="错题详情"
+            width="800px"
+            :close-on-click-modal="false"
+            class="question-detail-dialog"
+        >
+            <div v-if="selectedQuestion" class="question-detail-content">
+                <!-- 题目基本信息 -->
+                <div class="detail-section">
+                    <div class="detail-header">
+                        <h4>题目信息</h4>
+                        <div class="question-meta">
+                            <el-tag v-if="selectedQuestion.subjectNames && selectedQuestion.subjectNames.length > 0"
+                                    type="primary" size="small">
+                                {{ selectedQuestion.subjectNames.join('、') }}
+                            </el-tag>
+                            <el-tag v-if="selectedQuestion.bookNames && selectedQuestion.bookNames.length > 0"
+                                    type="info" size="small" style="margin-left: 8px;">
+                                {{ selectedQuestion.bookNames.join('、') }}
+                            </el-tag>
+                        </div>
+                    </div>
+                    <div class="question-body">
+                        <div class="question-text" v-html="renderLatex(selectedQuestion.content)"></div>
+
+                        <!-- 选项（如果有） -->
+                        <div v-if="selectedQuestion.options && selectedQuestion.options.length > 0" class="options-list">
+                            <div v-for="(option, index) in selectedQuestion.options" :key="index" class="option-item">
+                                <span class="option-label">{{ option.label || ['A', 'B', 'C', 'D', 'E', 'F'][index] }}.</span>
+                                <span class="option-text" v-html="renderLatex(option.text)"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="step-indicators">
-                    <span v-for="(step, index) in onboardingSteps" :key="index" class="indicator"
-                        :class="{ active: currentStep === index }"></span>
+                <!-- 答案与解析 -->
+                <div class="detail-section">
+                    <div class="detail-header">
+                        <h4>答案与解析</h4>
+                    </div>
+                    <div class="answer-section">
+                        <div class="answer-row">
+                            <span class="answer-label">正确答案：</span>
+                            <span class="answer-value primary latex-answer" v-html="renderLatex(selectedQuestion.answer)"></span>
+                        </div>
+                        <div v-if="selectedQuestion.analysis" class="analysis-row">
+                            <span class="analysis-label">题目解析：</span>
+                            <div class="analysis-content latex-content" v-html="renderLatex(selectedQuestion.analysis)"></div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="step-actions">
-                    <el-button v-if="currentStep > 0" @click="prevStep">上一步</el-button>
-                    <el-button v-if="currentStep < onboardingSteps.length - 1" type="primary" @click="nextStep">
-                        {{ currentStep === onboardingSteps.length - 2 ? '完成引导' : '下一步' }}
-                    </el-button>
-                    <el-button v-else type="success" @click="finishOnboarding">
-                        开始学习
-                    </el-button>
+                <!-- 标签（如果有） -->
+                <div v-if="selectedQuestion.tags && selectedQuestion.tags.length > 0" class="detail-section">
+                    <div class="detail-header">
+                        <h4>知识点标签</h4>
+                    </div>
+                    <div class="tags-list">
+                        <el-tag v-for="(tag, index) in selectedQuestion.tags" :key="index" size="small" style="margin-right: 8px; margin-bottom: 8px;">
+                            {{ tag }}
+                        </el-tag>
+                    </div>
                 </div>
             </div>
-        </div>
+
+            <template #footer>
+                <el-button @click="questionDetailDialogVisible = false">关闭</el-button>
+            </template>
+        </el-dialog>
 
         <!-- 悬浮胶囊按钮组 -->
         <div class="floating-capsules">
-            <!-- AI助手 -->
-            <div class="floating-capsule ai-capsule" @click="handleFloatingAction">
-                <div class="capsule-content">
-                    <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 19V5M5 12l7-7 7 7"/>
-                    </svg>
-                    <span class="capsule-text">AI助手</span>
-                </div>
-            </div>
-
-            <!-- 反馈 -->
-            <div class="floating-capsule feedback-capsule" @click="handleFeedback">
-                <div class="capsule-content">
-                    <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    <span class="capsule-text">反馈</span>
-                </div>
-            </div>
-
             <!-- 客服 -->
             <div class="floating-capsule service-capsule" @click="handleService">
                 <div class="capsule-content">
-                    <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-                    </svg>
+                    <img :src="serviceIcon" class="capsule-icon" style="width: 24px; height: 24px;">
                     <span class="capsule-text">客服</span>
                 </div>
             </div>
@@ -348,28 +440,27 @@
 </template>
 
 <script setup>
-// 导入图标
-// import singlePracticeIcon from '@/assets/icons/single-practice.svg?url'
-// import mockExamIcon from '@/assets/icons/mock-exam.svg?url'
-// import correctionNotebookIcon from '@/assets/icons/correction-notebook.svg?url'
-import {
-    Reading,
-    Failed,
-    Document,
-    Operation,
-    Trophy,
-    User,
-    DocumentChecked,
-    Collection,
-    Timer,
-    Promotion
-} from '@element-plus/icons-vue'
-
 import { ref, onMounted, onUnmounted, computed, onBeforeUnmount} from 'vue'
 import * as echarts from 'echarts'
 import { useRouter, useRoute } from 'vue-router'
-import { getHomePageDataApi } from '@/api/user'
+import { getHomePageDataApi, getUserStudyStatsApi, getErrorBookApi, getDailyTestStatusApi, getDailyTestAccuracyStatsApi } from '@/api/user'
 import { ElMessage } from 'element-plus'
+import { renderLatex } from '@/utils/latex'
+
+import dashboardIcon from '@/assets/icons/dashboard.svg?url'
+import singlePracticeIcon from '@/assets/icons/single-practice.svg?url'
+import correctionNotebookIcon from '@/assets/icons/correction-notebook.svg?url'
+import mockExamIcon from '@/assets/icons/mock-exam.svg?url'
+import treeIcon from '@/assets/icons/tree.svg?url'
+import trophyIcon from '@/assets/icons/trophy.svg?url'
+import userSettingIcon from '@/assets/icons/user-setting.svg?url'
+import testBaseIcon from '@/assets/icons/do-exercise.svg?url'
+import lineChartIcon from '@/assets/icons/line-chart.svg?url'
+import clockIcon from '@/assets/icons/clock.svg?url'
+import communityIcon from '@/assets/icons/community.svg?url'
+import chartNoAxisIcon from '@/assets/icons/chart-no-axis.svg?url'
+import serviceIcon from '@/assets/icons/service.svg?url'
+import dailyTestIcon from '@/assets/icons/daily-test.svg?url'
 
 const router = useRouter()
 const route = useRoute()
@@ -395,6 +486,8 @@ const userStats = ref({ questionsDone: 0, accuracy: 0, studyHours: 0 })
 const stats = ref({ questionsDone: 0, studyTime: 0, accuracy: 0, mistakes: 0 })
 // 考试科目
 const examSubjects = ref([])
+// 每日测试剩余次数
+const remainingCount = ref(0)
 
 // 所有励志语录
 const quotes = [
@@ -484,35 +577,25 @@ const studyPlan = ref([
     }
 ])
 
-// 首次用户引导
-const isNewUser = ref(true)
-const currentStep = ref(0)
-const onboardingSteps = ref([
-    {
-        title: '设定考研目标',
-        description: '完善你的考研目标院校、专业和考试时间，系统将为你定制专属学习计划。'
-    },
-    {
-        title: '选择科目体系',
-        description: '选择你需要备考的科目，系统会根据你的选择智能推荐学习内容。'
-    },
-    {
-        title: '开始首次刷题',
-        description: '完成第一套入门题目，系统将根据你的表现调整后续推荐策略。'
-    },
-    {
-        title: '了解数据看板',
-        description: '通过数据可视化图表追踪学习进度，找出薄弱知识点进行针对性突破。'
-    },
-    {
-        title: '制定学习计划',
-        description: '使用智能计划功能，为每天的学习设定明确目标，保持备考节奏。'
-    }
-])
 
 // 图表引用
 const radarChart = ref(null)
 const heatMap = ref(null)
+const dailyTestChart = ref(null)
+
+// 最近错题数据
+const recentMistakes = ref([])
+
+// 错题详情对话框
+const questionDetailDialogVisible = ref(false)
+const selectedQuestion = ref(null)
+
+// 每日测试统计数据（模拟数据）
+const dailyTestStats = ref({
+    averageAccuracy: 72.4,
+    maxAccuracy: 85,
+    totalTests: 23
+})
 
 // 难度文本映射
 const getDifficultyText = (level) => {
@@ -562,6 +645,35 @@ const viewMistakes = () => {
 
 const startMockExam = () => {
     navigateWithAnimation('/user/paper-list')
+}
+
+const startDailyTest = () => {
+    if (remainingCount.value === 0) {
+        ElMessage.info('今日测试已完成，继续保持')
+        return
+    }
+    navigateWithAnimation('/user/daily-test')
+}
+
+const fetchDailyTestStatus = async () => {
+    try {
+        const userId = JSON.parse(localStorage.getItem('user') || '{}').id;
+        if (!userId) {
+            console.log('未登录，跳过获取每日测试状态')
+            remainingCount.value = 0
+            return
+        }
+        
+        const res = await getDailyTestStatusApi(userId)
+        if (res.code === 200 && res.data) {
+            remainingCount.value = res.data.remainingCount || 0
+        } else {
+            remainingCount.value = 0
+        }
+    } catch (error) {
+        console.error('获取每日测试状态失败:', error)
+        remainingCount.value = 0
+    }
 }
 
 const goToPractice = (recommendation) => {
@@ -629,28 +741,39 @@ const fetchHomePageData = async () => {
     }
 }
 
+// 获取用户学习统计数据
+const fetchUserStudyStats = async () => {
+    try {
+        const userId = JSON.parse(localStorage.getItem('user') || '{}').id;
+        console.log('userId:', userId)
+        if (!userId) {
+            ElMessage.error('未登录，请先登录')
+            router.push('/login')
+            return
+        }
+
+        const res = await getUserStudyStatsApi(userId)
+        if (res.code === 200) {
+            const data = res.data
+            console.log('学习统计数据:', data)
+
+            if (data) {
+                userStats.value.questionsDone = data.questionsDone || 0
+                userStats.value.accuracy = data.accuracy || 0
+                userStats.value.studyHours = data.studyHours || 0
+            }
+        }
+    } catch (error) {
+        console.error('获取学习统计数据失败:', error)
+        ElMessage.error('获取学习统计数据失败')
+    }
+}
+
 // 推荐刷新
 const refreshRecommendations = () => {
     ElMessage.success('已刷新推荐内容！')
 }
 
-// 首次用户引导
-const nextStep = () => {
-    if (currentStep.value < onboardingSteps.value.length - 1) {
-        currentStep.value++
-    } else {
-        finishOnboarding()
-    }
-}
-const prevStep = () => {
-    if (currentStep.value > 0) {
-        currentStep.value--
-    }
-}
-const finishOnboarding = () => {
-    isNewUser.value = false
-    localStorage.setItem('onboardingCompleted', 'true')
-}
 
 // 初始化图表
 const initCharts = () => {
@@ -665,11 +788,10 @@ const initCharts = () => {
         },
         radar: {
             indicator: [
-                { name: '高等数学', max: 100 },
-                { name: '线性代数', max: 100 },
-                { name: '概率论', max: 100 },
-                { name: '英语', max: 100 },
-                { name: '政治', max: 100 }
+                { name: '计算能力', max: 100 },
+                { name: '基本功', max: 100 },
+                { name: '公式记忆', max: 100 },
+                { name: '推理能力', max: 100 }
             ],
             radius: '65%',
             splitArea: {
@@ -695,7 +817,7 @@ const initCharts = () => {
         series: [{
             type: 'radar',
             data: [{
-                value: [92, 65, 78, 85, 70],
+                value: [50, 62, 60, 66],
                 name: '能力分布',
                 symbol: 'circle',
                 symbolSize: 8,
@@ -823,19 +945,214 @@ const initCharts = () => {
     }
 }
 
+// 初始化每日测试折线图
+const initDailyTestChart = async () => {
+    if (!dailyTestChart.value) return
 
+    const userId = JSON.parse(localStorage.getItem('user') || '{}').id;
+    if (!userId) return
 
-// 悬浮胶囊点击事件
-const handleFloatingAction = () => {
-    ElMessage.info('AI助手功能开发中...')
+    const dailyTestChartInstance = echarts.init(dailyTestChart.value)
+    let last7Days = []
+    let accuracyData = []
+
+    try {
+        const res = await getDailyTestAccuracyStatsApi(userId)
+        if (res.code === 200 && res.data) {
+            last7Days = res.data.map(item => item.date)
+            accuracyData = res.data.map(item => item.accuracy)
+        }
+    } catch (error) {
+        console.error('获取正确率统计失败:', error)
+    }
+
+    // 如果没拿到数据，显示空的（或者保留原来的逻辑，但我这里选择直接用真实数据）
+    if (last7Days.length === 0) {
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date()
+            date.setDate(date.getDate() - i)
+            last7Days.push(`${date.getMonth() + 1}/${date.getDate()}`)
+            accuracyData.push(0)
+        }
+    }
+
+    const option = {
+        backgroundColor: 'transparent',
+        tooltip: {
+            trigger: 'axis',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            borderColor: '#e5e7eb',
+            textStyle: { color: '#1f2937' },
+            formatter: function (params) {
+                return `${params[0].name}<br/>正确率：<strong>${params[0].value}%</strong>`
+            }
+        },
+        grid: {
+            left: '8%',
+            right: '5%',
+            top: '15%',
+            bottom: '12%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: last7Days,
+            boundaryGap: false,
+            axisLine: {
+                lineStyle: { color: '#e5e7eb' }
+            },
+            axisLabel: {
+                color: '#6b7280',
+                fontSize: 12
+            }
+        },
+        yAxis: {
+            type: 'value',
+            min: 0,
+            max: 100,
+            axisLine: {
+                lineStyle: { color: '#e5e7eb' }
+            },
+            axisLabel: {
+                color: '#6b7280',
+                fontSize: 12,
+                formatter: '{value}%'
+            },
+            splitLine: {
+                lineStyle: {
+                    color: '#f3f4f6',
+                    type: 'dashed'
+                }
+            }
+        },
+        series: [{
+            name: '正确率',
+            type: 'line',
+            smooth: true,
+            data: accuracyData,
+            symbol: 'circle',
+            symbolSize: 8,
+            lineStyle: {
+                color: '#3b82f6',
+                width: 3
+            },
+            itemStyle: {
+                color: '#3b82f6',
+                borderColor: '#fff',
+                borderWidth: 2
+            },
+            areaStyle: {
+                color: {
+                    type: 'linear',
+                    x: 0,
+                    y: 0,
+                    x2: 0,
+                    y2: 1,
+                    colorStops: [{
+                        offset: 0,
+                        color: 'rgba(59, 130, 246, 0.3)'
+                    }, {
+                        offset: 1,
+                        color: 'rgba(59, 130, 246, 0.05)'
+                    }]
+                }
+            }
+        }]
+    }
+
+    dailyTestChartInstance.setOption(option)
+
+    // 响应窗口大小变化
+    const handleResize = () => {
+        dailyTestChartInstance.resize()
+    }
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+        window.removeEventListener('resize', handleResize)
+        dailyTestChartInstance.dispose()
+    }
 }
 
-const handleFeedback = () => {
-    ElMessage.info('反馈功能开发中...')
+// 获取最近错题数据
+const fetchRecentMistakes = async () => {
+    try {
+        const userId = JSON.parse(localStorage.getItem('user') || '{}').id
+        if (!userId) {
+            console.log('未登录，跳过获取错题数据')
+            return
+        }
+
+        const res = await getErrorBookApi(userId)
+        if (res.code === 200 && res.data) {
+            // 后端已经按update_time降序排列并只返回5条数据
+            const mistakes = res.data.map((item) => {
+                // 计算时间差
+                const mistakeTime = item.mistakeTime ? new Date(item.mistakeTime) : new Date()
+                const now = new Date()
+                const diffMs = now - mistakeTime
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+                const diffDays = Math.floor(diffHours / 24)
+
+                let timeAgo = ''
+                if (diffHours < 1) {
+                    timeAgo = '刚刚'
+                } else if (diffHours < 24) {
+                    timeAgo = `${diffHours}小时前`
+                } else if (diffDays < 7) {
+                    timeAgo = `${diffDays}天前`
+                } else {
+                    timeAgo = mistakeTime.toLocaleDateString('zh-CN')
+                }
+
+                // 获取科目名称
+                const subjectName = item.subjectNames && item.subjectNames.length > 0
+                    ? item.subjectNames[0]
+                    : '未分类'
+
+                // 获取科目类型（用于样式）
+                let subjectType = 'math'
+                if (subjectName.includes('代数') || subjectName.includes('线代')) {
+                    subjectType = 'algebra'
+                } else if (subjectName.includes('概率') || subjectName.includes('统计')) {
+                    subjectType = 'probability'
+                }
+
+                // 获取题目内容
+                const questionText = item.content || '题目内容加载失败'
+
+                // 限制题目文本长度
+                const truncatedQuestion = questionText.length > 100
+                    ? questionText.substring(0, 100) + '...'
+                    : questionText
+
+                return {
+                    id: item.id,
+                    question: truncatedQuestion,
+                    subjectName: subjectName,
+                    subjectType: subjectType,
+                    timeAgo: timeAgo,
+                    fullData: item // 保存完整数据以便点击时查看详情
+                }
+            })
+
+            recentMistakes.value = mistakes
+            console.log('最近错题数据:', recentMistakes.value)
+        }
+    } catch (error) {
+        console.error('获取最近错题失败:', error)
+    }
 }
 
-const handleService = () => {
-    ElMessage.info('客服功能开发中...')
+// 跳转到题目详情
+const goToQuestion = (mistake) => {
+    // 显示错题详情对话框
+    if (mistake.fullData) {
+        selectedQuestion.value = mistake.fullData
+        questionDetailDialogVisible.value = true
+    } else {
+        ElMessage.warning('无法查看题目详情')
+    }
 }
 
 // 监听菜单点击事件(针对菜单项的导航)
@@ -843,26 +1160,27 @@ const handleMenuNavigation = (path) => {
     navigateWithAnimation(path)
 }
 
-// 组件挂载
-onMounted(() => {
-    // 获取首页数据
+let cleanupFunctions = []
+
+onMounted(async () => {
     fetchHomePageData()
+    fetchUserStudyStats()
+    fetchRecentMistakes()
+    fetchDailyTestStatus()
 
-    // 检查是否已完成引导
-    if (localStorage.getItem('onboardingCompleted') === 'true') {
-        isNewUser.value = false
-    }
 
-    // 初始化图表
+    // 初始化通用图表
     const cleanup = initCharts()
+    if (typeof cleanup === 'function') cleanupFunctions.push(cleanup)
 
-    // 检测是否已完成引导
-    if (localStorage.getItem('onboardingCompleted') === 'true') {
-        isNewUser.value = false
-    }
+    // 初始化每日测试折线图
+    initDailyTestChart().then(cleanup => {
+        if (typeof cleanup === 'function') cleanupFunctions.push(cleanup)
+    })
+})
 
-    // 在组件卸载时清理
-    onUnmounted(cleanup)
+onUnmounted(() => {
+    cleanupFunctions.forEach(fn => fn())
 })
 
 </script>
@@ -923,6 +1241,13 @@ onMounted(() => {
     animation: logoBounce 2s ease-in-out infinite;
 }
 
+.logo-letter {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: white;
+    line-height: 1;
+}
+
 @keyframes logoBounce {
     0%, 100% {
         transform: scale(1);
@@ -962,12 +1287,6 @@ onMounted(() => {
     box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
 }
 
-.user-role {
-    color: #6b7280;
-    font-size: 13px;
-    margin-top: 4px;
-}
-
 .quick-stats {
     display: flex;
     justify-content: space-around;
@@ -985,7 +1304,6 @@ onMounted(() => {
     font-weight: 700;
     color: #3b82f6;
     display: block;
-    animation: pulseBounce 1.5s ease-in-out infinite;
 }
 
 @keyframes pulseBounce {
@@ -1119,10 +1437,27 @@ onMounted(() => {
     width: 20px;
     font-size: 18px;
     color: #6b7280;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.el-menu-item .el-icon img,
+.el-sub-menu__title .el-icon img {
+    filter: brightness(0) saturate(100%) invert(41%) sepia(5%) saturate(542%) hue-rotate(182deg) brightness(91%) contrast(87%);
+    transition: all 0.2s;
 }
 
 .el-menu-item.is-active .el-icon {
     color: #3b82f6;
+}
+
+.el-menu-item.is-active .el-icon img {
+    filter: brightness(0) saturate(100%) invert(53%) sepia(96%) saturate(3089%) hue-rotate(196deg) brightness(100%) contrast(101%);
+}
+
+.el-menu-item:hover .el-icon img {
+    filter: brightness(0) saturate(100%) invert(53%) sepia(96%) saturate(3089%) hue-rotate(196deg) brightness(100%) contrast(101%);
 }
 
 .motivation-quote {
@@ -1304,35 +1639,62 @@ onMounted(() => {
 
 .quick-actions {
     display: flex;
-    gap: 15px;
+    gap: 12px;
     flex-wrap: wrap;
 }
 
 .action-button {
     height: 50px;
-    padding: 0 25px;
-    font-weight: 500;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-    transition: all 0.3s ease;
-    background: white;
-    border: 1px solid rgba(229, 231, 235, 0.5);
-    border-radius: 16px;}
-
-.action-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(59, 130, 246, 0.2);
+    padding: 0 20px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.action-button:first-child {
-    background: linear-gradient(45deg, #3b82f6, #60a5fa);
-    color: white;
-    border: none;
+.action-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+/* 蓝色渐变 - 第一个按钮 */
+.action-button:nth-child(1) {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    color: white !important;
+    border: none !important;
+}
+
+/* 红色渐变 - 每日测试且有题时 */
+.action-button.is-daily-active {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%) !important;
+    color: white !important;
+    border: none !important;
+}
+
+/* 白色背景 - 普通状态 */
+.action-button:not(.is-daily-active):not(:nth-child(1)) {
+    background: white;
+    color: #4b5563;
+    border: 1px solid #e5e7eb;
 }
 
 .action-button .el-icon {
     margin-right: 8px;
     font-size: 18px;
-    vertical-align: middle;
+}
+
+/* 白色背景按钮的图标颜色转换 */
+.action-button:not(.is-daily-active):not(:nth-child(1)) .el-icon img {
+    filter: brightness(0) saturate(100%) invert(30%) sepia(10%) saturate(1000%) hue-rotate(200deg);
+}
+
+/* 彩色背景按钮的图标转为白色 */
+.action-button.is-daily-active .el-icon img,
+.action-button:nth-child(1) .el-icon img {
+    filter: brightness(0) invert(1);
 }
 
 /* 菜单图标 SVG 样式 */
@@ -1528,6 +1890,13 @@ onMounted(() => {
     font-size: 28px;
     transition: all 0.3s ease;
     animation: iconFloat 3s ease-in-out infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-icon .el-icon img {
+    filter: brightness(0) saturate(100%) invert(100%);
 }
 
 @keyframes iconFloat {
@@ -1552,9 +1921,7 @@ onMounted(() => {
     margin-bottom: 4px;
     color: #1f2937;
     background: linear-gradient(135deg, #1f2937 0%, #3b82f6 100%);
-    -webkit-background-clip: text;
     background-clip: text;
-    -webkit-text-fill-color: transparent;
     transition: all 0.3s ease;
 }
 
@@ -1592,14 +1959,20 @@ onMounted(() => {
     box-shadow: 0 6px 15px rgba(0, 0, 0, 0.05);
     backdrop-filter: blur(5px);
     border: 1px solid rgba(209, 213, 219, 0.3);
+    transition: all 0.3s ease;
+}
+
+.chart-container:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 25px rgba(59, 130, 246, 0.15);
 }
 
 .chart-title {
     font-size: 18px;
-    margin-bottom: 15px;
     display: flex;
     align-items: center;
     color: #1f2937;
+    margin-bottom: 15px;
 }
 
 .chart-title .el-icon {
@@ -1806,130 +2179,171 @@ onMounted(() => {
     margin-top: 10px;
 }
 
-/* 新手引导层 */
-.onboarding-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
+
+/* 卡片头部样式 */
+.feature-header {
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
-    z-index: 1000;
-    backdrop-filter: blur(8px);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid rgba(209, 213, 219, 0.3);
 }
 
-.onboarding-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
-    width: 90%;
-    max-width: 650px;
-    border-radius: 20px;
-    padding: 30px;
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-    border: 1px solid rgba(209, 213, 219, 0.5);
-    position: relative;
-    animation: fadeInUp 0.5s ease;
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.onboarding-header {
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.onboarding-header h2 {
-    font-size: 26px;
-    margin-bottom: 10px;
-    background: linear-gradient(to right, #1f2937, #3b82f6);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.onboarding-header p {
-    color: #6b7280;
-    font-size: 16px;
-}
-
-.onboarding-steps {
-    margin: 20px 0 30px;
-}
-
-.step-item {
+.feature-header h3 {
+    font-size: 18px;
+    color: #1f2937;
+    margin: 0;
     display: flex;
-    padding: 15px;
-    margin-bottom: 15px;
-    background: rgba(255, 255, 255, 0.5);
+    align-items: center;
+    gap: 8px;
+}
+
+.feature-header h3 .el-icon {
+    color: #3b82f6;
+}
+
+.test-period {
+    font-size: 13px;
+    color: #6b7280;
+    background: rgba(59, 130, 246, 0.1);
+    padding: 4px 12px;
     border-radius: 12px;
-    opacity: 0.6;
+}
+
+/* 最近错题模块 */
+.mistakes-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.mistakes-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.mistakes-list::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 3px;
+}
+
+.mistakes-list::-webkit-scrollbar-track {
+    background: rgba(209, 213, 219, 0.2);
+}
+
+.mistake-item {
+    display: flex;
+    gap: 12px;
+    padding: 15px;
+    margin-bottom: 12px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(209, 213, 219, 0.3);
     transition: all 0.3s ease;
     cursor: pointer;
 }
 
-.step-item.active {
-    opacity: 1;
-    background: rgba(59, 130, 246, 0.1);
-    border-left: 4px solid #3b82f6;
+.mistake-item:hover {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(59, 130, 246, 0.4);
     transform: translateX(5px);
 }
 
-.step-number {
-    width: 30px;
-    height: 30px;
-    background: linear-gradient(45deg, #3b82f6, #60a5fa);
+.mistake-index {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+    color: white;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-weight: bold;
-    margin-right: 15px;
+    font-weight: 600;
+    font-size: 14px;
     flex-shrink: 0;
 }
 
-.step-content h4 {
-    margin: 0 0 5px;
+.mistake-content {
+    flex: 1;
+}
+
+.mistake-subject {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.subject-badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.subject-badge.subject-math {
+    background: rgba(59, 130, 246, 0.15);
     color: #3b82f6;
 }
 
-.step-indicators {
+.subject-badge.subject-algebra {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.subject-badge.subject-probability {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.mistake-time {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.mistake-question {
+    color: #374151;
+    line-height: 1.6;
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #10b981;
+    font-size: 16px;
+}
+
+/* 每日测试模块 */
+.daily-test-chart {
+    margin-bottom: 15px;
+}
+
+.test-summary {
     display: flex;
-    justify-content: center;
-    margin-bottom: 25px;
-    gap: 8px;
+    justify-content: space-around;
+    padding: 15px;
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 12px;
 }
 
-.indicator {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: rgba(209, 213, 219, 0.5);
-    transition: all 0.3s ease;
+.summary-item {
+    text-align: center;
 }
 
-.indicator.active {
-    background: #3b82f6;
-    transform: scale(1.2);
+.summary-label {
+    display: block;
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 5px;
 }
 
-.step-actions {
-    display: flex;
-    justify-content: space-between;
-    gap: 15px;
+.summary-value {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    color: #3b82f6;
 }
 
 /* 响应式调整 */
@@ -1959,7 +2373,6 @@ onMounted(() => {
 
     .logo-text,
     .user-profile-section h3,
-    .user-role,
     .stat-label,
     .nav-menu h4,
     .quote-author,
@@ -2051,12 +2464,6 @@ onMounted(() => {
     backdrop-filter: blur(10px);
 }
 
-/* AI助手胶囊 - 紫色渐变 */
-.ai-capsule .capsule-content {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
-}
-
 /* 反馈胶囊 - 橙色渐变 */
 .feedback-capsule .capsule-content {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -2133,5 +2540,150 @@ onMounted(() => {
     .capsule-text {
         font-size: 14px;
     }
+}
+
+/* 错题详情对话框样式 */
+.question-detail-dialog .el-dialog__body {
+    padding: 20px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.question-detail-content {
+    color: #1f2937;
+}
+
+.detail-section {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.detail-section:last-child {
+    border-bottom: none;
+}
+
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.detail-header h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #3b82f6;
+    margin: 0;
+}
+
+.question-meta {
+    display: flex;
+    align-items: center;
+}
+
+.question-body {
+    line-height: 1.8;
+}
+
+.question-text {
+    font-size: 15px;
+    color: #374151;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.options-list {
+    margin-top: 12px;
+}
+
+.option-item {
+    display: flex;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.option-item:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+}
+
+.option-label {
+    font-weight: 600;
+    color: #3b82f6;
+    min-width: 24px;
+}
+
+.option-text {
+    flex: 1;
+    color: #4b5563;
+}
+
+.answer-section {
+    background: #f0f9ff;
+    padding: 16px;
+    border-radius: 8px;
+}
+
+.answer-row,
+.analysis-row {
+    margin-bottom: 12px;
+}
+
+.answer-row:last-child,
+.analysis-row:last-child {
+    margin-bottom: 0;
+}
+
+.answer-label,
+.analysis-label {
+    font-weight: 600;
+    color: #1f2937;
+    margin-right: 8px;
+}
+
+.answer-value {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.answer-value.primary {
+    color: #10b981;
+}
+
+.analysis-content {
+    display: inline-block;
+    color: #4b5563;
+    line-height: 1.8;
+    padding: 8px 0;
+}
+
+.tags-list {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* KaTeX样式优化 */
+.latex-answer :deep(.katex),
+.latex-content :deep(.katex) {
+    font-size: 1.1em;
+}
+
+.latex-content :deep(.katex-display) {
+    margin: 12px 0;
+}
+
+.question-text :deep(.katex) {
+    font-size: 1.05em;
+}
+
+.option-text :deep(.katex) {
+    font-size: 1em;
 }
 </style>
