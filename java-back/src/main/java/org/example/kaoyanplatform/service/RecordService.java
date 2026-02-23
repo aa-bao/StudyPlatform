@@ -82,4 +82,18 @@ public interface RecordService extends IService<AnswerRecord> {
      * @param examRecord 答题记录
      */
     void updateMistakeBook(AnswerRecord examRecord);
+
+    /**
+     * 获取用户错题分布统计（按科目）
+     * @param userId 用户ID
+     * @return 错题分布统计数据
+     */
+    List<Map<String, Object>> getMistakeDistributionStats(Long userId);
+
+    /**
+     * 获取用户各科目刷题数量统计
+     * @param userId 用户ID
+     * @return 各科目刷题数量统计数据
+     */
+    List<Map<String, Object>> getSubjectQuestionCountStats(Long userId);
 }

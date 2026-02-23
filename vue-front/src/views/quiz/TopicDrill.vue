@@ -34,7 +34,106 @@
 
                 <main class="content-panel" :style="{ borderColor: currentTheme?.borderColor }">
                     <transition name="fade-slide" mode="out-in">
-                        <div v-if="selectedNode" :key="selectedNode.id" class="detail-card">
+                        <!-- 大平面刷题模式 -->
+                        <div v-if="isDrillMode" :key="`drill-${selectedNode?.id}`" class="drill-mode">
+                            <div class="drill-header">
+                                <div class="drill-title">
+                                    <h2>{{ selectedNode?.label }}</h2>
+                                    <p class="drill-subtitle">开始刷题</p>
+                                </div>
+                                <div class="drill-controls">
+                                    <button class="control-btn" @click="returnToDetail">
+                                        返回详情
+                                    </button>
+                                    <button class="control-btn" @click="resetCards">
+                                        重置布局
+                                    </button>
+                                    <button class="control-btn" @click="saveSession">
+                                        保存进度
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="drill-canvas" ref="drillCanvas">
+                                <!-- 共享草稿区域 -->
+                                <div class="shared-draft-section">
+                                    <div class="draft-toolbar">
+                                        <div class="tool-group">
+                                            <label>颜色:</label>
+                                            <div class="color-picker">
+                                                <button
+                                                    v-for="color in draftColors"
+                                                    :key="color.value"
+                                                    class="color-btn"
+                                                    :style="{ backgroundColor: color.value }"
+                                                    :class="{ active: draftColor === color.value }"
+                                                    @click="changeDraftColor(color.value)"
+                                                ></button>
+                                            </div>
+                                        </div>
+                                        <div class="tool-group">
+                                            <label>粗细:</label>
+                                            <select v-model="draftLineWidth" @change="changeDraftLineWidth">
+                                                <option value="1">细</option>
+                                                <option value="2">中</option>
+                                                <option value="3">粗</option>
+                                                <option value="5">很粗</option>
+                                            </select>
+                                        </div>
+                                        <div class="tool-group">
+                                            <button @click="clearDraft">清空</button>
+                                            <button @click="saveDraft">保存</button>
+                                            <button @click="loadDraft">加载</button>
+                                        </div>
+                                    </div>
+                                    <canvas
+                                        ref="draftCanvas"
+                                        class="draft-canvas"
+                                        @mousedown="startDraftDrawing"
+                                        @mousemove="drawDraft"
+                                        @mouseup="stopDraftDrawing"
+                                        @mouseleave="stopDraftDrawing"
+                                        @touchstart="handleDraftTouchStart"
+                                        @touchmove="handleDraftTouchMove"
+                                        @touchend="stopDraftDrawing"
+                                    ></canvas>
+                                </div>
+
+                                <!-- 题目卡片容器 -->
+                                <QuestionCard
+                                    v-for="(question, index) in questionsData"
+                                    :key="question.id"
+                                    :questionData="question"
+                                    :questionIndex="index"
+                                    :cardId="`card_${question.id}`"
+                                    :style="getCardPositionStyle(index)"
+                                />
+                            </div>
+
+                            <div class="drill-footer">
+                                <div class="footer-stats">
+                                    <span class="footer-stat">
+                                        <span class="stat-value">{{ questionsData.length }}</span>
+                                        <span class="stat-label">题目总数</span>
+                                    </span>
+                                    <span class="footer-stat">
+                                        <span class="stat-value">{{ answeredCount }}</span>
+                                        <span class="stat-label">已答题目</span>
+                                    </span>
+                                    <span class="footer-stat">
+                                        <span class="stat-value">{{ correctCount }}</span>
+                                        <span class="stat-label">正确答案</span>
+                                    </span>
+                                    <span class="footer-stat">
+                                        <span class="stat-value">{{ accuracy }}%</span>
+                                        <span class="stat-label">正确率</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 详情模式 -->
+                        <div v-else-if="selectedNode" :key="`detail-${selectedNode.id}`" class="detail-card">
                             <header class="detail-header">
                                 <div class="title-section">
                                     <span class="type-tag" :style="{ background: currentTheme?.color }">
@@ -45,13 +144,13 @@
 
                                 <div class="quick-stats">
                                     <div class="stat-item">
-                                        <span class="label">掌握度</span>
+                                        <span class="label">完成度</span>
                                         <div class="mini-progress-bar">
                                             <div class="fill"
-                                                :style="{ width: (selectedNode.mastery || 0) + '%', background: currentTheme?.gradient }">
+                                                :style="{ width: (correctRate || 0) + '%', background: currentTheme?.gradient }">
                                             </div>
                                         </div>
-                                        <span class="value">{{ selectedNode.mastery || 0 }}%</span>
+                                        <span class="value">{{ correctRate || 0 }}%</span>
                                     </div>
                                     <div class="stat-item" v-if="selectedNode.examFrequency">
                                         <span class="label">考察热度</span>
@@ -62,14 +161,12 @@
 
                             <section class="info-grid">
                                 <div class="info-block solution">
-                                    <h3><i class="icon">🧠</i> 解题通法</h3>
                                     <div v-if="selectedNode.solutionPatterns?.length" class="pattern-steps">
                                         <div v-for="(p, i) in selectedNode.solutionPatterns" :key="i" class="step-item">
                                             <span class="step-num" :style="{ borderColor: currentTheme?.color, color: currentTheme?.color }">{{ i + 1 }}</span>
                                             <p>{{ p }}</p>
                                         </div>
                                     </div>
-                                    <div v-else class="empty-mini">暂无录入解题模式</div>
                                 </div>
 
                                 <div class="info-block mistakes" v-if="selectedNode.commonMistakes?.length">
@@ -79,9 +176,58 @@
                                     </ul>
                                 </div>
                             </section>
+
+                            <!-- 视频讲解 -->
+                            <section class="video-section">
+                                <div class="video-header">
+                                    <h3>视频讲解</h3>
+                                    <span class="video-source">Bilibili</span>
+                                </div>
+                                <div class="video-container">
+                                    <iframe
+                                        v-if="selectedNode?.videoUrl"
+                                        class="bilibili-video"
+                                        :src="getBilibiliEmbedUrl(selectedNode.videoUrl)"
+                                        scrolling="no"
+                                        border="0"
+                                        frameborder="no"
+                                        framespacing="0"
+                                        allowfullscreen="true"
+                                    ></iframe>
+                                    <div v-else class="no-video">
+                                        <p>暂无视频讲解</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- 大平面刷题入口 -->
+                            <section class="drill-entry-section">
+                                <div class="entry-card" @click="enterTopicDrill">
+                                    <h3>大观</h3>
+                                    <p>进入大观刷题模式，支持手写笔记和草稿</p>
+                                    <div class="entry-stats">
+                                        <span class="stat-item">
+                                            <span class="stat-value">{{ questionCount }}</span>
+                                            <span class="stat-label">题目总数</span>
+                                        </span>
+                                        <span class="stat-item">
+                                            <span class="stat-value">{{ answeredCount }}</span>
+                                            <span class="stat-label">已作答</span>
+                                        </span>
+                                        <span class="stat-item">
+                                            <span class="stat-value">{{ correctRate }}%</span>
+                                            <span class="stat-label">正确率</span>
+                                        </span>
+                                    </div>
+                                    <button class="entry-button" :style="{ background: currentTheme?.gradient }">
+                                        开始刷题
+                                    </button>
+                                </div>
+                            </section>
                         </div>
 
-                        <div v-else class="empty-state">
+                        <!-- 空状态 -->
+                        <div v-else :key="`empty`" class="empty-state">
                             <div class="floating-icons">📐 🧪 🖋️</div>
                             <h2>开始你的专项练习</h2>
                             <p>从左侧图谱中选择一个知识模块查看详情</p>
@@ -95,8 +241,26 @@
 
 <script setup>
 import { ref, onMounted, defineComponent, h, computed, reactive, nextTick, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { getExamSpecListApi, getTreeByExamSpecApi } from '@/api/subject'
+import {
+  saveTopicDrillProgressApi,
+  loadTopicDrillProgressApi,
+  getQuestionsByKnowledgePointApi,
+  getKnowledgePointStatsApi
+} from '@/api/topicDrill'
 import { ElMessage } from 'element-plus'
+import QuestionCard from '@/components/QuestionCard.vue'
+
+// 草稿颜色选项
+const draftColors = [
+  { name: '黑色', value: '#000000' },
+  { name: '红色', value: '#FF0000' },
+  { name: '蓝色', value: '#0000FF' },
+  { name: '绿色', value: '#00FF00' },
+  { name: '黄色', value: '#FFFF00' },
+  { name: '橙色', value: '#FFA500' }
+]
 
 const navRefs = ref([])
 const navSliderStyle = reactive({
@@ -206,6 +370,32 @@ const activeSubject = ref(null) // 当前选中的科目（后端原始数据）
 const activeExamSpec = ref(null) // 当前选中的具体考试规格（如"数学一"）
 const moduleTree = ref([])
 const selectedNode = ref(null)
+
+// 大平面刷题相关状态
+const questionCount = ref(0) // 题目数量
+const answeredCount = ref(0) // 已答题目数量
+const correctRate = ref(0) // 正确率
+const isDrillMode = ref(false) // 是否进入大平面模式
+const questionsData = ref([]) // 题目数据
+const correctCount = ref(0) // 正确答案数量
+const accuracy = ref(0) // 正确率
+
+// 共享草稿相关状态
+const draftCanvas = ref(null)
+const isDraftDrawing = ref(false)
+const lastDraftX = ref(0)
+const lastDraftY = ref(0)
+const draftColor = ref('#000000')
+const draftLineWidth = ref(2)
+
+// 卡片尺寸
+const cardWidth = 300
+const cardHeight = 400
+const cardGap = 20
+
+// 进度条状态
+const progressPercentage = ref(0) // 进度百分比
+const progressSteps = ref([]) // 进度步骤
 
 // 计算属性：处理后的显示科目列表（只显示4个主科目）
 const displaySubjects = computed(() => {
@@ -362,11 +552,370 @@ const convertTreeData = (nodes) => {
         solutionPatterns: node.solutionPatterns,
         commonMistakes: node.commonMistakes,
         examFrequency: node.examFrequency,
+        videoUrl: node.videoUrl, // 新增视频链接字段
         children: node.children?.length ? convertTreeData(node.children) : []
     }))
 }
 
-const handleNodeClick = (node) => { selectedNode.value = node }
+const handleNodeClick = (node) => {
+    selectedNode.value = node
+    // 加载该知识点的题目数据
+    loadKnowledgePointData(node)
+}
+
+// 加载知识点数据
+const loadKnowledgePointData = async (node) => {
+    try {
+        const userStr = localStorage.getItem('user') || '{}'
+        const userInfo = JSON.parse(userStr)
+
+        // 调用API获取该知识点的题目数量、已作答数量、正确率等数据
+        const res = await getKnowledgePointStatsApi(node.id, userInfo.id)
+        if (res.code === 200) {
+            questionCount.value = res.data.questionCount || 0
+            answeredCount.value = res.data.answeredCount || 0
+            correctRate.value = res.data.correctRate || 0
+        } else {
+            // 如果API调用失败，使用默认值
+            questionCount.value = 0
+            answeredCount.value = 0
+            correctRate.value = 0
+        }
+    } catch (error) {
+        console.error('加载知识点数据失败:', error)
+        // 异常情况下使用默认值
+        questionCount.value = 0
+        answeredCount.value = 0
+        correctRate.value = 0
+    }
+    // 初始化进度条
+    initProgressBar()
+}
+
+// 初始化进度条
+const initProgressBar = () => {
+    // 计算进度百分比
+    if (questionCount.value > 0) {
+        progressPercentage.value = Math.round((answeredCount.value / questionCount.value) * 100)
+    } else {
+        progressPercentage.value = 0
+    }
+
+    // 初始化进度步骤
+    progressSteps.value = [
+        { name: '开始学习', completed: true, percentage: 0 },
+        { name: '完成10%', completed: progressPercentage.value >= 10, percentage: 10 },
+        { name: '完成25%', completed: progressPercentage.value >= 25, percentage: 25 },
+        { name: '完成50%', completed: progressPercentage.value >= 50, percentage: 50 },
+        { name: '完成75%', completed: progressPercentage.value >= 75, percentage: 75 },
+        { name: '完成100%', completed: progressPercentage.value >= 100, percentage: 100 }
+    ]
+}
+
+// 更新进度条
+const updateProgressBar = () => {
+    if (questionCount.value > 0) {
+        progressPercentage.value = Math.round((answeredCount.value / questionCount.value) * 100)
+    } else {
+        progressPercentage.value = 0
+    }
+
+    // 更新进度步骤
+    progressSteps.value.forEach(step => {
+        step.completed = progressPercentage.value >= step.percentage
+    })
+}
+
+// 解析 Bilibili 视频 URL，生成嵌入代码
+const getBilibiliEmbedUrl = (url) => {
+    // 匹配 Bilibili 视频 URL 中的 BV 号
+    const bvMatch = url.match(/BV[a-zA-Z0-9]+/)
+    if (bvMatch) {
+        const bvid = bvMatch[0]
+        return `https://player.bilibili.com/player.html?bvid=${bvid}&page=1&high_quality=1&danmaku=0`
+    }
+    return ''
+}
+
+// 进入大平面刷题模式
+const router = useRouter()
+
+const enterTopicDrill = () => {
+    if (!selectedNode.value) {
+        ElMessage.warning('请先选择一个知识点')
+        return
+    }
+    // 跳转到新的大平面刷题页面
+    router.push({
+        path: '/user/drill-page',
+        query: {
+            knowledgePointId: selectedNode.value.id,
+            knowledgePointName: selectedNode.value.label
+        }
+    })
+}
+
+// 返回详情模式
+const returnToDetail = () => {
+    isDrillMode.value = false
+}
+
+// 加载知识点题目数据
+const loadQuestionsByKnowledgePoint = async (knowledgePointId) => {
+    try {
+        // 调用API获取题目数据
+        const res = await getQuestionsByKnowledgePointApi(knowledgePointId)
+        if (res.code === 200) {
+            // 处理题目数据，添加必要字段
+            questionsData.value = res.data.map(question => ({
+                id: question.id,
+                title: `题目 ${question.id}`,
+                content: question.content || '暂无题目内容',
+                answer: question.answer || '暂无答案',
+                questionImage: question.contentJson?.questionImage || null,
+                answerImage: question.contentJson?.answerImage || null,
+                difficulty: question.difficulty || 3,
+                isAnswered: false,
+                isCorrect: false
+            }))
+            calculateStats()
+            ElMessage.success('题目加载成功')
+        }
+    } catch (error) {
+        ElMessage.error('题目加载失败')
+        console.error('Error loading questions:', error)
+    }
+}
+
+// 计算卡片位置样式（平铺布局）
+const getCardPositionStyle = (index) => {
+    const cols = 3 // 每行显示的卡片数量
+    const col = index % cols
+    const row = Math.floor(index / cols)
+
+    return {
+        left: `${col * (cardWidth + cardGap)}px`,
+        top: `${row * (cardHeight + cardGap)}px`,
+        width: `${cardWidth}px`,
+        height: `${cardHeight}px`
+    }
+}
+
+// 生成模拟题目数据
+const generateMockQuestions = () => {
+    const count = Math.floor(Math.random() * 20) + 10
+    const questions = []
+
+    for (let i = 0; i < count; i++) {
+        questions.push({
+            id: `q_${Date.now()}_${i}`,
+            title: `题目 ${i + 1}`,
+            content: `这是第${i + 1}道题的内容，包含了${selectedNode.value?.label}相关的知识点`,
+            answer: `这是第${i + 1}道题的答案`,
+            questionImage: `https://picsum.photos/seed/question_${i}_${Date.now()}/400/200`,
+            answerImage: `https://picsum.photos/seed/answer_${i}_${Date.now()}/400/200`,
+            difficulty: Math.floor(Math.random() * 3) + 1, // 1-简单, 2-中等, 3-困难
+            isAnswered: false,
+            isCorrect: false
+        })
+    }
+    return questions
+}
+
+// 计算统计数据
+const calculateStats = () => {
+    answeredCount.value = questionsData.value.filter(q => q.isAnswered).length
+    correctCount.value = questionsData.value.filter(q => q.isAnswered && q.isCorrect).length
+    accuracy.value = questionsData.value.length > 0 ?
+        Math.round((correctCount.value / answeredCount.value) * 100) : 0
+}
+
+// 重置卡片布局
+const resetCards = () => {
+    localStorage.removeItem('questionCards')
+    ElMessage.success('卡片布局已重置')
+}
+
+// 保存答题进度
+const saveSession = async () => {
+    try {
+        const userStr = localStorage.getItem('user') || '{}'
+        const userInfo = JSON.parse(userStr)
+
+        const progressData = {
+            userId: userInfo.id,
+            subjectId: selectedNode.value.id,
+            questionCount: questionCount.value,
+            masteryLevel: masteryLevel.value,
+            studyTime: studyTime.value,
+            answeredCount: answeredCount.value,
+            correctCount: correctCount.value,
+            accuracy: accuracy.value,
+            questionsData: questionsData.value,
+            timestamp: new Date().toISOString()
+        }
+
+        const res = await saveTopicDrillProgressApi(progressData)
+        if (res.code === 200) {
+            ElMessage.success('答题进度已保存')
+        } else {
+            ElMessage.error('保存失败: ' + res.msg)
+        }
+    } catch (error) {
+        console.error('保存答题进度失败:', error)
+        ElMessage.error('保存失败')
+    }
+}
+
+// 加载答题进度
+const loadSession = async () => {
+    try {
+        const userStr = localStorage.getItem('user') || '{}'
+        const userInfo = JSON.parse(userStr)
+
+        const res = await loadTopicDrillProgressApi(
+            userInfo.id,
+            selectedNode.value.id
+        )
+
+        if (res.code === 200 && res.data) {
+            const progressData = res.data
+            questionCount.value = progressData.questionCount || 0
+            masteryLevel.value = progressData.masteryLevel || 0
+            studyTime.value = progressData.studyTime || 0
+            answeredCount.value = progressData.answeredCount || 0
+            correctCount.value = progressData.correctCount || 0
+            accuracy.value = progressData.accuracy || 0
+            questionsData.value = progressData.questionsData || []
+            ElMessage.success('答题进度已加载')
+        } else {
+            ElMessage.info('暂无答题进度')
+        }
+    } catch (error) {
+        console.error('加载答题进度失败:', error)
+        ElMessage.error('加载失败')
+    }
+}
+
+// 共享草稿功能方法
+const initDraftCanvas = () => {
+    const canvas = draftCanvas.value
+    if (canvas) {
+        const rect = canvas.getBoundingClientRect()
+        canvas.width = rect.width
+        canvas.height = rect.height
+        const ctx = canvas.getContext('2d')
+        ctx.lineWidth = draftLineWidth.value
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+        ctx.strokeStyle = draftColor.value
+    }
+}
+
+const changeDraftColor = (color) => {
+    draftColor.value = color
+    const canvas = draftCanvas.value
+    if (canvas) {
+        const ctx = canvas.getContext('2d')
+        ctx.strokeStyle = color
+    }
+}
+
+const changeDraftLineWidth = () => {
+    const canvas = draftCanvas.value
+    if (canvas) {
+        const ctx = canvas.getContext('2d')
+        ctx.lineWidth = draftLineWidth.value
+    }
+}
+
+const startDraftDrawing = (e) => {
+    isDraftDrawing.value = true
+    const rect = draftCanvas.value.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    lastDraftX.value = x
+    lastDraftY.value = y
+}
+
+const drawDraft = (e) => {
+    if (!isDraftDrawing.value) return
+
+    const canvas = draftCanvas.value
+    const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    const ctx = canvas.getContext('2d')
+    ctx.beginPath()
+    ctx.moveTo(lastDraftX.value, lastDraftY.value)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+
+    lastDraftX.value = x
+    lastDraftY.value = y
+}
+
+const stopDraftDrawing = () => {
+    isDraftDrawing.value = false
+}
+
+const handleDraftTouchStart = (e) => {
+    e.preventDefault()
+    const touch = e.touches[0]
+    const mouseEvent = new MouseEvent('mousedown', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+    })
+    draftCanvas.value.dispatchEvent(mouseEvent)
+}
+
+const handleDraftTouchMove = (e) => {
+    e.preventDefault()
+    const touch = e.touches[0]
+    const mouseEvent = new MouseEvent('mousemove', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+    })
+    draftCanvas.value.dispatchEvent(mouseEvent)
+}
+
+const clearDraft = () => {
+    const canvas = draftCanvas.value
+    if (canvas) {
+        const ctx = canvas.getContext('2d')
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+    }
+}
+
+const saveDraft = () => {
+    const canvas = draftCanvas.value
+    if (canvas) {
+        const draftData = canvas.toDataURL()
+        const key = `draft_${selectedNode.value?.id}`
+        localStorage.setItem(key, draftData)
+        ElMessage.success('草稿已保存')
+    }
+}
+
+const loadDraft = () => {
+    const key = `draft_${selectedNode.value?.id}`
+    const draftData = localStorage.getItem(key)
+    if (draftData) {
+        const canvas = draftCanvas.value
+        if (canvas) {
+            const ctx = canvas.getContext('2d')
+            const img = new Image()
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0)
+            }
+            img.src = draftData
+            ElMessage.success('草稿已加载')
+        }
+    } else {
+        ElMessage.info('暂无草稿')
+    }
+}
 
 
 // --- 逻辑处理 ---
@@ -649,7 +1198,7 @@ onMounted(fetchExamSpecs)
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 40px;
+    margin-bottom: 10px;
 }
 
 .type-tag {
@@ -776,14 +1325,413 @@ onMounted(fetchExamSpecs)
 }
 
 @keyframes float {
-
     0%,
     100% {
         transform: translateY(0);
     }
-
     50% {
         transform: translateY(-10px);
+    }
+}
+
+/* 大平面刷题模式样式 */
+.drill-mode {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #fafbfc;
+    border-radius: 24px;
+    overflow: hidden;
+}
+
+.drill-header {
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.drill-title h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #1e293b;
+}
+
+.drill-subtitle {
+    margin: 5px 0 0 0;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.drill-controls {
+    display: flex;
+    gap: 12px;
+}
+
+.control-btn {
+    padding: 8px 16px;
+    background: #f1f5f9;
+    border: none;
+    border-radius: 8px;
+    color: #475569;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.control-btn:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+.drill-canvas {
+    flex: 1;
+    position: relative;
+    padding: 20px;
+    overflow: auto;
+    background: #fafbfc;
+}
+
+/* 共享草稿区域样式 */
+.shared-draft-section {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 400px;
+    height: 300px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    z-index: 100;
+}
+
+.draft-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e2e8f0;
+    flex-wrap: wrap;
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tool-group label {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+.color-picker {
+    display: flex;
+    gap: 4px;
+}
+
+.color-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: 2px solid transparent;
+}
+
+.color-btn:hover {
+    transform: scale(1.2);
+}
+
+.color-btn.active {
+    border-color: #333;
+}
+
+.tool-group select {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 12px;
+    background: white;
+    cursor: pointer;
+}
+
+.tool-group button {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 12px;
+    background: white;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.tool-group button:hover {
+    background: #f0f0f0;
+}
+
+.draft-canvas {
+    width: 100%;
+    height: calc(100% - 50px);
+    cursor: crosshair;
+    background: white;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .shared-draft-section {
+        width: 300px;
+        height: 250px;
+        bottom: 10px;
+        right: 10px;
+    }
+
+    .drill-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .drill-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .drill-entry-section .entry-card {
+        padding: 20px;
+    }
+
+    .entry-stats {
+        gap: 20px;
+    }
+
+    .entry-stats .stat-value {
+        font-size: 1.2rem;
+    }
+
+    .footer-stats {
+        gap: 20px;
+    }
+
+    .stat-value {
+        font-size: 1rem;
+    }
+}
+
+.drill-footer {
+    background: white;
+    border-top: 1px solid #e2e8f0;
+    padding: 16px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.footer-stats {
+    display: flex;
+    gap: 30px;
+}
+
+.footer-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 4px;
+}
+
+/* 大平面入口样式 */
+.drill-entry-section {
+    margin-top: 20px;
+    padding-top: 20px;
+}
+
+.entry-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 20px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.entry-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.entry-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+}
+
+.entry-card h3 {
+    margin: 0 0 12px 0;
+    font-size: 1.5rem;
+    color: #1e293b;
+}
+
+.entry-card p {
+    margin: 0 0 20px 0;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+.entry-stats {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-bottom: 20px;
+}
+
+.entry-stats .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.entry-stats .stat-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2563eb;
+}
+
+.entry-stats .stat-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-top: 4px;
+}
+
+.entry-button {
+    padding: 12px 30px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.entry-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .drill-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .drill-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .drill-entry-section .entry-card {
+        padding: 20px;
+    }
+
+    .entry-stats {
+        gap: 20px;
+    }
+
+    .entry-stats .stat-value {
+        font-size: 1.2rem;
+    }
+
+    .footer-stats {
+        gap: 20px;
+    }
+
+    .stat-value {
+        font-size: 1rem;
+    }
+}
+
+/* 视频预览样式 */
+.video-section {
+    margin-top: 5px;
+    padding: 24px;
+    background: #f8f9fa;
+    border-radius: 16px;
+}
+
+.video-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.video-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #1e293b;
+}
+
+.video-source {
+    font-size: 0.9rem;
+    color: #64748b;
+    background: #e2e8f0;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+    height: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #000;
+}
+
+.video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .video-section {
+        padding: 16px;
+    }
+
+    .video-header h3 {
+        font-size: 1rem;
+    }
+
+    .video-source {
+        font-size: 0.8rem;
+        padding: 3px 10px;
     }
 }
 </style>

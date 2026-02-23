@@ -169,6 +169,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
         List<ExamRecord> details = new ArrayList<>();
         BigDecimal objectiveScore = BigDecimal.ZERO;
         BigDecimal subjectiveTotalScore = BigDecimal.ZERO;
+        BigDecimal objectiveTotalScore = BigDecimal.ZERO; // 计算客观题总分（不保存到数据库）
 
         for (QuestionPaperRel mapping : mappings) {
             Question question = questionService.getById(mapping.getQuestionId());
@@ -184,15 +185,16 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
 
             if (isObjectiveQuestion(question.getType())) {
                 // 客观题：立即批改
+                objectiveTotalScore = objectiveTotalScore.add(mapping.getScoreValue()); // 计算客观题总分
                 Integer result = gradeObjectiveQuestion(question, userAnswer);
                 detail.setIsCorrect(result);
                 detail.setScoreEarned(result == 1 ? mapping.getScoreValue() : BigDecimal.ZERO);
                 objectiveScore = objectiveScore.add(detail.getScoreEarned());
             } else {
-                // 主观题：标记为待批改（isCorrect=3，初始分数为0）
+                // 主观题：不批改（isCorrect=3，分数为0）
                 detail.setIsCorrect(3);
                 detail.setScoreEarned(BigDecimal.ZERO);
-                detail.setAiFeedback("AI正在批改中，请稍候...");
+                detail.setAiFeedback("主观题需自行批改");
                 subjectiveTotalScore = subjectiveTotalScore.add(mapping.getScoreValue());
             }
 
@@ -202,15 +204,14 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
         // 保存答题明细
         examAnswerDetailService.saveBatch(details);
 
-        // 立即更新考试状态：设置客观题分数，主观题分数为0（待批改）
+        // 立即更新考试状态：只设置客观题分数，主观题不批改
         session.setStatus(1);
         session.setSubmitTime(LocalDateTime.now());
         session.setTotalScore(objectiveScore);
-        session.setAiSummary("客观题已批改完成，主观题正在AI批改中，请稍后刷新查看完整成绩。\n\n客观题得分：" + objectiveScore + " 分\n主观题总分：" + subjectiveTotalScore + " 分（批改中）");
+        session.setAiSummary("客观题已批改完成。\n\n客观题得分：" + objectiveScore + " 分\n客观题总分：" + objectiveTotalScore + " 分\n主观题总分：" + subjectiveTotalScore + " 分（需自行批改）");
         updateById(session);
 
-        // 触发异步批改主观题
-        gradeSubjectiveQuestionsAsync(session.getId().toString());
+        // 不再触发异步批改主观题
     }
 
     @Override

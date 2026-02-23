@@ -11,7 +11,7 @@ public class SubjectDTO {
     private Integer id;
     private String name;
     private Integer parentId;
-    private String icon;
+    private String videoUrl;     // 视频链接
     private Integer sort;
     private String level;
     private String scope;

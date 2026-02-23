@@ -39,7 +39,7 @@ export function updatePwdApi(data) {
 // 上传头像
 export function uploadAvatarApi(formData) {
     return request({
-        url: '/file/upload', 
+        url: '/file/upload',
         method: 'post',
         data: formData,
         headers: {
@@ -119,6 +119,28 @@ export function getDailyTestAccuracyStatsApi(userId) {
     })
 }
 
+// 获取错题分布统计
+export function getMistakeDistributionStatsApi(userId) {
+    return request({
+        url: '/record/mistake-distribution-stats',
+        method: 'get',
+        params: {
+            userId
+        }
+    })
+}
+
+// 获取各科目刷题数量统计
+export function getSubjectQuestionCountStatsApi(userId) {
+    return request({
+        url: '/record/subject-question-count-stats',
+        method: 'get',
+        params: {
+            userId
+        }
+    })
+}
+
 // ==================== Dashboard API ====================
 
 // 获取高频错题
@@ -153,5 +175,30 @@ export function getRecentRecordsApi(userId, days = 7) {
         url: '/record/recent',
         method: 'get',
         params: { userId, limit: days * 20 } // 假设每天最多20条
+    })
+}
+
+// 发送邮箱验证码
+export function sendEmailCodeApi(email, bizType = 'verify') {
+    return request({
+        url: '/api/mail/sendCode',
+        method: 'post',
+        data: {
+            email,
+            bizType
+        }
+    })
+}
+
+// 验证邮箱验证码
+export function verifyEmailCodeApi(email, code, bizType = 'verify') {
+    return request({
+        url: '/api/mail/verifyCode',
+        method: 'post',
+        data: {
+            email,
+            code,
+            bizType
+        }
     })
 }

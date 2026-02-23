@@ -6,11 +6,14 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.example.kaoyanplatform.entity.AnswerRecord;
 import org.example.kaoyanplatform.entity.ErrorQuestion;
 import org.example.kaoyanplatform.entity.Question;
+import org.example.kaoyanplatform.entity.Subject;
 import org.example.kaoyanplatform.entity.dto.*;
 import org.example.kaoyanplatform.mapper.AnswerRecordMapper;
 import org.example.kaoyanplatform.service.ErrorQuestionService;
 import org.example.kaoyanplatform.service.QuestionService;
+import org.example.kaoyanplatform.service.QuestionSubjectRelService;
 import org.example.kaoyanplatform.service.RecordService;
+import org.example.kaoyanplatform.service.SubjectService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +23,8 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 答题记录服务实现类
@@ -27,11 +32,19 @@ import java.util.stream.Collectors;
 @Service
 public class RecordServiceImpl extends ServiceImpl<AnswerRecordMapper, AnswerRecord> implements RecordService {
 
+    private static final Logger log = LoggerFactory.getLogger(RecordServiceImpl.class);
+
     @Autowired
     private QuestionService questionService;
 
     @Autowired
     private ErrorQuestionService mistakeRecordService;
+
+    @Autowired
+    private QuestionSubjectRelService mapQuestionSubjectService;
+
+    @Autowired
+    private SubjectService subjectService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -50,10 +63,16 @@ public class RecordServiceImpl extends ServiceImpl<AnswerRecordMapper, AnswerRec
         examRecord.setIsCorrect(isRight ? 1 : 0);
         examRecord.setScore(isRight ? 5 : 0);
         examRecord.setCreateTime(LocalDateTime.now());
-        
+
         // 设置默认来源
         if (examRecord.getSource() == null || examRecord.getSource().isEmpty()) {
             examRecord.setSource("single_practice");
+        }
+
+        // 设置科目ID
+        List<Integer> subjectIds = mapQuestionSubjectService.getSubjectIdsByQuestionId(examRecord.getQuestionId());
+        if (subjectIds != null && !subjectIds.isEmpty()) {
+            examRecord.setSubjectId(subjectIds.get(0)); // 取第一个科目ID
         }
 
         // 3. 保存答题记录
@@ -103,10 +122,21 @@ public class RecordServiceImpl extends ServiceImpl<AnswerRecordMapper, AnswerRec
         if (limit == null || limit <= 0) {
             limit = 10;
         }
-        return list(new LambdaQueryWrapper<AnswerRecord>()
+
+        List<AnswerRecord> records = list(new LambdaQueryWrapper<AnswerRecord>()
                 .eq(AnswerRecord::getUserId, userId)
                 .orderByDesc(AnswerRecord::getCreateTime)
                 .last("limit " + limit));
+
+        // 为每条答题记录设置科目ID
+        for (AnswerRecord record : records) {
+            List<Integer> subjectIds = mapQuestionSubjectService.getSubjectIdsByQuestionId(record.getQuestionId());
+            if (subjectIds != null && !subjectIds.isEmpty()) {
+                record.setSubjectId(subjectIds.get(0)); // 取第一个科目ID
+            }
+        }
+
+        return records;
     }
 
     @Override
@@ -192,9 +222,20 @@ public class RecordServiceImpl extends ServiceImpl<AnswerRecordMapper, AnswerRec
 
         List<AnswerRecord> records = list(wrapper);
 
+        log.info("查询到每日测试记录数: {}", records.size());
+        for (AnswerRecord record : records) {
+            log.info("记录: ID={}, 日期={}, isCorrect={}", record.getId(), record.getCreateTime(), record.getIsCorrect());
+        }
+
         // 按日期分组
         Map<LocalDate, List<AnswerRecord>> groupedByDate = records.stream()
                 .collect(Collectors.groupingBy(r -> r.getCreateTime().toLocalDate()));
+
+        log.info("按日期分组后的记录:");
+        for (Map.Entry<LocalDate, List<AnswerRecord>> entry : groupedByDate.entrySet()) {
+            log.info("日期: {}, 记录数: {}, 正确数: {}", entry.getKey(), entry.getValue().size(),
+                    entry.getValue().stream().filter(r -> r.getIsCorrect() == 1).count());
+        }
 
         List<Map<String, Object>> statsList = new ArrayList<>();
         for (int i = 6; i >= 0; i--) {
@@ -204,7 +245,9 @@ public class RecordServiceImpl extends ServiceImpl<AnswerRecordMapper, AnswerRec
             double accuracy = 0;
             if (!dayRecords.isEmpty()) {
                 long correctCount = dayRecords.stream().filter(r -> r.getIsCorrect() == 1).count();
+                log.info("日期 {}: 总题数={}, 正确数={}", date, dayRecords.size(), correctCount);
                 accuracy = Math.round((double) correctCount / dayRecords.size() * 100);
+                log.info("计算出的正确率: {}", accuracy);
             }
 
             Map<String, Object> dayStat = new HashMap<>();
@@ -464,5 +507,139 @@ public class RecordServiceImpl extends ServiceImpl<AnswerRecordMapper, AnswerRec
         // 这里需要通过question_subject_rel表查询
         // 简化实现,返回"未知科目",实际应该查询数据库
         return "数学";
+    }
+
+    @Override
+    public List<Map<String, Object>> getMistakeDistributionStats(Long userId) {
+        // 1. 获取用户的所有错题记录
+        LambdaQueryWrapper<AnswerRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AnswerRecord::getUserId, userId)
+                .eq(AnswerRecord::getIsCorrect, 0);
+        List<AnswerRecord> mistakeRecords = list(wrapper);
+
+        if (mistakeRecords.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 2. 按科目ID分组统计错题数量
+        Map<Integer, List<AnswerRecord>> groupedBySubject = mistakeRecords.stream()
+                .filter(record -> record.getSubjectId() != null) // 过滤掉没有科目ID的记录
+                .collect(Collectors.groupingBy(AnswerRecord::getSubjectId));
+
+        // 3. 构建统计结果
+        List<Map<String, Object>> distributionStats = new ArrayList<>();
+        for (Map.Entry<Integer, List<AnswerRecord>> entry : groupedBySubject.entrySet()) {
+            Integer subjectId = entry.getKey();
+            List<AnswerRecord> subjectRecords = entry.getValue();
+
+            // 获取科目名称
+            String subjectName = getSubjectNameBySubjectId(subjectId);
+
+            // 统计该科目下的错题数量和题目数量
+            long mistakeCount = subjectRecords.size();
+            Set<Long> uniqueQuestionIds = subjectRecords.stream()
+                    .map(AnswerRecord::getQuestionId)
+                    .collect(Collectors.toSet());
+            long uniqueQuestionCount = uniqueQuestionIds.size();
+
+            Map<String, Object> stat = new HashMap<>();
+            stat.put("subjectId", subjectId);
+            stat.put("subjectName", subjectName);
+            stat.put("mistakeCount", mistakeCount);
+            stat.put("questionCount", uniqueQuestionCount);
+            distributionStats.add(stat);
+        }
+
+        // 按错题数量降序排序
+        distributionStats.sort((a, b) -> {
+            Number countA = (Number) a.get("mistakeCount");
+            Number countB = (Number) b.get("mistakeCount");
+            return Double.compare(countB.doubleValue(), countA.doubleValue());
+        });
+
+        return distributionStats;
+    }
+
+    private String getSubjectNameBySubjectId(Integer subjectId) {
+        if (subjectId == null) {
+            return "未知科目";
+        }
+
+        try {
+            Subject subject = subjectService.getById(subjectId);
+            if (subject != null && subject.getName() != null && !subject.getName().isEmpty()) {
+                return subject.getName();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to get subject name for id: " + subjectId, e);
+        }
+
+        return "未知科目";
+    }
+
+    @Override
+    public List<Map<String, Object>> getSubjectQuestionCountStats(Long userId) {
+        // 1. 获取用户的所有答题记录
+        LambdaQueryWrapper<AnswerRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AnswerRecord::getUserId, userId);
+        List<AnswerRecord> allRecords = list(wrapper);
+
+        if (allRecords.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 2. 按科目ID分组统计刷题数量
+        Map<Integer, List<AnswerRecord>> groupedBySubject = allRecords.stream()
+                .filter(record -> record.getSubjectId() != null) // 过滤掉没有科目ID的记录
+                .collect(Collectors.groupingBy(AnswerRecord::getSubjectId));
+
+        // 3. 构建统计结果
+        List<Map<String, Object>> subjectStats = new ArrayList<>();
+        for (Map.Entry<Integer, List<AnswerRecord>> entry : groupedBySubject.entrySet()) {
+            Integer subjectId = entry.getKey();
+            List<AnswerRecord> subjectRecords = entry.getValue();
+
+            // 获取科目名称
+            String subjectName = getSubjectNameBySubjectId(subjectId);
+
+            // 统计该科目下的刷题数量
+            long questionCount = subjectRecords.size();
+            Set<Long> uniqueQuestionIds = subjectRecords.stream()
+                    .map(AnswerRecord::getQuestionId)
+                    .collect(Collectors.toSet());
+            long uniqueQuestionCount = uniqueQuestionIds.size();
+
+            Map<String, Object> stat = new HashMap<>();
+            stat.put("subjectId", subjectId);
+            stat.put("subjectName", subjectName);
+            stat.put("questionCount", questionCount);
+            stat.put("uniqueQuestionCount", uniqueQuestionCount);
+            subjectStats.add(stat);
+        }
+
+        // 确保所有科目都有统计数据（包括没有答题记录的科目）
+        List<String> allSubjects = Arrays.asList("政治", "英语", "高等数学", "线性代数", "概率论与数理统计", "专业课");
+        for (String subjectName : allSubjects) {
+            if (!subjectStats.stream().anyMatch(stat -> stat.get("subjectName").equals(subjectName))) {
+                Map<String, Object> emptyStat = new HashMap<>();
+                emptyStat.put("subjectName", subjectName);
+                emptyStat.put("questionCount", 0);
+                emptyStat.put("uniqueQuestionCount", 0);
+                subjectStats.add(emptyStat);
+            }
+        }
+
+        // 按科目名称排序
+        subjectStats.sort((a, b) -> {
+            String nameA = (String) a.get("subjectName");
+            String nameB = (String) b.get("subjectName");
+            // 按政治、英语、数学（高数、线代、概率论）、专业课的顺序排序
+            List<String> order = Arrays.asList("政治", "英语", "高等数学", "线性代数", "概率论与数理统计", "专业课");
+            int indexA = order.indexOf(nameA);
+            int indexB = order.indexOf(nameB);
+            return Integer.compare(indexA, indexB);
+        });
+
+        return subjectStats;
     }
 }

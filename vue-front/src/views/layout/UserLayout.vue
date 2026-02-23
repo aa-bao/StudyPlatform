@@ -19,15 +19,6 @@
                         <span class="menu-text">主页</span>
                     </router-link>
 
-                    <router-link to="/user/dashboard" class="menu-item" :class="{ active: activeMenu === '/user/dashboard' }">
-                        <el-tooltip content="备考看板" placement="right" :show-after="500">
-                            <div class="menu-icon">
-                                <img :src="dashboardIcon" class="menu-icon-svg" />
-                            </div>
-                        </el-tooltip>
-                        <span class="menu-text">备考看板</span>
-                    </router-link>
-
                     <router-link to="/user/subject" class="menu-item" :class="{ active: activeMenu === '/user/subject' }">
                         <el-tooltip content="开始学习" placement="right" :show-after="500">
                             <div class="menu-icon">
@@ -260,7 +251,6 @@ import { getPaperDetail } from '@/api/paper'
 import { useTransitionStore } from '@/stores/transition'
 
 // 导入自定义图标
-import dashboardIcon from '@/assets/icons/dashboard.svg?url'
 import singlePracticeIcon from '@/assets/icons/single-practice.svg?url'
 import topicDrillIcon from '@/assets/icons/tree.svg?url'
 import mockExamIcon from '@/assets/icons/mock-exam.svg?url'

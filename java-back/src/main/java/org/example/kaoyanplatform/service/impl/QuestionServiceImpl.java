@@ -411,12 +411,11 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
 
     @Override
     public List<Question> getErrorQuestionsWithTime(Integer userId) {
-        // 查询错题记录，按update_time降序排列，只取最近5条
+        // 查询错题记录，按update_time降序排列，返回所有错题
         List<ErrorQuestion> list = mistakeRecordService.list(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ErrorQuestion>()
                         .eq(ErrorQuestion::getUserId, userId)
-                        .orderByDesc(ErrorQuestion::getUpdateTime)
-                        .last("LIMIT 5"));
+                        .orderByDesc(ErrorQuestion::getUpdateTime));
 
         if (list.isEmpty()) return new ArrayList<>();
 
@@ -445,9 +444,12 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
                             }
                             q.setSubjectNames(subjectNames);
                             q.setSubjectName(subjectNames.isEmpty() ? null : subjectNames.get(0));
+                            // 为了兼容前端，设置单个subjectId字段
+                            q.setSubjectId(subjectIds.get(0));
                         } else {
                             q.setSubjectNames(Collections.emptyList());
                             q.setSubjectName(null);
+                            q.setSubjectId(null);
                         }
 
                         // 填充习题册信息

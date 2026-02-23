@@ -229,6 +229,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                     .mapToInt(r -> r.getDuration() != null ? r.getDuration() : 0)
                     .sum();
 
+            // 计算累计打卡天数
+            int totalStudyDays = (int) answerRecords.stream()
+                    .filter(r -> r.getCreateTime() != null)
+                    .map(r -> r.getCreateTime().toLocalDate())
+                    .distinct()
+                    .count();
+            statsDTO.setTotalStudyDays(totalStudyDays);
+
             // 设置快捷统计字段（用于前端侧边栏显示）
             statsDTO.setQuestionsDone(totalFinished);
             statsDTO.setAccuracy(overallStats.getOverallAccuracy());
@@ -246,6 +254,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             statsDTO.setQuestionsDone(0);
             statsDTO.setAccuracy(0.0);
             statsDTO.setStudyHours(0.0);
+            statsDTO.setTotalStudyDays(0);
         }
 
         return statsDTO;

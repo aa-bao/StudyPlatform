@@ -248,7 +248,7 @@
                 <div class="score-box">
                   <span class="score-label">总得分</span>
                   <span class="score-value">{{ examResult.totalScore || 0 }}</span>
-                  <span class="score-total">/ {{ paperInfo.totalScore || 150 }}</span>
+                  <span class="score-total">/ {{ examResult.objectiveTotalScore || 75 }}</span>
                 </div>
                 <div class="analysis-box">
                   <h4>总结</h4>
@@ -476,6 +476,17 @@ const initExam = async () => {
       index: index + 1
     }));
 
+    // 计算客观题总分
+    let objectiveTotalScore = 0;
+    allQuestions.value.forEach(q => {
+      if (q.type === 'single-choice' || q.type === 'multiple-choice' || q.type === 'fill-blank') {
+        objectiveTotalScore += (q.scoreValue || 0);
+      }
+    });
+
+    // 保存到 examResult 中，用于报告显示
+    examResult.value.objectiveTotalScore = objectiveTotalScore;
+
     // 恢复后端保存的答题快照（如果有）
     if (data.session.snapshotAnswers && data.session.snapshotAnswers !== '{}') {
       try {
@@ -509,7 +520,8 @@ const convertQuestions = (apiQuestions) => {
     type: getQuestionType(q.type),
     content: q.content,
     options: convertOptions(q.options || []),
-    answer: q.answer
+    answer: q.answer,
+    scoreValue: q.scoreValue || 0 // 保留分值信息
   }));
 };
 
@@ -874,6 +886,7 @@ const confirmSubmit = async () => {
     const resultRes = await getSessionDetail(sessionId.value);
     if (resultRes.code === 200 && resultRes.data) {
       examResult.value = {
+        ...examResult.value, // 保留之前计算好的客观题总分
         totalScore: resultRes.data.totalScore || 0,
         aiSummary: resultRes.data.aiSummary || ''
       };
@@ -896,12 +909,8 @@ const confirmSubmit = async () => {
     // 获取答题详情（批改结果）
     await fetchExamDetails();
 
-    // 弹出主观题自评对话框
-    showUserGradingDialog.value = true;
-
-    // 注意：不再立即显示结果，而是在用户完成自评后再显示
-    // 开始轮询获取完整成绩
-    // startPollingForResult(); // 注释掉原有的轮询逻辑，改由自评完成后触发
+    // 直接显示考试结果（只包含客观题成绩）
+    showResultModal.value = true;
   } catch (err) {
     console.error('提交考试失败:', err);
     ElMessage.error(err.message || '提交失败');

@@ -103,7 +103,9 @@
             </div>
 
             <!-- 填空题答题区 -->
-            <div v-else-if="currentQuestion.type === 3" class="fill-blank-area">
+            <div v-else-if="currentQuestion.type === 6" class="fill-blank-area">
+              <div style="color: red; font-size: 14px; margin-bottom: 10px;">
+              </div>
               <el-input
                 v-model="userAnswer"
                 type="text"
@@ -166,10 +168,6 @@
                       <el-icon><CloseBold /></el-icon>
                       答错了
                     </el-button>
-                  </div>
-                  <div class="integrity-notice">
-                    <el-icon><InfoFilled /></el-icon>
-                    <span>越真实的数据训练出的模型效果越符合你的水平！</span>
                   </div>
                 </div>
               </div>
@@ -658,13 +656,13 @@ const loadQuestionAtIndex = (index) => {
   }
 }
 
-const formatType = (type) => ({ 1: '单选', 2: '多选', 3: '填空', 4: '简答' }[type] || '未知')
+const formatType = (type) => ({ 1: '单选', 2: '多选', 3: '填空', 4: '简答', 6: '填空', 7: '填空' }[type] || '未知')
 
 const getAnswerTitle = () => {
   const type = currentQuestion.value?.type
   if (type === 1) return '请选择答案'
   if (type === 2) return '请选择答案'
-  if (type === 3) return '请填写答案'
+  if (type === 3 || type === 6 || type === 7) return '请填写答案'
   if (type === 4) return '请作答'
   return '请作答'
 }
@@ -677,6 +675,8 @@ const formatUserAnswerForDisplay = () => {
       }
       return String(opt)
     }).join(', ')
+  } else if (typeof userAnswer.value === 'object' && userAnswer.value !== null) {
+    return userAnswer.value.text || userAnswer.value.label || JSON.stringify(userAnswer.value)
   }
   return userAnswer.value || ''
 }
@@ -687,7 +687,10 @@ const canSubmit = () => {
     return userAnswer.value && (!Array.isArray(userAnswer.value) || userAnswer.value.length > 0)
   }
   // 填空题和主观题：需要有输入内容
-  return userAnswer.value && userAnswer.value.trim().length > 0
+  if (currentQuestion.value.type === 3 || currentQuestion.value.type === 6 || currentQuestion.value.type === 7 || currentQuestion.value.type === 4) {
+    return userAnswer.value && userAnswer.value.trim().length > 0
+  }
+  return false
 }
 
 // 主观题自评
@@ -820,7 +823,7 @@ const submitAnswer = async () => {
     }
   }
   // 填空题和主观题验证
-  else if (currentQuestion.value.type === 3 || currentQuestion.value.type === 4) {
+  else if (currentQuestion.value.type === 3 || currentQuestion.value.type === 4 || currentQuestion.value.type === 6 || currentQuestion.value.type === 7) {
     if (!userAnswer.value || !userAnswer.value.trim()) {
       return ElMessage.warning('请先输入答案')
     }

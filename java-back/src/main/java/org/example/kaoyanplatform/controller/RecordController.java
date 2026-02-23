@@ -195,4 +195,44 @@ public class RecordController {
             return Result.error("获取学习统计失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 10. 获取用户错题分布统计（按科目）
+     */
+    @GetMapping("/mistake-distribution-stats")
+    @Operation(summary = "获取错题分布统计", description = "获取用户错题分布统计数据，按科目分组，用于柱状图或饼图展示")
+    public Result getMistakeDistributionStats(
+            @Parameter(description = "用户ID") @RequestParam Long userId
+    ) {
+        if (userId == null) {
+            return Result.error("未传入用户ID");
+        }
+
+        try {
+            List<Map<String, Object>> stats = recordService.getMistakeDistributionStats(userId);
+            return Result.success(stats);
+        } catch (Exception e) {
+            return Result.error("获取错题分布统计失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 11. 获取用户各科目刷题数量统计
+     */
+    @GetMapping("/subject-question-count-stats")
+    @Operation(summary = "获取各科目刷题数量统计", description = "获取用户各科目刷题数量统计数据，用于柱状图展示")
+    public Result getSubjectQuestionCountStats(
+            @Parameter(description = "用户ID") @RequestParam Long userId
+    ) {
+        if (userId == null) {
+            return Result.error("未传入用户ID");
+        }
+
+        try {
+            List<Map<String, Object>> stats = recordService.getSubjectQuestionCountStats(userId);
+            return Result.success(stats);
+        } catch (Exception e) {
+            return Result.error("获取各科目刷题数量统计失败: " + e.getMessage());
+        }
+    }
 }

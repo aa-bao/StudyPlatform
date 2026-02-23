@@ -50,6 +50,11 @@ public class UserStudyStatsDTO {
     private Double studyHours;
 
     /**
+     * 累计打卡天数
+     */
+    private Integer totalStudyDays;
+
+    /**
      * 各科目统计数据
      */
     private List<SubjectStats> subjectStats;

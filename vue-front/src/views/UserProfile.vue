@@ -19,11 +19,11 @@
                         </div>
                         <p class="motto">{{ userInfo.motto || '不要放弃自己的梦想！' }}</p>
                         <div class="stats-row">
-                            <div class="stat-cell"><span>{{ progress[0].current || 0 }}</span> 刷题</div>
+                            <div class="stat-cell"><span>{{ userStats.questionCount || 0 }}</span> 刷题</div>
                             <div class="v-line"></div>
-                            <div class="stat-cell"><span>{{ progress[1].percent || 0 }}%</span> 正确率</div>
+                            <div class="stat-cell"><span>{{ userStats.accuracy || 0 }}%</span> 正确率</div>
                             <div class="v-line"></div>
-                            <div class="stat-cell"><span>{{ progress[2].current || 0 }}h</span> 学习时长</div>
+                            <div class="stat-cell"><span>{{ userStats.studyHours || 0 }}h</span> 学习时长</div>
                         </div>
                     </div>
                 </div>
@@ -34,17 +34,8 @@
                             <img :src="calendarIcon" alt="clock">
                         </div>
                         <div class="card-info">
-                            <label>连续打卡</label>
-                            <p>15天</p>
-                        </div>
-                    </div>
-                    <div class="glass-card">
-                        <div class="icon-wrap sky">
-                            <img :src="trophyIcon" alt="trophy">
-                        </div>
-                        <div class="card-info">
-                            <label>今日排名</label>
-                            <p>TOP 5%</p>
+                            <label>累计打卡</label>
+                            <p>{{ userStats.totalStudyDays || 0 }}天</p>
                         </div>
                     </div>
                 </div>
@@ -164,15 +155,17 @@
                             <label>绑定邮箱</label>
                             <div class="input-with-action">
                                 <input type="email" v-model="userInfo.email" placeholder="请输入邮箱地址">
-                                <button type="button" class="btn-verify" @click="handleEmailVerify">验证</button>
+                                <button type="button" class="btn-verify" @click="handleEmailVerify" :disabled="isSending">
+                                    {{ isSending ? '发送中...' : (countdown > 0 ? `${countdown}s后重试` : '发送验证码') }}
+                                </button>
                             </div>
                         </div>
 
-                        <div class="form-item">
-                            <label>绑定手机</label>
+                        <div class="form-item" v-if="showCodeInput">
+                            <label>验证码</label>
                             <div class="input-with-action">
-                                <input type="tel" v-model="userInfo.phone" placeholder="请输入手机号">
-                                <button type="button" class="btn-verify" @click="handlePhoneModify">修改</button>
+                                <input type="text" v-model="emailCode" placeholder="请输入验证码" maxlength="6">
+                                <button type="button" class="btn-verify" @click="handleVerifyCode">验证</button>
                             </div>
                         </div>
 
@@ -195,46 +188,26 @@
                 <section class="card">
                     <div class="card-header">
                         <h2 class="card-title-with-icon">
-                        <img :src="chartIcon" alt="chart">
-                            学习进度
-                        </h2>
-                        <a href="#" class="link">查看详情</a>
-                    </div>
-                    <div class="progress-stack">
-                        <div v-for="item in progress" :key="item.label" class="progress-group">
-                            <div class="progress-labels">
-                                <span>{{ item.label }} ({{ item.current }}/{{ item.total }} {{ item.unit }})</span>
-                                <span class="percent" :style="{ color: item.color }">{{ item.percent }}%</span>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="fill"
-                                    :style="{ width: item.percent + '%', backgroundColor: item.color, boxShadow: `0 0 10px ${item.color}4d` }">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="card">
-                    <div class="card-header">
-                        <h2 class="card-title-with-icon">
                             <img :src="clockIcon" alt="notebook">
                             最近学习
                         </h2>
                         <a href="#" class="link">查看全部</a>
                     </div>
                     <div class="learning-list">
-                        <div v-for="i in 3" :key="i" class="learning-item">
+                        <div v-if="recentRecords.length === 0" class="empty-state">
+                            <p>暂无学习记录</p>
+                        </div>
+                        <div v-for="(item, index) in recentRecords" :key="item.id" class="learning-item">
                             <div class="item-left">
-                                <div class="item-icon" :class="['green', 'amber', 'blue'][i - 1]">
+                                <div class="item-icon" :class="['green', 'amber', 'blue'][index % 3]">
                                     <img :src="notebookIcon" alt="learning">
                                 </div>
                                 <div class="item-info">
-                                    <h3>高等数学 - 第{{ i + 1 }}章练习</h3>
-                                    <p>完成 20 题 · 正确率 85%</p>
+                                    <h3>{{ item.subjectName }} - {{ item.questionType }}</h3>
+                                    <p>完成 {{ item.questionCount }} 题 · 正确率 {{ item.accuracy }}%</p>
                                 </div>
                             </div>
-                            <span class="time">2小时前</span>
+                            <span class="time">{{ formatTime(item.createTime) }}</span>
                         </div>
                     </div>
                 </section>
@@ -324,7 +297,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import chartIcon from '@/assets/icons/chart-no-axis.svg?url'
 import userSettingIcon from '@/assets/icons/user-setting.svg?url'
@@ -335,7 +308,7 @@ import notebookIcon from '@/assets/icons/correction-notebook.svg?url'
 import circleIcon from '@/assets/icons/circle.svg?url'
 import trophyIcon from '@/assets/icons/trophy.svg?url'
 import { useUserStore } from '@/stores/user'
-import { getUserInfoApi, updateUserApi, updatePwdApi, uploadAvatarApi } from '@/api/user'
+import { getUserInfoApi, updateUserApi, updatePwdApi, uploadAvatarApi, getRecentRecordsApi, getUserStudyStatsApi, sendEmailCodeApi, verifyEmailCodeApi } from '@/api/user'
 import StudyHeatmap from '@/components/chart/StudyHeatmap.vue'
 
 const userStore = useUserStore()
@@ -366,12 +339,27 @@ const userInfo = reactive({
     }
 })
 
+// 用户学习统计数据
+const userStats = reactive({
+    questionCount: 0,
+    accuracy: 0,
+    studyHours: 0,
+    totalStudyDays: 0
+})
+
 // 密码修改表单
 const passwordForm = reactive({
     oldPassword: '',
     newPassword: '',
     confirmPassword: ''
 })
+
+// 邮箱验证相关
+const emailCode = ref('')
+const showCodeInput = ref(false)
+const isSending = ref(false)
+const countdown = ref(0)
+let countdownTimer = null
 
 // 密码验证错误信息
 const passwordError = reactive({
@@ -417,12 +405,8 @@ const targetForm = reactive({
     targetTotalScore: null
 })
 
-// 学习进度数据
-const progress = ref([
-    { label: '今日目标', current: 13, total: 20, unit: '题', percent: 65, color: '#2563eb' },
-    { label: '本周目标', current: 16, total: 35, unit: '小时', percent: 48, color: '#10b981' },
-    { label: '总体目标', current: 320, total: 1000, unit: '题目', percent: 32, color: '#f59e0b' }
-])
+// 最近学习记录
+const recentRecords = ref([])
 
 // 成就徽章数据
 const badges = ref([
@@ -431,6 +415,112 @@ const badges = ref([
     { icon: '📊', name: '刷题1000', unlocked: false },
     { icon: '🏆', name: '模考冠军', unlocked: false }
 ])
+
+// 获取最近学习记录
+const fetchRecentRecords = async () => {
+    try {
+        const userId = userStore.userInfo?.id
+        if (!userId) {
+            return
+        }
+
+        const response = await getRecentRecordsApi(userId, 10)
+        if (response.code === 200) {
+            // 处理最近学习记录数据，格式化为前端需要的结构
+            recentRecords.value = processRecentRecords(response.data)
+        }
+    } catch (error) {
+        console.error('获取最近学习记录失败:', error)
+    }
+}
+
+// 处理最近学习记录数据
+const processRecentRecords = (records) => {
+    if (!records || !Array.isArray(records)) {
+        return []
+    }
+
+    // 按题目来源和类型分组，计算每个类别的答题数量和正确率
+    const recordMap = new Map()
+
+    records.forEach(record => {
+        const key = `${record.subjectId || 'unknown'}_${record.source || 'unknown'}`
+        if (!recordMap.has(key)) {
+            recordMap.set(key, {
+                id: key,
+                subjectName: getSubjectName(record.subjectId),
+                questionType: getQuestionTypeName(record.source),
+                questionCount: 0,
+                correctCount: 0,
+                accuracy: 0,
+                createTime: record.createTime
+            })
+        }
+
+        const item = recordMap.get(key)
+        item.questionCount++
+        if (record.isCorrect === 1) {
+            item.correctCount++
+        }
+        item.accuracy = Math.round((item.correctCount / item.questionCount) * 100)
+
+        // 保持最新的时间
+        if (new Date(record.createTime) > new Date(item.createTime)) {
+            item.createTime = record.createTime
+        }
+    })
+
+    return Array.from(recordMap.values())
+        .sort((a, b) => new Date(b.createTime) - new Date(a.createTime))
+        .slice(0, 5) // 只取最近的5条记录
+}
+
+// 获取科目名称
+const getSubjectName = (subjectId) => {
+    const subjectMap = {
+        '1': '高等数学',
+        '2': '线性代数',
+        '3': '概率论与数理统计',
+        '4': '思想政治理论',
+        '5': '英语一',
+        '6': '英语二'
+    }
+    return subjectMap[subjectId] || '其他科目'
+}
+
+// 获取题目类型名称
+const getQuestionTypeName = (source) => {
+    const typeMap = {
+        'single_practice': '单项练习',
+        'daily_test': '每日测试',
+        'mock_exam': '模拟考试',
+        'custom_practice': '自定义练习'
+    }
+    return typeMap[source] || '练习'
+}
+
+// 格式化时间
+const formatTime = (timeStr) => {
+    const date = new Date(timeStr)
+    const now = new Date()
+    const diff = now - date
+
+    const minute = 60 * 1000
+    const hour = 60 * minute
+    const day = 24 * hour
+
+    if (diff < minute) {
+        return '刚刚'
+    } else if (diff < hour) {
+        return `${Math.floor(diff / minute)}分钟前`
+    } else if (diff < day) {
+        return `${Math.floor(diff / hour)}小时前`
+    } else if (diff < 7 * day) {
+        return `${Math.floor(diff / day)}天前`
+    } else {
+        return date.toLocaleDateString()
+    }
+}
 
 
 // 获取用户数据
@@ -442,6 +532,16 @@ const fetchUserData = async () => {
         if (!userId) {
             ElMessage.error('用户未登录，请先登录')
             return
+        }
+
+        // 获取用户学习统计数据
+        const statsResponse = await getUserStudyStatsApi(userId)
+        if (statsResponse.code === 200) {
+            const statsData = statsResponse.data
+            userStats.questionCount = statsData.questionsDone || 0
+            userStats.accuracy = statsData.accuracy || 0
+            userStats.studyHours = statsData.studyHours || 0
+            userStats.totalStudyDays = statsData.totalStudyDays || 0
         }
 
         const response = await getUserInfoApi(userId)
@@ -664,8 +764,17 @@ const handleUpdatePassword = async () => {
     } catch (error) {
         console.error('修改密码失败:', error)
         // 处理网络错误或其他异常
-        if (error.response && error.response.data && error.response.data.msg) {
+        if (error.message) {
+            ElMessage.error(error.message)
+            // 根据错误信息判断是哪个字段错了
+            if (error.message.includes('原密码')) {
+                passwordError.oldPassword = error.message
+            }
+        } else if (error.response && error.response.data && error.response.data.msg) {
             ElMessage.error(error.response.data.msg)
+            if (error.response.data.msg.includes('原密码')) {
+                passwordError.oldPassword = error.response.data.msg
+            }
         } else {
             ElMessage.error('网络错误，请稍后重试')
         }
@@ -724,8 +833,79 @@ const handleSaveTargetScore = async () => {
 }
 
 // 点击邮箱验证
-const handleEmailVerify = () => {
-    ElMessage.info('验证码已发送至您的邮箱，请查收')
+const handleEmailVerify = async () => {
+    if (!userInfo.email) {
+        ElMessage.warning('请先输入邮箱地址')
+        return
+    }
+
+    // 邮箱格式验证
+    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+    if (!emailPattern.test(userInfo.email)) {
+        ElMessage.warning('请输入有效的邮箱地址')
+        return
+    }
+
+    isSending.value = true
+    try {
+        const response = await sendEmailCodeApi(userInfo.email, 'verify')
+        if (response.code === 200) {
+            ElMessage.success('验证码已发送至您的邮箱，请查收')
+            showCodeInput.value = true
+            startCountdown()
+        } else {
+            ElMessage.error(response.msg || '发送验证码失败')
+        }
+    } catch (error) {
+        console.error('发送验证码失败:', error)
+        ElMessage.error('网络错误，请稍后重试')
+    } finally {
+        isSending.value = false
+    }
+}
+
+// 点击验证验证码
+const handleVerifyCode = async () => {
+    if (!emailCode.value) {
+        ElMessage.warning('请输入验证码')
+        return
+    }
+
+    if (emailCode.value.length !== 6) {
+        ElMessage.warning('验证码长度应为6位')
+        return
+    }
+
+    try {
+        const response = await verifyEmailCodeApi(userInfo.email, emailCode.value, 'verify')
+        if (response.code === 200) {
+            ElMessage.success('邮箱验证成功')
+            // 验证成功后，可以更新用户信息
+            await updateUserInfo({ email: userInfo.email })
+            showCodeInput.value = false
+            emailCode.value = ''
+        } else {
+            ElMessage.error(response.msg || '验证码验证失败')
+        }
+    } catch (error) {
+        console.error('验证验证码失败:', error)
+        ElMessage.error('网络错误，请稍后重试')
+    }
+}
+
+// 倒计时函数
+const startCountdown = () => {
+    countdown.value = 60
+    if (countdownTimer) {
+        clearInterval(countdownTimer)
+    }
+    countdownTimer = setInterval(() => {
+        countdown.value--
+        if (countdown.value <= 0) {
+            clearInterval(countdownTimer)
+            countdownTimer = null
+        }
+    }, 1000)
 }
 
 // 点击手机修改
@@ -736,6 +916,15 @@ const handlePhoneModify = () => {
 // 在 onMounted 中获取用户数据
 onMounted(async () => {
     await fetchUserData()
+    await fetchRecentRecords()
+})
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+    if (countdownTimer) {
+        clearInterval(countdownTimer)
+        countdownTimer = null
+    }
 })
 </script>
 
@@ -1455,6 +1644,14 @@ textarea {
     border-radius: 0.8rem;
     border: 1px solid transparent;
     transition: 0.2s;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #9ca3af;
+    background: #f9fafb;
+    border-radius: 0.8rem;
 }
 
 .learning-item:hover {

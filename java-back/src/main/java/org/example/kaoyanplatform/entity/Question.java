@@ -174,6 +174,26 @@ public class Question {
     private List<Integer> subjectIds;
 
     /**
+     * 非数据库字段：所属科目ID（兼容字段，用于前端简化处理）
+     */
+    @TableField(exist = false)
+    private Integer subjectId;
+
+    /**
+     * 获取所属科目ID
+     */
+    public Integer getSubjectId() {
+        return subjectId;
+    }
+
+    /**
+     * 设置所属科目ID
+     */
+    public void setSubjectId(Integer subjectId) {
+        this.subjectId = subjectId;
+    }
+
+    /**
      * 非数据库字段：所属习题册ID列表（通过map_question_book查询）
      */
     @TableField(exist = false)

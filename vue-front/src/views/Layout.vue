@@ -10,12 +10,6 @@
                 </div>
 
                 <el-menu :default-active="activeMenu" router :collapse="isCollapse" class="el-menu-vertical">
-                    <el-menu-item index="/user/dashboard">
-                        <el-icon>
-                            <Odometer />
-                        </el-icon>
-                        <template #title>备考看板</template>
-                    </el-menu-item>
                     <el-menu-item index="/user/questions">
                         <el-icon>
                             <Notebook />
@@ -70,7 +64,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Odometer, Notebook, CollectionTag, Fold, Expand } from '@element-plus/icons-vue'
+import { Notebook, CollectionTag, Fold, Expand } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,7 +72,7 @@ const isCollapse = ref(false)
 
 const activeMenu = computed(() => route.path)
 const currentRouteName = computed(() => {
-    const map = { '/user/dashboard': '备考看板', '/user/questions': '在线刷题', '/user/error-book': '错题本' }
+    const map = { '/user/questions': '在线刷题', '/user/error-book': '错题本' }
     return map[route.path] || '刷题中'
 })
 

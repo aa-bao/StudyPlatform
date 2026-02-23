@@ -18,7 +18,8 @@ public class Subject {
     private Integer id;
     private String name;        // 科目名称
     private Integer parentId;   // 父节点 ID
-    private String icon;        // 图标
+    @TableField("video_url")
+    private String videoUrl;     // 视频链接（原 icon 字段，现用于存储视频链接）
     private Integer sort;       // 排序号
     /**
      * 层级

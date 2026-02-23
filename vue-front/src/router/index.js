@@ -60,6 +60,12 @@ const routes = [
         path: 'topic-drill',
         component: () => import('@/views/quiz/TopicDrill.vue')
       },
+      // 大平面刷题页面
+      {
+        path: 'drill-page',
+        component: () => import('@/views/quiz/DrillPage.vue'),
+        meta: { hideLayout: true }
+      },
       // 套卷刷题列表
        {
          path: 'paper-list',
@@ -175,7 +181,7 @@ router.beforeEach((to, from, next) => {
   if (to.path === '/login') {
     // 如果已登录，且访问登录页 -> 自动跳转到对应首页
     if (isLogin) {
-      next(userRole === 'admin' ? '/admin/home' : '/user/dashboard')
+      next(userRole === 'admin' ? '/admin/home' : '/user/home')
     } else {
       // 未登录 -> 放行进入登录页
       next()

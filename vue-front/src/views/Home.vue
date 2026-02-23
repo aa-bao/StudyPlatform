@@ -31,12 +31,6 @@
             <div class="nav-menu">
                 <h4>功能导航</h4>
                 <el-menu :default-active="$route.path" class="el-menu-vertical" @select="handleMenuNavigation">
-                    <el-menu-item index="/user/dashboard">
-                        <el-icon>
-                            <img :src="dashboardIcon" style="width: 18px; height: 18px;">
-                        </el-icon>
-                        <span>备考看板</span>
-                    </el-menu-item>
                     <el-menu-item index="subject">
                         <el-icon>
                             <img :src="singlePracticeIcon" style="width: 18px; height: 18px;">
@@ -61,23 +55,11 @@
                         </el-icon>
                         <span>知识体系树</span>
                     </el-menu-item>
-                    <el-menu-item index="/rankings">
-                        <el-icon>
-                            <img :src="trophyIcon" style="width: 18px; height: 18px;">
-                        </el-icon>
-                        <span>排行榜</span>
-                    </el-menu-item>
                     <el-menu-item index="/user/profile">
                         <el-icon>
                             <img :src="userSettingIcon" style="width: 18px; height: 18px;">
                         </el-icon>
                         <span>个人中心</span>
-                    </el-menu-item>
-                    <el-menu-item index="/user/community">
-                        <el-icon>
-                            <img :src="communityIcon" style="width: 18px; height: 18px;">
-                        </el-icon>
-                        <span>学习社区</span>
                     </el-menu-item>
                 </el-menu>
             </div>
@@ -200,12 +182,7 @@
                 <!-- 最近错题模块 -->
                 <div class="chart-container feature-card">
                     <div class="feature-header">
-                        <h3>
-                            <el-icon>
-                                <img :src="correctionNotebookIcon" style="width: 20px; height: 20px;">
-                            </el-icon>
-                            最近错题
-                        </h3>
+                        <h3>最近错题</h3>
                         <el-button type="primary" text @click="viewMistakes()">查看全部</el-button>
                     </div>
                     <div class="mistakes-list">
@@ -228,18 +205,13 @@
                     </div>
                 </div>
 
-                <!-- 数学能力雷达图 -->
+                <!-- 各科刷题数 -->
                 <div class="chart-container feature-card">
                     <div class="feature-header">
-                        <h3>
-                            <el-icon>
-                                <img :src="testBaseIcon" style="width: 20px; height: 20px;">
-                            </el-icon>
-                            数学能力雷达图
-                        </h3>
+                        <h3>各科刷题数</h3>
                     </div>
                     <div ref="radarChart" class="chart-area" style="width: 100%; height: 280px;"></div>
-                    <p class="chart-tip">💡 你的<strong>高等数学</strong>能力突出，<strong>线性代数</strong>需要加强练习</p>
+                    <p class="chart-tip" v-html="subjectTip"></p>
                 </div>
             </div>
 
@@ -248,12 +220,7 @@
                 <!-- 每日测试模块 -->
                 <div class="chart-container feature-card">
                     <div class="feature-header">
-                        <h3>
-                            <el-icon>
-                                <img :src="lineChartIcon" style="width: 20px; height: 20px;">
-                            </el-icon>
-                            每日测试正确率
-                        </h3>
+                        <h3>每日测试正确率</h3>
                         <span class="test-period">最近7天</span>
                     </div>
                     <div ref="dailyTestChart" class="daily-test-chart" style="width: 100%; height: 280px;"></div>
@@ -273,84 +240,16 @@
                     </div>
                 </div>
 
-                <!-- 错题分布热力图 -->
+                <!-- 错题分布 -->
                 <div class="chart-container feature-card">
                     <div class="feature-header">
-                        <h3>
-                            <el-icon>
-                                <img :src="chartNoAxisIcon" style="width: 20px; height: 20px;">
-                            </el-icon>
-                            错题分布
-                        </h3>
+                        <h3>错题分布</h3>
                     </div>
                     <div ref="heatMap" class="chart-area" style="width: 100%; height: 280px;"></div>
-                    <p class="chart-tip">🔥 <strong>泰勒公式</strong>相关题目错误率高达65%，建议优先复习</p>
+                    <p class="chart-tip" v-html="mistakeTip"></p>
                 </div>
             </div>
 
-            <!-- 个性化推荐和学习计划 -->
-            <div class="recommendations-section">
-                <div class="recommendations">
-                    <div class="section-header">
-                        <h2><el-icon name="Hot" /> 为你推荐</h2>
-                        <el-button type="primary" text @click="refreshRecommendations">刷新推荐</el-button>
-                    </div>
-
-                    <div class="recommendation-cards">
-                        <div class="recommendation-card" v-for="(recommendation, index) in recommendations"
-                            :key="index">
-                            <div class="card-header">
-                                <span class="subject-tag" :class="recommendation.subjectColor">
-                                    {{ recommendation.subjectName }}
-                                </span>
-                                <span class="difficulty-tag" :class="'difficulty-' + recommendation.difficulty">
-                                    {{ getDifficultyText(recommendation.difficulty) }}
-                                </span>
-                            </div>
-                            <div class="card-content">
-                                <p class="question-preview">{{ recommendation.content }}</p>
-                                <div class="card-footer">
-                                    <el-button type="primary" size="small" @click="goToPractice(recommendation)">
-                                        立即练习
-                                    </el-button>
-                                    <span class="recommendation-reason">
-                                        {{ recommendation.reason }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="study-plan">
-                    <div class="section-header">
-                        <h2><el-icon name="Guide" /> 今日学习计划</h2>
-                        <el-button type="primary" text @click="generateNewPlan">重新生成</el-button>
-                    </div>
-
-                    <div class="plan-items">
-                        <div class="plan-item" v-for="(item, index) in studyPlan" :key="index"
-                            :class="{ completed: item.completed }">
-                            <div class="plan-checkbox">
-                                <el-checkbox v-model="item.completed" @change="togglePlanItem(item)"></el-checkbox>
-                            </div>
-                            <div class="plan-content">
-                                <h4>{{ item.title }}</h4>
-                                <p class="plan-detail">{{ item.detail }}</p>
-                                <div class="progress-bar">
-                                    <el-progress :percentage="item.progress" :color="getProgressColor(item.progress)"
-                                        :stroke-width="6" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="plan-actions">
-                        <el-button type="primary" @click="customizePlan">自定义计划</el-button>
-                        <el-button @click="generateNewPlan">智能生成新计划</el-button>
-                    </div>
-                </div>
-            </div>
         </div>
 
 
@@ -443,21 +342,18 @@
 import { ref, onMounted, onUnmounted, computed, onBeforeUnmount} from 'vue'
 import * as echarts from 'echarts'
 import { useRouter, useRoute } from 'vue-router'
-import { getHomePageDataApi, getUserStudyStatsApi, getErrorBookApi, getDailyTestStatusApi, getDailyTestAccuracyStatsApi } from '@/api/user'
+import { getHomePageDataApi, getUserStudyStatsApi, getErrorBookApi, getDailyTestStatusApi, getDailyTestAccuracyStatsApi, getMistakeDistributionStatsApi, getSubjectQuestionCountStatsApi } from '@/api/user'
 import { ElMessage } from 'element-plus'
 import { renderLatex } from '@/utils/latex'
 
-import dashboardIcon from '@/assets/icons/dashboard.svg?url'
 import singlePracticeIcon from '@/assets/icons/single-practice.svg?url'
 import correctionNotebookIcon from '@/assets/icons/correction-notebook.svg?url'
 import mockExamIcon from '@/assets/icons/mock-exam.svg?url'
 import treeIcon from '@/assets/icons/tree.svg?url'
-import trophyIcon from '@/assets/icons/trophy.svg?url'
 import userSettingIcon from '@/assets/icons/user-setting.svg?url'
 import testBaseIcon from '@/assets/icons/do-exercise.svg?url'
 import lineChartIcon from '@/assets/icons/line-chart.svg?url'
 import clockIcon from '@/assets/icons/clock.svg?url'
-import communityIcon from '@/assets/icons/community.svg?url'
 import chartNoAxisIcon from '@/assets/icons/chart-no-axis.svg?url'
 import serviceIcon from '@/assets/icons/service.svg?url'
 import dailyTestIcon from '@/assets/icons/daily-test.svg?url'
@@ -524,64 +420,16 @@ onBeforeUnmount(() => {
     }
 })
 
-// 个性化推荐
-const recommendations = ref([
-    {
-        id: 1,
-        subjectName: '高等数学',
-        subjectColor: 'math',
-        difficulty: 3,
-        content: '求函数 f(x) = x³ - 3x² + 2 的极值点及极值',
-        reason: '根据你最近的错题，推荐相似题目进行巩固'
-    },
-    {
-        id: 2,
-        subjectName: '线性代数',
-        subjectColor: 'algebra',
-        difficulty: 2,
-        content: '计算行列式 | 1 2 3 | | 4 5 6 | | 7 8 9 | 的值',
-        reason: '你尚未覆盖的知识点：特殊行列式计算'
-    },
-    {
-        id: 3,
-        subjectName: '概率论',
-        subjectColor: 'probability',
-        difficulty: 4,
-        content: '设随机变量 X 服从参数为 λ 的泊松分布，求 E(X²)',
-        reason: '系统预测这道题对你的考研目标很有帮助'
-    }
-])
-
-// 学习计划
-const studyPlan = ref([
-    {
-        id: 1,
-        title: '高等数学基础练习',
-        detail: '完成5道极限与连续相关题目',
-        progress: 40,
-        completed: false
-    },
-    {
-        id: 2,
-        title: '线性代数专项突破',
-        detail: '复习矩阵运算，完成3道典型例题',
-        progress: 0,
-        completed: false
-    },
-    {
-        id: 3,
-        title: '错题本复习',
-        detail: '复习10道之前做错的题目',
-        progress: 100,
-        completed: true
-    }
-])
 
 
 // 图表引用
 const radarChart = ref(null)
 const heatMap = ref(null)
 const dailyTestChart = ref(null)
+
+// 动态提示文字
+const subjectTip = ref('')
+const mistakeTip = ref('')
 
 // 最近错题数据
 const recentMistakes = ref([])
@@ -597,18 +445,6 @@ const dailyTestStats = ref({
     totalTests: 23
 })
 
-// 难度文本映射
-const getDifficultyText = (level) => {
-    const levels = ['简单', '中等', '困难', '挑战']
-    return levels[level - 1] || '中等'
-}
-
-// 进度条颜色
-const getProgressColor = (percentage) => {
-    if (percentage < 30) return '#ff4d4f'
-    if (percentage < 70) return '#faad14'
-    return '#52c41a'
-}
 
 // 快捷操作 - 包装导航函数,添加退出动画
 const navigateWithAnimation = (path) => {
@@ -633,10 +469,6 @@ const startPractice = () => {
 
 const startTopicDrill = () => {
     navigateWithAnimation('/user/topic-drill')
-}
-
-const ViewDashboard = () => {
-    navigateWithAnimation('/user/dashboard')
 }
 
 const viewMistakes = () => {
@@ -676,24 +508,6 @@ const fetchDailyTestStatus = async () => {
     }
 }
 
-const goToPractice = (recommendation) => {
-    if (recommendation) {
-        navigateWithAnimation(`/user/practice/${recommendation.id}`)
-    } else {
-        navigateWithAnimation('/user/practice')
-    }
-}
-
-// 学习计划操作
-const togglePlanItem = (item) => {
-    item.progress = item.completed ? 100 : 0
-}
-const customizePlan = () => {
-    ElMessage.info('跳转到自定义计划页面')
-}
-const generateNewPlan = () => {
-    ElMessage.success('已生成新的学习计划！')
-}
 
 
 // 获取首页数据
@@ -769,179 +583,232 @@ const fetchUserStudyStats = async () => {
     }
 }
 
-// 推荐刷新
-const refreshRecommendations = () => {
-    ElMessage.success('已刷新推荐内容！')
-}
 
 
 // 初始化图表
-const initCharts = () => {
-    // 雷达图
-    const radarChartInstance = echarts.init(radarChart.value)
-    const radarOption = {
-        backgroundColor: 'transparent',
-        tooltip: {
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            borderColor: '#e5e7eb',
-            textStyle: { color: '#1f2937' }
-        },
-        radar: {
-            indicator: [
-                { name: '计算能力', max: 100 },
-                { name: '基本功', max: 100 },
-                { name: '公式记忆', max: 100 },
-                { name: '推理能力', max: 100 }
-            ],
-            radius: '65%',
-            splitArea: {
-                areaStyle: {
-                    color: ['rgba(59, 130, 246, 0.08)', 'rgba(59, 130, 246, 0.15)']
-                }
-            },
-            axisName: {
-                color: '#4b5563',
-                fontWeight: 500
-            },
-            axisLine: {
-                lineStyle: {
-                    color: 'rgba(59, 130, 246, 0.2)'
-                }
-            },
-            splitLine: {
-                lineStyle: {
-                    color: 'rgba(59, 130, 246, 0.1)'
-                }
+const initCharts = async () => {
+    // 各科目刷题数量柱状图
+    const subjectQuestionCountChartInstance = echarts.init(radarChart.value)
+    let subjectNames = []
+    let questionCountData = []
+
+    try {
+        const userId = JSON.parse(localStorage.getItem('user') || '{}').id
+        if (userId) {
+            const res = await getSubjectQuestionCountStatsApi(userId)
+            if (res.code === 200 && res.data) {
+                subjectNames = res.data.map(item => item.subjectName)
+                questionCountData = res.data.map(item => item.questionCount)
             }
-        },
-        series: [{
-            type: 'radar',
-            data: [{
-                value: [50, 62, 60, 66],
-                name: '能力分布',
-                symbol: 'circle',
-                symbolSize: 8,
-                lineStyle: {
-                    color: '#3b82f6',
-                    width: 3
-                },
-                areaStyle: {
-                    color: 'rgba(59, 130, 246, 0.25)'
-                },
-                itemStyle: {
-                    color: '#3b82f6',
-                    borderColor: '#fff',
-                    borderWidth: 2
-                }
-            }]
-        }]
+        }
+    } catch (error) {
+        console.error('获取各科目刷题数量失败:', error)
+        // 使用默认数据
+        subjectNames = ['政治', '英语', '数学', '专业课']
+        questionCountData = [150, 200, 300, 100]
     }
-    radarChartInstance.setOption(radarOption)
 
-    // 热力图
-    const heatMapInstance = echarts.init(heatMap.value)
-    const xAxisData = ['极限', '导数', '积分', '级数', '微分方程', '矩阵', '特征值', '概率分布', '统计推断']
-    const yAxisData = ['基础', '提高', '强化', '冲刺']
+    // 计算各科刷题数的动态提示
+    if (subjectNames.length > 0 && questionCountData.length > 0) {
+        const maxCount = Math.max(...questionCountData)
+        const maxSubject = subjectNames[questionCountData.indexOf(maxCount)]
+        const minCount = Math.min(...questionCountData)
+        const minSubject = subjectNames[questionCountData.indexOf(minCount)]
 
-    const heatMapData = []
-    for (let i = 0; i < yAxisData.length; i++) {
-        for (let j = 0; j < xAxisData.length; j++) {
-            const val = Math.floor(Math.random() * 100)
-            heatMapData.push([j, i, val])
+        if (maxSubject === minSubject) {
+            subjectTip.value = `💡 各科刷题数量比较均衡，继续保持！`
+        } else {
+            subjectTip.value = `💡 你的<strong>${maxSubject}</strong>刷题数量最多，<strong>${minSubject}</strong>需要加强练习`
         }
     }
 
-    const heatMapOption = {
+    const barChartOption = {
         backgroundColor: 'transparent',
         tooltip: {
+            trigger: 'axis',
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
             borderColor: '#e5e7eb',
-            textStyle: { color: '#1f2937' }
+            textStyle: { color: '#1f2937' },
+            formatter: function (params) {
+                return `${params[0].name}<br/>刷题数量：<strong>${params[0].value}题</strong>`
+            }
         },
         grid: {
-            left: '15%',
+            left: '8%',
             right: '5%',
-            top: '10%',
+            top: '15%',
             bottom: '20%',
             containLabel: true
         },
         xAxis: {
             type: 'category',
-            data: xAxisData,
-            splitArea: {
-                show: true,
-                areaStyle: {
-                    color: ['rgba(255,255,255,0.8)', 'rgba(249,250,251,0.8)']
-                }
+            data: subjectNames,
+            axisLine: {
+                lineStyle: { color: '#e5e7eb' }
             },
             axisLabel: {
-                rotate: 45,
-                fontSize: 10,
-                color: '#4b5563'
+                color: '#6b7280',
+                fontSize: 12,
+                rotate: 15
             }
         },
         yAxis: {
-            type: 'category',
-            data: yAxisData,
-            splitArea: {
-                show: true,
-                areaStyle: {
-                    color: ['rgba(255,255,255,0.8)', 'rgba(249,250,251,0.8)']
-                }
+            type: 'value',
+            min: 0,
+            axisLine: {
+                lineStyle: { color: '#e5e7eb' }
             },
             axisLabel: {
-                color: '#4b5563'
-            }
-        },
-        visualMap: {
-            min: 0,
-            max: 100,
-            calculable: true,
-            orient: 'horizontal',
-            left: 'center',
-            bottom: '0%',
-            text: ['高错误率', '低错误率'],
-            inRange: {
-                color: ['#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6']
+                color: '#6b7280',
+                fontSize: 12
             },
-            textStyle: {
-                color: '#4b5563'
+            splitLine: {
+                lineStyle: {
+                    color: '#f3f4f6',
+                    type: 'dashed'
+                }
             }
         },
         series: [{
-            name: '错题分布',
-            type: 'heatmap',
-            data: heatMapData,
-            label: {
-                show: true,
-                formatter: function (params) {
-                    return params.value[2] > 50 ? params.value[2] : ''
-                },
-                color: '#fff',
-                fontWeight: 500
+            name: '刷题数量',
+            type: 'bar',
+            data: questionCountData,
+            itemStyle: {
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: '#10b981' },
+                    { offset: 1, color: '#34d399' }
+                ]),
+                borderRadius: [8, 8, 0, 0]
             },
             emphasis: {
                 itemStyle: {
-                    shadowBlur: 10,
-                    shadowColor: 'rgba(0, 0, 0, 0.2)'
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: '#059669' },
+                        { offset: 1, color: '#10b981' }
+                    ])
                 }
-            }
+            },
+            barWidth: '60%'
         }]
     }
-    heatMapInstance.setOption(heatMapOption)
+    subjectQuestionCountChartInstance.setOption(barChartOption)
+
+    // 错题分布柱状图
+    const mistakeDistributionChartInstance = echarts.init(heatMap.value)
+    let distributionData = []
+    let mistakeSubjectNames = []
+
+    try {
+        const userId = JSON.parse(localStorage.getItem('user') || '{}').id
+        if (userId) {
+            const res = await getMistakeDistributionStatsApi(userId)
+            if (res.code === 200 && res.data) {
+                distributionData = res.data.map(item => item.mistakeCount)
+                mistakeSubjectNames = res.data.map(item => item.subjectName)
+            }
+        }
+    } catch (error) {
+        console.error('获取错题分布数据失败:', error)
+        //  fallback 数据
+        mistakeSubjectNames = ['高等数学', '线性代数', '概率论', '英语', '政治']
+        distributionData = [12, 8, 6, 15, 5]
+    }
+
+    // 计算错题分布的动态提示
+    if (mistakeSubjectNames.length > 0 && distributionData.length > 0) {
+        const maxMistakes = Math.max(...distributionData)
+        const maxSubject = mistakeSubjectNames[distributionData.indexOf(maxMistakes)]
+
+        // 计算错误率（这里简单计算为错题数占总错题数的百分比）
+        const totalMistakes = distributionData.reduce((sum, count) => sum + count, 0)
+        const errorRate = totalMistakes > 0 ? Math.round((maxMistakes / totalMistakes) * 100) : 0
+
+        mistakeTip.value = `🔥 <strong>${maxSubject}</strong>相关题目错误率较高，占总错题数的${errorRate}%，建议优先复习`
+    }
+
+    const mistakeBarChartOption = {
+        backgroundColor: 'transparent',
+        tooltip: {
+            trigger: 'axis',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            borderColor: '#e5e7eb',
+            textStyle: { color: '#1f2937' },
+            formatter: function (params) {
+                return `${params[0].name}<br/>错题数：<strong>${params[0].value}题</strong>`
+            }
+        },
+        grid: {
+            left: '8%',
+            right: '5%',
+            top: '15%',
+            bottom: '20%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: mistakeSubjectNames,
+            axisLine: {
+                lineStyle: { color: '#e5e7eb' }
+            },
+            axisLabel: {
+                color: '#6b7280',
+                fontSize: 12,
+                rotate: 15
+            }
+        },
+        yAxis: {
+            type: 'value',
+            min: 0,
+            axisLine: {
+                lineStyle: { color: '#e5e7eb' }
+            },
+            axisLabel: {
+                color: '#6b7280',
+                fontSize: 12
+            },
+            splitLine: {
+                lineStyle: {
+                    color: '#f3f4f6',
+                    type: 'dashed'
+                }
+            }
+        },
+        series: [{
+            name: '错题数',
+            type: 'bar',
+            data: distributionData,
+            itemStyle: {
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: '#3b82f6' },
+                    { offset: 1, color: '#60a5fa' }
+                ]),
+                borderRadius: [8, 8, 0, 0]
+            },
+            emphasis: {
+                itemStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: '#2563eb' },
+                        { offset: 1, color: '#3b82f6' }
+                    ])
+                }
+            },
+            barWidth: '60%'
+        }]
+    }
+    mistakeDistributionChartInstance.setOption(mistakeBarChartOption)
 
     // 响应窗口大小变化
     const resizeCharts = () => {
-        radarChartInstance.resize()
-        heatMapInstance.resize()
+        subjectQuestionCountChartInstance.resize()
+        mistakeDistributionChartInstance.resize()
     }
 
     window.addEventListener('resize', resizeCharts)
 
     return () => {
         window.removeEventListener('resize', resizeCharts)
-        radarChartInstance.dispose()
-        heatMapInstance.dispose()
+        subjectQuestionCountChartInstance.dispose()
+        mistakeDistributionChartInstance.dispose()
     }
 }
 
@@ -958,9 +825,23 @@ const initDailyTestChart = async () => {
 
     try {
         const res = await getDailyTestAccuracyStatsApi(userId)
+        console.log('每日测试接口原始数据:', res) // 输出原始数据到控制台
         if (res.code === 200 && res.data) {
+            console.log('接口返回的有效数据:', res.data) // 输出有效数据到控制台
             last7Days = res.data.map(item => item.date)
             accuracyData = res.data.map(item => item.accuracy)
+
+            // 计算每日测试统计数据
+            const validAccuracyData = accuracyData.filter(accuracy => accuracy > 0)
+            if (validAccuracyData.length > 0) {
+                const sum = validAccuracyData.reduce((a, b) => a + b, 0)
+                const average = sum / validAccuracyData.length
+                const max = Math.max(...validAccuracyData)
+
+                dailyTestStats.value.averageAccuracy = parseFloat(average.toFixed(1))
+                dailyTestStats.value.maxAccuracy = max
+                dailyTestStats.value.totalTests = validAccuracyData.length
+            }
         }
     } catch (error) {
         console.error('获取正确率统计失败:', error)
@@ -974,6 +855,10 @@ const initDailyTestChart = async () => {
             last7Days.push(`${date.getMonth() + 1}/${date.getDate()}`)
             accuracyData.push(0)
         }
+    } else {
+        // 打印最终使用的数据
+        console.log('准备绘制图表的日期数据:', last7Days)
+        console.log('准备绘制图表的正确率数据:', accuracyData)
     }
 
     const option = {
@@ -1060,7 +945,12 @@ const initDailyTestChart = async () => {
         }]
     }
 
-    dailyTestChartInstance.setOption(option)
+    // 使用 notMerge: false 强制重绘图表，确保数据正确更新
+    dailyTestChartInstance.setOption(option, {
+        notMerge: false,
+        lazyUpdate: false
+    })
+    console.log('图表已更新')
 
     // 响应窗口大小变化
     const handleResize = () => {
@@ -1170,7 +1060,7 @@ onMounted(async () => {
 
 
     // 初始化通用图表
-    const cleanup = initCharts()
+    const cleanup = await initCharts()
     if (typeof cleanup === 'function') cleanupFunctions.push(cleanup)
 
     // 初始化每日测试折线图
@@ -1994,190 +1884,6 @@ onUnmounted(() => {
     font-weight: 600;
 }
 
-/* 推荐和计划区域 */
-.recommendations-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
-    gap: 25px;
-}
-
-.section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid rgba(209, 213, 219, 0.5);
-}
-
-.section-header h2 {
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    color: #1f2937;
-}
-
-.section-header h2 .el-icon {
-    margin-right: 8px;
-    color: #3b82f6;
-}
-
-.recommendation-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.recommendation-card {
-    background: rgba(255, 255, 255, 0.7);
-    border-radius: 12px;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-    border: 1px solid rgba(209, 213, 219, 0.3);
-}
-
-.recommendation-card:hover {
-    transform: translateX(5px);
-    box-shadow: 0 6px 15px rgba(59, 130, 246, 0.1);
-}
-
-.card-header {
-    display: flex;
-    justify-content: space-between;
-    padding: 12px 15px;
-    background: rgba(255, 255, 255, 0.5);
-    border-bottom: 1px solid rgba(209, 213, 219, 0.3);
-}
-
-.subject-tag {
-    padding: 3px 10px;
-    border-radius: 15px;
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.subject-tag.math {
-    background: rgba(59, 130, 246, 0.15);
-    color: #3b82f6;
-}
-
-.subject-tag.algebra {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-}
-
-.subject-tag.probability {
-    background: rgba(245, 158, 11, 0.15);
-    color: #f59e0b;
-}
-
-.difficulty-tag {
-    padding: 3px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.difficulty-1 {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-}
-
-.difficulty-2 {
-    background: rgba(245, 158, 11, 0.15);
-    color: #f59e0b;
-}
-
-.difficulty-3 {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-}
-
-.difficulty-4 {
-    background: rgba(139, 92, 246, 0.15);
-    color: #8b5cf6;
-}
-
-.card-content {
-    padding: 15px;
-}
-
-.question-preview {
-    margin-bottom: 15px;
-    line-height: 1.6;
-    color: #4b5563;
-    min-height: 60px;
-}
-
-.card-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.recommendation-reason {
-    color: #6b7280;
-    font-size: 13px;
-    max-width: 70%;
-}
-
-.plan-items {
-    margin-bottom: 20px;
-}
-
-.plan-item {
-    display: flex;
-    padding: 15px;
-    margin-bottom: 12px;
-    background: rgba(255, 255, 255, 0.7);
-    border-radius: 12px;
-    transition: all 0.3s ease;
-    border: 1px solid rgba(209, 213, 219, 0.3);
-}
-
-.plan-item:hover {
-    background: rgba(255, 255, 255, 0.9);
-}
-
-.plan-item.completed {
-    opacity: 0.8;
-    background: rgba(16, 185, 129, 0.1);
-    border-color: rgba(16, 185, 129, 0.3);
-}
-
-.plan-checkbox {
-    margin-right: 15px;
-    display: flex;
-    align-items: center;
-}
-
-.plan-content {
-    flex: 1;
-}
-
-.plan-content h4 {
-    margin: 0 0 5px;
-    font-size: 16px;
-    color: #1f2937;
-}
-
-.plan-detail {
-    color: #6b7280;
-    font-size: 14px;
-    margin-bottom: 10px;
-}
-
-.progress-bar {
-    margin-top: 5px;
-}
-
-.plan-actions {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin-top: 10px;
-}
 
 
 /* 卡片头部样式 */
@@ -2349,8 +2055,7 @@ onUnmounted(() => {
 /* 响应式调整 */
 @media (max-width: 1200px) {
 
-    .charts-section,
-    .recommendations-section {
+    .charts-section {
         grid-template-columns: 1fr;
     }
 
