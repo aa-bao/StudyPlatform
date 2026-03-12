@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -80,7 +81,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
             if (session.getExpectedEndTime() != null &&
                 LocalDateTime.now().isAfter(session.getExpectedEndTime())) {
                 // 考试已超时，自动提交
-                submitExam(session.getId().toString());
+                submitExam(session.getId().toString(), "{}");
                 throw new RuntimeException("考试时间已到，本次考试已自动提交");
             }
         } else {
@@ -139,7 +140,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
 
     @Override
     @Transactional
-    public void submitExam(String sessionId) {
+    public void submitExam(String sessionId, String imagesJson) {
         ExamSession session = getById(Long.parseLong(sessionId));
         if (session == null) {
             throw new RuntimeException("考试会话不存在");
@@ -147,6 +148,16 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
 
         if (session.getStatus() == 1) {
             throw new RuntimeException("考试已提交");
+        }
+
+        // 解析前端传过来的图片答案
+        Map<String, Object> submittedImages = new java.util.HashMap<>();
+        if (imagesJson != null && !imagesJson.isEmpty() && !imagesJson.equals("{}")) {
+            try {
+                submittedImages = objectMapper.readValue(imagesJson, new TypeReference<Map<String, Object>>() {});
+            } catch (Exception e) {
+                System.err.println("解析图片答案失败: " + e.getMessage());
+            }
         }
 
         List<QuestionPaperRel> mappings = mapPaperQuestionService.list(
@@ -159,6 +170,7 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
             throw new RuntimeException("试卷题目数据异常");
         }
 
+        // 解析快照数据（只有文本答案）
         Map<String, Object> snapshotAnswers;
         try {
             snapshotAnswers = objectMapper.readValue(session.getSnapshotAnswers(), new TypeReference<Map<String, Object>>() {});
@@ -177,11 +189,21 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
 
             String questionId = mapping.getQuestionId().toString();
             String userAnswer = (String) snapshotAnswers.get(questionId);
+            // 获取图片答案（从提交时传入的图片数据）
+            String userAnswerImages = null;
+            if (submittedImages != null && submittedImages.containsKey(questionId)) {
+                try {
+                    userAnswerImages = objectMapper.writeValueAsString(submittedImages.get(questionId));
+                } catch (Exception e) {
+                    userAnswerImages = null;
+                }
+            }
 
             ExamRecord detail = new ExamRecord();
             detail.setSessionId(session.getId());
             detail.setQuestionId(mapping.getQuestionId());
             detail.setUserAnswer(userAnswer != null ? userAnswer : "");
+            detail.setUserAnswerImages(userAnswerImages);
 
             if (isObjectiveQuestion(question.getType())) {
                 // 客观题：立即批改
@@ -211,111 +233,303 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
         session.setAiSummary("客观题已批改完成。\n\n客观题得分：" + objectiveScore + " 分\n客观题总分：" + objectiveTotalScore + " 分\n主观题总分：" + subjectiveTotalScore + " 分");
         updateById(session);
 
+        // 异步调用主观题批改
+        System.out.println("\n考试已提交，开始异步批改主观题...");
+        System.out.println("客观题得分：" + objectiveScore + " 分");
+        System.out.println("待批改主观题数：" + (subjectiveTotalScore.compareTo(BigDecimal.ZERO) > 0 ? subjectiveTotalScore : "0"));
+        System.out.println("主观题批改将在后台异步进行，请稍候...");
+
+        gradeSubjectiveQuestionsAsync(sessionId);
     }
 
     @Override
     @Async
     public void gradeSubjectiveQuestionsAsync(String sessionId) {
-        System.out.println("开始异步批改主观题 - sessionId: " + sessionId);
+        System.out.println("\n==========================================");
+        System.out.println("开始整卷AI分析 - sessionId: " + sessionId + " @ " + LocalDateTime.now());
+        System.out.println("==========================================");
 
         try {
             ExamSession session = getById(Long.parseLong(sessionId));
             if (session == null || session.getStatus() != 1) {
-                System.out.println("会话不存在或未提交，跳过批改 - sessionId: " + sessionId);
+                System.out.println("会话不存在或未提交，跳过分析 - sessionId: " + sessionId);
+                System.out.println("==========================================");
                 return;
             }
 
-            // 查询所有待批改的主观题（isCorrect=3）
-            LambdaQueryWrapper<ExamRecord> pendingWrapper = new LambdaQueryWrapper<>();
-            pendingWrapper.eq(ExamRecord::getSessionId, session.getId())
-                    .eq(ExamRecord::getIsCorrect, 3);
+            System.out.println("考试会话信息:");
+            System.out.println("  PaperId: " + session.getPaperId());
+            System.out.println("  状态: " + session.getStatus());
+            System.out.println("  创建时间: " + session.getCreateTime());
+            System.out.println("  提交时间: " + session.getSubmitTime());
 
-            List<ExamRecord> pendingDetails = examAnswerDetailService.list(pendingWrapper);
-
-            if (pendingDetails.isEmpty()) {
-                System.out.println("没有待批改的主观题 - sessionId: " + sessionId);
+            // 获取试卷信息
+            ExamPaper paper = paperService.getById(session.getPaperId());
+            if (paper == null) {
+                System.out.println("试卷不存在");
+                System.out.println("==========================================");
                 return;
             }
 
-            System.out.println("找到 " + pendingDetails.size() + " 道待批改的主观题");
-
-            // 获取试卷题目映射（用于获取分值）
+            // 获取所有题目和用户答案
             List<QuestionPaperRel> mappings = mapPaperQuestionService.list(
                     new LambdaQueryWrapper<QuestionPaperRel>()
                             .eq(QuestionPaperRel::getPaperId, session.getPaperId().toString())
+                            .orderByAsc(QuestionPaperRel::getSortOrder)
             );
 
-            Map<String, QuestionPaperRel> mappingMap = mappings.stream()
+            if (mappings == null || mappings.isEmpty()) {
+                System.out.println("试卷没有题目");
+                System.out.println("==========================================");
+                return;
+            }
+
+            // 获取所有答题记录
+            LambdaQueryWrapper<ExamRecord> recordWrapper = new LambdaQueryWrapper<>();
+            recordWrapper.eq(ExamRecord::getSessionId, session.getId());
+            List<ExamRecord> allDetails = examAnswerDetailService.list(recordWrapper);
+
+            Map<String, ExamRecord> recordMap = allDetails.stream()
                     .collect(Collectors.toMap(
-                            m -> m.getQuestionId().toString(),
-                            m -> m,
-                            (m1, m2) -> m1
+                            r -> r.getQuestionId().toString(),
+                            r -> r,
+                            (r1, r2) -> r1
                     ));
 
-            BigDecimal subjectiveScoreEarned = BigDecimal.ZERO;
+            // 构建整卷数据
+            List<Map<String, Object>> questions = new ArrayList<>();
+            BigDecimal objectiveTotalScore = BigDecimal.ZERO;
+            BigDecimal subjectiveTotalScore = BigDecimal.ZERO;
 
-            // 逐道批改主观题
-            for (ExamRecord detail : pendingDetails) {
-                try {
-                    Question question = questionService.getById(detail.getQuestionId().toString());
-                    if (question == null) continue;
+            for (int i = 0; i < mappings.size(); i++) {
+                QuestionPaperRel mapping = mappings.get(i);
+                Question question = questionService.getById(mapping.getQuestionId().toString());
+                if (question == null) continue;
 
-                    QuestionPaperRel mapping = mappingMap.get(detail.getQuestionId().toString());
-                    if (mapping == null) continue;
+                ExamRecord record = recordMap.get(mapping.getQuestionId().toString());
 
-                    // 调用 Python 服务进行批改
-                    Map<String, Object> gradingResult = pythonBackendClient.gradeAnswer(
-                            question.getContent(),
-                            detail.getUserAnswer(),
-                            question.getAnswer(),
-                            4  // 简答题类型
-                    );
+                Map<String, Object> questionData = new HashMap<>();
+                questionData.put("index", i + 1);
+                questionData.put("type", question.getType());
+                questionData.put("content", question.getContent());
+                questionData.put("answer", question.getAnswer());
+                questionData.put("score", mapping.getScoreValue() != null ? mapping.getScoreValue().doubleValue() : 10.0);
 
-                    // 更新答题明细
-                    Double earnedScore = (Double) gradingResult.getOrDefault("score", 0.0);
-                    BigDecimal score = BigDecimal.valueOf(earnedScore).setScale(2, RoundingMode.HALF_UP);
+                if (record != null) {
+                    questionData.put("user_answer", record.getUserAnswer() != null ? record.getUserAnswer() : "");
 
-                    detail.setScoreEarned(score);
-                    detail.setIsCorrect(2); // 标记为已批改
-                    detail.setAiFeedback((String) gradingResult.getOrDefault("feedback", "批改完成"));
-                    examAnswerDetailService.updateById(detail);
+                    // 处理图片答案
+                    String userAnswerImages = record.getUserAnswerImages();
+                    if (userAnswerImages != null && !userAnswerImages.isEmpty() && userAnswerImages.startsWith("[")) {
+                        try {
+                            List<String> imageBases = objectMapper.readValue(userAnswerImages, new TypeReference<List<String>>() {});
+                            questionData.put("user_answer_images", imageBases);
+                        } catch (Exception e) {
+                            questionData.put("user_answer_images", new ArrayList<>());
+                        }
+                    } else {
+                        questionData.put("user_answer_images", new ArrayList<>());
+                    }
+                }
 
-                    subjectiveScoreEarned = subjectiveScoreEarned.add(score);
+                questions.add(questionData);
 
-                    System.out.println("批改完成 - 题目ID: " + detail.getQuestionId() + ", 得分: " + score);
-
-                    // 避免API限流，每次调用间隔1秒
-                    Thread.sleep(1000);
-
-                } catch (Exception e) {
-                    System.err.println("批改题目失败 - 题目ID: " + detail.getQuestionId() + ", 错误: " + e.getMessage());
-                    detail.setAiFeedback("AI批改失败：" + e.getMessage());
-                    examAnswerDetailService.updateById(detail);
+                // 计算客观题/主观题总分
+                if (isObjectiveQuestion(question.getType())) {
+                    objectiveTotalScore = objectiveTotalScore.add(mapping.getScoreValue());
+                } else {
+                    subjectiveTotalScore = subjectiveTotalScore.add(mapping.getScoreValue());
                 }
             }
 
-            // 重新计算总分
-            LambdaQueryWrapper<ExamRecord> allWrapper = new LambdaQueryWrapper<>();
-            allWrapper.eq(ExamRecord::getSessionId, session.getId());
-            List<ExamRecord> allDetails = examAnswerDetailService.list(allWrapper);
+            System.out.println("准备整卷分析数据:");
+            System.out.println("  总题数: " + questions.size());
+            System.out.println("  客观题总分: " + objectiveTotalScore);
+            System.out.println("  主观题总分: " + subjectiveTotalScore);
+            System.out.println("正在调用AI进行整卷分析...");
 
-            BigDecimal totalScore = allDetails.stream()
-                    .map(ExamRecord::getScoreEarned)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // 调用Python后端整卷分析
+            long apiStart = System.currentTimeMillis();
 
-            // 生成最终总结
-            String finalSummary = generateAISummary(session, allDetails, mappings);
+            Map<String, Object> examData = new HashMap<>();
+            examData.put("total_score", paper.getTotalScore() != null ? paper.getTotalScore().doubleValue() : 150.0);
+            examData.put("time_limit", paper.getTimeLimit() != null ? paper.getTimeLimit() : 180);
+            examData.put("questions", questions);
+
+            Map<String, Object> analysisResult = pythonBackendClient.analyzeExam(examData);
+
+            long apiEnd = System.currentTimeMillis();
+            System.out.println("AI整卷分析完成，耗时: " + (apiEnd - apiStart) + "ms");
+
+            // 解析分析结果并更新答题记录
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> detailedGrading = (List<Map<String, Object>>) analysisResult.get("detailed_grading");
+
+            // 先累加客观题原来的得分（这些已经批改过了）
+            BigDecimal manualObjectiveScore = BigDecimal.ZERO;
+            BigDecimal manualSubjectiveScore = BigDecimal.ZERO;
+
+            // 先获取客观题原来的得分 - 通过record的isCorrect判断（0或1表示客观题）
+            for (QuestionPaperRel mapping : mappings) {
+                ExamRecord record = recordMap.get(mapping.getQuestionId().toString());
+                if (record != null) {
+                    // 检查是否是客观题：isCorrect为0或1表示客观题
+                    boolean isObjective = record.getIsCorrect() != null &&
+                                         (record.getIsCorrect() == 0 || record.getIsCorrect() == 1);
+                    if (isObjective && record.getScoreEarned() != null) {
+                        manualObjectiveScore = manualObjectiveScore.add(record.getScoreEarned());
+                        System.out.println("客观题 - questionId: " + mapping.getQuestionId() +
+                                          ", score: " + record.getScoreEarned() +
+                                          ", isCorrect: " + record.getIsCorrect());
+                    }
+                }
+            }
+            System.out.println("累加后的客观题总分: " + manualObjectiveScore);
+
+            if (detailedGrading != null) {
+                for (Map<String, Object> grading : detailedGrading) {
+                    Integer questionIndex = (Integer) grading.get("question_index");
+                    if (questionIndex == null || questionIndex < 1 || questionIndex > mappings.size()) continue;
+
+                    QuestionPaperRel mapping = mappings.get(questionIndex - 1);
+                    ExamRecord record = recordMap.get(mapping.getQuestionId().toString());
+                    if (record == null) continue;
+
+                    // 只处理主观题，客观题保持原样 - 通过record的isCorrect判断
+                    boolean isObjective = record.getIsCorrect() != null &&
+                                         (record.getIsCorrect() == 0 || record.getIsCorrect() == 1);
+                    if (isObjective) {
+                        continue; // 跳过客观题，不修改
+                    }
+
+                    // 更新得分和反馈
+                    Double score = (Double) grading.get("score");
+                    String feedback = (String) grading.get("feedback");
+
+                    boolean hasAnswer = false;
+                    // 检查用户是否有答案（文本或图片）
+                    if (record.getUserAnswer() != null && !record.getUserAnswer().trim().isEmpty()) {
+                        hasAnswer = true;
+                    }
+                    if (record.getUserAnswerImages() != null && !record.getUserAnswerImages().trim().isEmpty()
+                            && !record.getUserAnswerImages().equals("[]")) {
+                        hasAnswer = true;
+                    }
+
+                    BigDecimal scoreDecimal = BigDecimal.ZERO;
+                    if (score != null && hasAnswer) {
+                        scoreDecimal = BigDecimal.valueOf(score).setScale(2, RoundingMode.HALF_UP);
+                        // 限制得分不超过题目分值
+                        if (mapping.getScoreValue() != null && scoreDecimal.compareTo(mapping.getScoreValue()) > 0) {
+                            scoreDecimal = mapping.getScoreValue();
+                        }
+                    } else if (!hasAnswer) {
+                        // 没有答案的主观题得0分
+                        feedback = "未作答";
+                    }
+
+                    record.setScoreEarned(scoreDecimal);
+
+                    // 只累加主观题得分（这里已经跳过了客观题，所以可以安全累加）
+                    manualSubjectiveScore = manualSubjectiveScore.add(scoreDecimal);
+                    System.out.println("主观题 - questionId: " + mapping.getQuestionId() +
+                                      ", score: " + scoreDecimal +
+                                      ", hasAnswer: " + hasAnswer);
+
+                    if (feedback != null) {
+                        record.setAiFeedback(feedback);
+                    }
+                    record.setIsCorrect(2); // 标记为已批改
+
+                    examAnswerDetailService.updateById(record);
+                }
+            }
+
+            // 构建完整的AI分析报告（Markdown格式）
+            @SuppressWarnings("unchecked")
+            Map<String, Object> analysis = (Map<String, Object>) analysisResult.get("analysis");
+
+            StringBuilder aiSummary = new StringBuilder();
+            aiSummary.append("# AI考试分析报告\n\n");
+
+            // 使用手动计算的总分，不依赖AI返回的分数
+            BigDecimal manualTotalScore = manualObjectiveScore.add(manualSubjectiveScore);
+            System.out.println("最终计算结果 - 客观题: " + manualObjectiveScore +
+                              ", 主观题: " + manualSubjectiveScore +
+                              ", 总分: " + manualTotalScore);
+            aiSummary.append("## 成绩概览\n\n");
+            aiSummary.append("| 项目 | 得分 | 总分 |\n");
+            aiSummary.append("|------|------|------|\n");
+            aiSummary.append("| **总分** | **").append(manualTotalScore).append("** | ").append(objectiveTotalScore.add(subjectiveTotalScore)).append(" |\n");
+            aiSummary.append("| 客观题 | ").append(manualObjectiveScore).append(" | ").append(objectiveTotalScore).append(" |\n");
+            aiSummary.append("| 主观题 | ").append(manualSubjectiveScore).append(" | ").append(subjectiveTotalScore).append(" |\n\n");
+
+            if (analysis != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> objectiveAnalysis = (Map<String, Object>) analysis.get("objective_analysis");
+                if (objectiveAnalysis != null) {
+                    String objErrorAnalysis = (String) objectiveAnalysis.get("error_analysis");
+                    if (objErrorAnalysis != null && !objErrorAnalysis.isEmpty()) {
+                        aiSummary.append("## 📊 客观题分析\n\n");
+                        aiSummary.append(objErrorAnalysis).append("\n\n");
+                    }
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> subjectiveAnalysis = (Map<String, Object>) analysis.get("subjective_analysis");
+                if (subjectiveAnalysis != null) {
+                    String subjErrorAnalysis = (String) subjectiveAnalysis.get("error_analysis");
+                    if (subjErrorAnalysis != null && !subjErrorAnalysis.isEmpty()) {
+                        aiSummary.append("## ✍️ 主观题分析\n\n");
+                        aiSummary.append(subjErrorAnalysis).append("\n\n");
+                    }
+                }
+
+                @SuppressWarnings("unchecked")
+                List<String> strengths = (List<String>) analysis.get("strengths");
+                if (strengths != null && !strengths.isEmpty()) {
+                    aiSummary.append("## ✅ 表现优秀\n\n");
+                    for (String s : strengths) {
+                        aiSummary.append("- ").append(s).append("\n");
+                    }
+                    aiSummary.append("\n");
+                }
+
+                @SuppressWarnings("unchecked")
+                List<String> weaknesses = (List<String>) analysis.get("weaknesses");
+                if (weaknesses != null && !weaknesses.isEmpty()) {
+                    aiSummary.append("## ⚠️ 待提升部分\n\n");
+                    for (String w : weaknesses) {
+                        aiSummary.append("- ").append(w).append("\n");
+                    }
+                    aiSummary.append("\n");
+                }
+
+                @SuppressWarnings("unchecked")
+                List<String> suggestions = (List<String>) analysis.get("suggestions");
+                if (suggestions != null && !suggestions.isEmpty()) {
+                    aiSummary.append("## 💪 学习建议\n\n");
+                    for (String s : suggestions) {
+                        aiSummary.append("- ").append(s).append("\n");
+                    }
+                }
+            }
+
+            // 使用手动计算的总分（不依赖AI返回的结果）
+            BigDecimal totalScore = manualTotalScore;
 
             // 更新会话
             session.setTotalScore(totalScore);
-            session.setAiSummary(finalSummary);
+            session.setAiSummary(aiSummary.toString());
             updateById(session);
 
-            System.out.println("异步批改完成 - sessionId: " + sessionId + ", 最终总分: " + totalScore);
+            System.out.println("整卷AI分析完成 - sessionId: " + sessionId + ", 最终总分: " + totalScore);
+            System.out.println("==========================================");
 
         } catch (Exception e) {
-            System.err.println("异步批改过程出错 - sessionId: " + sessionId + ", 错误: " + e.getMessage());
+            System.err.println("整卷AI分析出错 - sessionId: " + sessionId + ", 错误: " + e.getMessage());
             e.printStackTrace();
+            System.out.println("==========================================");
         }
     }
 
@@ -359,51 +573,5 @@ public class ExamSessionServiceImpl extends ServiceImpl<ExamSessionMapper, ExamS
         }
 
         return 0;
-    }
-
-    private String generateAISummary(ExamSession session, List<ExamRecord> details, List<QuestionPaperRel> mappings) {
-        int correctCount = 0;
-        int totalQuestions = details.size();
-        int objectiveCorrect = 0;
-        int objectiveTotal = 0;
-
-        for (int i = 0; i < details.size(); i++) {
-            ExamRecord detail = details.get(i);
-            if (detail.getIsCorrect() == 1) {
-                correctCount++;
-                objectiveCorrect++;
-                objectiveTotal++;
-            } else if (detail.getIsCorrect() == 2) {
-                objectiveTotal++;
-            }
-        }
-
-        double correctRate = totalQuestions > 0 ? (double) correctCount / totalQuestions * 100 : 0;
-        double avgScore = totalQuestions > 0 ? session.getTotalScore().doubleValue() / totalQuestions : 0;
-
-        StringBuilder summary = new StringBuilder();
-        summary.append(String.format("本次考试共 %d 题，其中客观题 %d 题。\n", totalQuestions, objectiveTotal));
-        summary.append(String.format("客观题正确数：%d/%d，正确率：%.1f%%\n", objectiveCorrect, objectiveTotal,
-                objectiveTotal > 0 ? (double) objectiveCorrect / objectiveTotal * 100 : 0));
-        summary.append(String.format("总得分：%.1f 分，平均每题得分：%.2f 分\n", session.getTotalScore().doubleValue(), avgScore));
-        summary.append(String.format("答题时长：%d 分钟，切换题目次数：%d 次\n",
-                session.getCreateTime() != null && session.getSubmitTime() != null ?
-                        java.time.Duration.between(session.getCreateTime(), session.getSubmitTime()).toMinutes() : 0,
-                session.getSwitchCount()));
-        summary.append("\n建议：\n");
-
-        for (int i = 0; i < details.size(); i++) {
-            ExamRecord detail = details.get(i);
-            if (detail.getIsCorrect() == 2 && detail.getAiFeedback() != null && !detail.getAiFeedback().isEmpty()) {
-                Question q = questionService.getById(detail.getQuestionId().toString());
-                if (q != null) {
-                    summary.append(String.format("【第%d题】%s\n", i + 1, q.getContent()));
-                    summary.append(String.format("得分：%.1f 分\n", detail.getScoreEarned().doubleValue()));
-                    summary.append(String.format("反馈：%s\n\n", detail.getAiFeedback()));
-                }
-            }
-        }
-
-        return summary.toString();
     }
 }

@@ -197,8 +197,8 @@
 
             <!-- 选项（仅选择题显示） -->
             <div class="options-list" th:if="${(question.type == 1 || question.type == 2) && question.options != null && !question.options.isEmpty()}">
-                <div class="option" th:each="option, optStat : ${question.options}" th:data-index="${optStat.index + 1}">
-                    <span class="option-text" th:utext="${option}"></span>
+                <div class="option" th:each="option, optStat : ${question.options}" th:data-index="${option.label}">
+                    <span class="option-text" th:utext="${option.text}"></span>
                 </div>
             </div>
 

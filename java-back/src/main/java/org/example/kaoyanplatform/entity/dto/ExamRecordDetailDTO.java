@@ -21,6 +21,9 @@ public class ExamRecordDetailDTO {
     @Schema(description = "用户答案")
     private String userAnswer;
 
+    @Schema(description = "用户手写答案图片（JSON格式Base64列表）")
+    private String userAnswerImages;
+
     @Schema(description = "是否正确：0-错误, 1-正确, 3-待批改（主观题）")
     private Integer isCorrect;
 

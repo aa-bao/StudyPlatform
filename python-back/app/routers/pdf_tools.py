@@ -7,7 +7,7 @@ from fastapi import APIRouter, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional
 
-from app.tools.PDFExtract.PDFExtract import extract_pdf_with_mineru, detect_pdf_type
+# from app.tools.PDFExtract.PDFExtract import extract_pdf_with_mineru, detect_pdf_type
 
 router = APIRouter(prefix="/pdf-tools", tags=["PDF Extract Tools"])
 

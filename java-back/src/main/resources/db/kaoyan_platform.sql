@@ -90,6 +90,7 @@ CREATE TABLE `exam_record`  (
   `session_id` bigint NOT NULL COMMENT '会话id',
   `question_id` bigint NOT NULL COMMENT '题目id',
   `user_answer` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL COMMENT '用户答案',
+  `user_answer_images` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL COMMENT '用户手写答案图片（JSON格式Base64列表）',
   `is_correct` tinyint NULL DEFAULT NULL COMMENT '对/错/待定（主观题）',
   `score_earned` decimal(5, 2) NULL DEFAULT NULL COMMENT '得分率',
   `duration_seconds` int NULL DEFAULT NULL COMMENT '用时',

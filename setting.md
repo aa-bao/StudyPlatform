@@ -32,26 +32,10 @@
 # 火山 coding plan
 ```
 {
-  "env": {
-    "ANTHROPIC_AUTH_TOKEN": "5d392539-dc02-41db-8756-e5f1b29160f0",
-    "ANTHROPIC_BASE_URL": "https://ark.cn-beijing.volces.com/api/coding",
-    "ANTHROPIC_MODEL": "ark-code-latest",
-    "API_TIMEOUT_MS": "3000000",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
-  },
-  "permissions": {
-    "allow": [
-      "Bash(git push:*)"
-    ]
-  },
-  "enableAllProjectMcpServers": true,
-  "enabledPlugins": {
-    "code-review@claude-plugins-official": true,
-    "superpowers@claude-plugins-official": true,
-    "context7@claude-plugins-official": true,
-    "example-skills@anthropic-agent-skills": true,
-    "document-skills@anthropic-agent-skills": true
-  },
-  "skipDangerousModePermissionPrompt": true
+    "env": {
+        "ANTHROPIC_AUTH_TOKEN": "5d392539-dc02-41db-8756-e5f1b29160f0",
+        "ANTHROPIC_BASE_URL": "https://ark.cn-beijing.volces.com/api/coding",
+        "ANTHROPIC_MODEL": "ark-code-latest"
+    }
 }
 ```

@@ -361,8 +361,12 @@ const loadUserInfo = async (userId) => {
 
 // 获取用户昵称
 const getUserName = (userId) => {
+    if (!userId) {
+        return '未知用户'
+    }
+
     const user = userCache.value.get(userId)
-    return user ? user.nickname || user.username : `用户${userId}`
+    return user ? user.nickname || user.username || `用户${userId}` : `用户${userId}`
 }
 
 // 获取科目名称

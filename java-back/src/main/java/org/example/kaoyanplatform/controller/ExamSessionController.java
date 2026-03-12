@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "套卷刷题管理", description = "套卷刷题相关接口，包括考试会话管理、答题快照、提交批改等")
 @RestController
@@ -62,12 +63,30 @@ public class ExamSessionController {
 
     @PostMapping("/submit")
     @Operation(summary = "提交考试", description = "提交考试并触发AI批改流程，客观题自动判分，主观题AI批改")
-    public Result<ExamSession> submitExam(
-            @Parameter(description = "考试会话ID", required = true) @RequestParam String sessionId) {
+    public Result<ExamSession> submitExam(@RequestBody Map<String, Object> requestBody) {
         try {
-            examSessionService.submitExam(sessionId);
+            Object sessionIdObj = requestBody.get("sessionId");
+            String sessionId = sessionIdObj != null ? sessionIdObj.toString() : null;
+            String imagesJson = (String) requestBody.getOrDefault("imagesJson", "{}");
+            examSessionService.submitExam(sessionId, imagesJson);
             ExamSession session = examSessionService.getById(sessionId);
             return Result.success(session);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{sessionId}")
+    @Operation(summary = "放弃考试", description = "删除考试会话，放弃当前考试")
+    public Result<String> abandonExam(
+            @Parameter(description = "考试会话ID", required = true) @PathVariable String sessionId) {
+        try {
+            boolean success = examSessionService.removeById(sessionId);
+            if (success) {
+                return Result.success("考试已放弃");
+            } else {
+                return Result.error("放弃考试失败");
+            }
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
@@ -113,6 +132,8 @@ public class ExamSessionController {
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
             wrapper.eq(ExamSession::getUserId, userId)
                    .eq(ExamSession::getStatus, 0) // 0-进行中
+                   // 排除已过期的考试（预期结束时间小于当前时间超过30分钟的，视为已超时）
+                   .apply("expected_end_time IS NULL OR expected_end_time > DATE_SUB(NOW(), INTERVAL 30 MINUTE)")
                    .orderByDesc(ExamSession::getCreateTime);
             List<ExamSession> sessions = examSessionService.list(wrapper);
             return Result.success(sessions);

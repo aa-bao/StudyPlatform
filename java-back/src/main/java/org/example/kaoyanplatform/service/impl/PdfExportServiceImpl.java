@@ -18,9 +18,17 @@ import java.io.FileNotFoundException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import java.util.Base64;
+import org.scilab.forge.jlatexmath.TeXFormula;
+import org.scilab.forge.jlatexmath.TeXIcon;
+import org.scilab.forge.jlatexmath.TeXConstants;
 
 /**
  * PDF导出服务实现类
@@ -127,79 +135,110 @@ public class PdfExportServiceImpl implements PdfExportService {
             }
             if (question.getOptions() != null) {
                 // 处理新的选项格式：List<Map<String, String>>
-                List<Map<String, String>> processedOptions = question.getOptions().stream()
-                    .map(opt -> {
-                        Map<String, String> newOpt = new java.util.HashMap<>();
-                        newOpt.put("label", opt.get("label"));
-                        newOpt.put("text", convertLatexToHtml(opt.get("text")));
-                        return newOpt;
-                    })
-                    .collect(Collectors.toList());
+                String[] labels = {"A", "B", "C", "D", "E", "F"};
+                List<Map<String, String>> processedOptions = new ArrayList<>();
+                for (int i = 0; i < question.getOptions().size(); i++) {
+                    Map<String, String> opt = question.getOptions().get(i);
+                    Map<String, String> newOpt = new java.util.HashMap<>();
+                    // 确保选项有正确的标签（A、B、C、D等）
+                    String label = opt.get("label");
+                    if (label == null || label.isEmpty()) {
+                        label = i < labels.length ? labels[i] : String.valueOf((char)('A' + i));
+                    }
+                    newOpt.put("label", label);
+                    newOpt.put("text", convertLatexToHtml(opt.get("text")));
+                    processedOptions.add(newOpt);
+                }
                 question.setOptions(processedOptions);
             }
         }
     }
 
     /**
-     * 将LaTeX公式转换为HTML span，同时处理特殊字符
-     * 使用占位符保护LaTeX公式，先转义HTML，再恢复并转换LaTeX
+     * 将文本转换为HTML，同时处理特殊字符
+     * 使用JLaTeXMath将LaTeX公式转换为图片
      */
     private String convertLatexToHtml(String text) {
         if (text == null) return null;
 
-        // 第一步：提取并保护LaTeX公式
-        String placeholderPrefix = "___LATEX___";
-        List<String> latexFormulas = new ArrayList<>();
-
-        // 提取块级公式 $$...$$
-        Pattern blockPattern = Pattern.compile("\\$\\$([^$]+)\\$\\$");
-        Matcher blockMatcher = blockPattern.matcher(text);
-        int counter = 0;
-        StringBuffer sb = new StringBuffer();
-        while (blockMatcher.find()) {
-            String placeholder = placeholderPrefix + "BLOCK_" + counter + "___";
-            latexFormulas.add(blockMatcher.group(1).trim());
-            blockMatcher.appendReplacement(sb, Matcher.quoteReplacement(placeholder));
-            counter++;
-        }
-        blockMatcher.appendTail(sb);
-
-        // 提取行内公式 $...$
-        String tempText = sb.toString();
-        Pattern inlinePattern = Pattern.compile("\\$([^$\\n]+)\\$");
-        Matcher inlineMatcher = inlinePattern.matcher(tempText);
-        sb = new StringBuffer();
-        counter = 0;
-        while (inlineMatcher.find()) {
-            String placeholder = placeholderPrefix + "INLINE_" + counter + "___";
-            latexFormulas.add(inlineMatcher.group(1).trim());
-            inlineMatcher.appendReplacement(sb, Matcher.quoteReplacement(placeholder));
-            counter++;
-        }
-        inlineMatcher.appendTail(sb);
-
-        // 第二步：转义HTML特殊字符
-        String escaped = sb.toString()
-            .replace("&", "&amp;")
+        // 首先转义HTML特殊字符
+        String escapedText = text.replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
             .replace("'", "&#x27;");
 
-        // 第三步：将LaTeX公式转换为HTML span
-        for (int i = 0; i < latexFormulas.size(); i++) {
-            String formula = latexFormulas.get(i);
-            boolean isBlock = i < latexFormulas.size() && text.contains("$$" + formula + "$$") &&
-                !text.substring(0, text.indexOf("$$" + formula + "$$")).contains("$" + formula + "$");
+        // 使用JLaTeXMath渲染LaTeX公式
+        try {
+            // 提取行内公式 $...$
+            Pattern inlinePattern = Pattern.compile("\\$(.*?)\\$");
+            Matcher inlineMatcher = inlinePattern.matcher(escapedText);
+            StringBuffer sb = new StringBuffer();
+            int formulaCount = 0;
 
-            // 简化处理：直接用原始公式替换占位符
-            // KaTeX会在前端渲染，所以这里只做占位符处理
-            String placeholder = placeholderPrefix + (i < 10 ? "0" + i : i) + "___";
-            String latexHtml = "$" + formula + "$";
-            escaped = escaped.replace(placeholder, latexHtml);
+            while (inlineMatcher.find()) {
+                String formula = inlineMatcher.group(1);
+                String imgTag = renderLatexFormula(formula, formulaCount++);
+                inlineMatcher.appendReplacement(sb, Matcher.quoteReplacement(imgTag));
+            }
+            inlineMatcher.appendTail(sb);
+
+            // 提取块级公式 $$...$$
+            Pattern blockPattern = Pattern.compile("\\$\\$(.*?)\\$\\$", Pattern.DOTALL);
+            Matcher blockMatcher = blockPattern.matcher(sb.toString());
+            sb = new StringBuffer();
+
+            while (blockMatcher.find()) {
+                String formula = blockMatcher.group(1);
+                String imgTag = renderLatexFormula(formula, formulaCount++);
+                blockMatcher.appendReplacement(sb, Matcher.quoteReplacement(imgTag));
+            }
+            blockMatcher.appendTail(sb);
+
+            return sb.toString();
+        } catch (Exception e) {
+            System.err.println("LaTeX formula rendering failed: " + e.getMessage());
+            // 如果渲染失败，返回原始文本
+            return escapedText;
         }
+    }
 
-        return escaped;
+    /**
+     * 使用JLaTeXMath渲染LaTeX公式为图片
+     */
+    private String renderLatexFormula(String formula, int formulaCount) {
+        try {
+            // 渲染公式为图片
+            TeXFormula teXFormula = new TeXFormula(formula);
+            TeXIcon teXIcon = teXFormula.createTeXIcon(TeXConstants.STYLE_DISPLAY, 16);
+
+            // 设置前景色
+            teXIcon.setForeground(Color.BLACK);
+
+            // 创建图片
+            BufferedImage bufferedImage = new BufferedImage(
+                teXIcon.getIconWidth(),
+                teXIcon.getIconHeight(),
+                BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics2D = bufferedImage.createGraphics();
+            graphics2D.setColor(Color.WHITE);
+            graphics2D.fillRect(0, 0, teXIcon.getIconWidth(), teXIcon.getIconHeight());
+            teXIcon.paintIcon(null, graphics2D, 0, 0);
+            graphics2D.dispose();
+
+            // 转换为Base64字符串
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            ImageIO.write(bufferedImage, "png", outputStream);
+            byte[] imageBytes = outputStream.toByteArray();
+            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+
+            // 创建HTML img标签
+            return String.format("<img src=\"data:image/png;base64,%s\" alt=\"%s\" style=\"vertical-align: middle;\" />",
+                base64Image, formula);
+        } catch (Exception e) {
+            System.err.println("Error rendering LaTeX formula '" + formula + "': " + e.getMessage());
+            return "$" + formula + "$";
+        }
     }
 
     /**
@@ -308,12 +347,41 @@ public class PdfExportServiceImpl implements PdfExportService {
                 }
             }
 
+            // 调试输出：检查HTML内容的前300行
+            if (htmlContent.length() > 0) {
+                String[] lines = htmlContent.split("\n");
+                System.out.println("HTML Content for PDF (first " + Math.min(300, lines.length) + " lines):");
+                for (int i = 0; i < Math.min(300, lines.length); i++) {
+                    System.out.println(String.format("%03d: %s", i+1, lines[i]));
+                    // 如果是第288行，特别输出
+                    if (i == 287) {
+                        System.out.println("Line 288 detail:");
+                        if (lines[i].length() >= 75) {
+                            System.out.println("Char 75: '" + lines[i].charAt(74) + "'");
+                            System.out.println("Context around char 75: " + lines[i].substring(Math.max(0, 74 - 10), Math.min(lines[i].length(), 74 + 10)));
+                        }
+                    }
+                }
+            }
+
             renderer.setDocumentFromString(htmlContent);
             renderer.layout();
             renderer.createPDF(outputStream);
 
             return outputStream.toByteArray();
         } catch (Exception e) {
+            System.err.println("PDF generation error details:");
+            System.err.println("HTML content length: " + (htmlContent != null ? htmlContent.length() : 0));
+            if (htmlContent != null && htmlContent.length() > 0) {
+                String[] lines = htmlContent.split("\n");
+                System.err.println("HTML lines: " + lines.length);
+                if (lines.length >= 288) {
+                    System.err.println("Line 288: " + lines[287]);
+                    if (lines[287].length() >= 75) {
+                        System.err.println("Line 288 char 75: " + lines[287].charAt(74));
+                    }
+                }
+            }
             throw new RuntimeException("PDF生成失败: " + e.getMessage(), e);
         }
     }

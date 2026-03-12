@@ -8,9 +8,6 @@
                         <div class="header-desc">选择条件导出题目为PDF格式</div>
                     </div>
                     <div class="header-btns">
-                        <el-button type="primary" :icon="View" @click="handlePreview" :loading="previewLoading">
-                            预览题目
-                        </el-button>
                         <el-button type="success" :icon="Download" @click="handleExport" :loading="exportLoading">
                             导出PDF
                         </el-button>

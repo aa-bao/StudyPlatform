@@ -15,7 +15,7 @@ import java.util.Map;
 @Component
 public class JwtUtil {
 
-    // 密钥，使用 Jwts.SIG 提供的安全密钥生成方法
+    // 密钥
     private static final SecretKey SECRET_KEY = Jwts.SIG.HS256.key().build();
 
     // 默认过期时间：1天 (24小时)

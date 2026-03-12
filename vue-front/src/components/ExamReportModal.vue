@@ -38,7 +38,7 @@
       <!-- AI 总结 -->
       <div class="ai-summary" v-if="reportData.aiSummary">
         <h4>💡 AI 总结</h4>
-        <p class="summary-text" style="white-space: pre-line;">{{ reportData.aiSummary }}</p>
+        <div class="summary-text markdown-content" v-html="renderMarkdown(reportData.aiSummary)"></div>
       </div>
 
       <!-- 详细分析 -->
@@ -155,6 +155,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { renderLatex } from '@/utils/latex'
+import MarkdownIt from 'markdown-it'
 
 const props = defineProps({
   visible: {
@@ -174,6 +175,19 @@ const dialogVisible = computed({
   get: () => props.visible,
   set: (val) => emit('update:visible', val)
 })
+
+// 初始化 markdown-it
+const md = new MarkdownIt({
+  breaks: true,
+  linkify: true,
+  typographer: true
+})
+
+// 渲染 markdown 内容
+const renderMarkdown = (content) => {
+  if (!content) return ''
+  return md.render(content)
+}
 
 const loading = ref(false)
 const activeTab = ref('objective')
@@ -357,6 +371,133 @@ const goBack = () => {
   color: #606266;
   line-height: 1.8;
   font-size: 14px;
+}
+
+/* Markdown 内容样式 */
+.markdown-content {
+  color: #303133;
+  line-height: 1.8;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.markdown-content h1 {
+  font-size: 22px;
+  border-bottom: 2px solid #e4e7ed;
+  padding-bottom: 8px;
+}
+
+.markdown-content h2 {
+  font-size: 18px;
+  border-bottom: 1px solid #e4e7ed;
+  padding-bottom: 6px;
+}
+
+.markdown-content h3 {
+  font-size: 16px;
+}
+
+.markdown-content h4 {
+  font-size: 15px;
+}
+
+.markdown-content p {
+  margin: 8px 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-content li {
+  margin: 4px 0;
+}
+
+.markdown-content code {
+  background-color: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  color: #c7254e;
+}
+
+.markdown-content pre {
+  background-color: #f5f7fa;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  color: #303133;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #409eff;
+  padding-left: 12px;
+  margin: 12px 0;
+  color: #606266;
+  background-color: #ecf5ff;
+  padding: 8px 12px;
+  border-radius: 0 4px 4px 0;
+}
+
+.markdown-content strong {
+  color: #303133;
+  font-weight: 600;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content a {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #dcdfe6;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: #f5f7fa;
+  font-weight: 600;
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid #dcdfe6;
+  margin: 16px 0;
 }
 
 .detail-analysis {

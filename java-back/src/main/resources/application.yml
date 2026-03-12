@@ -1,7 +1,15 @@
 server:
   port: 8081
+  tomcat:
+    max-http-form-post-size: 50MB
+    max-swallow-size: 50MB
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     jdbc-url: jdbc:mysql://localhost:3306/kaoyan_platform?serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=utf-8

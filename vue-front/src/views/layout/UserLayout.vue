@@ -246,7 +246,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useUserStore } from '../../stores/user'
-import { getIncompleteSessions } from '@/api/examSession'
+import { getIncompleteSessions, abandonExamApi } from '@/api/examSession'
 import { getPaperDetail } from '@/api/paper'
 import { useTransitionStore } from '@/stores/transition'
 
@@ -391,9 +391,20 @@ const abandonExam = () => {
             type: 'warning',
             distinguishCancelAndClose: true
         }
-    ).then(() => {
-        showIncompleteExamDialog.value = false
-        ElMessage.warning('您已放弃考试，如需继续请从套卷列表重新进入')
+    ).then(async () => {
+        // 调用后端API删除考试会话
+        try {
+            const res = await abandonExamApi(incompleteExamInfo.value.sessionId)
+            if (res.code === 200) {
+                showIncompleteExamDialog.value = false
+                ElMessage.success('已放弃考试')
+            } else {
+                ElMessage.error(res.message || '放弃考试失败')
+            }
+        } catch (error) {
+            console.error('放弃考试失败:', error)
+            ElMessage.error('放弃考试失败，请重试')
+        }
     }).catch(() => {
         // 用户选择继续考试
     })

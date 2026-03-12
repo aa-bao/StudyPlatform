@@ -103,17 +103,17 @@ public class UserProgressController {
                     var user = userService.getById(entry.getKey());
 
                     Map<String, Object> item = new HashMap<>();
-                    item.put("userId", entry.getKey());
+                    item.put("user_id", entry.getKey());
                     item.put("nickname", user != null ? user.getNickname() : "未知用户");
                     item.put("avatar", user != null ? user.getAvatar() : "/img/default-avatar.png");
-                    item.put("totalQuestions", totalFinished);
-                    item.put("totalCorrect", totalCorrect);
+                    item.put("total_finished", totalFinished);
+                    item.put("total_correct", totalCorrect);
                     item.put("accuracy", accuracy);
                     return item;
                 })
                 .sorted((a, b) -> {
-                    int finishedA = (Integer) a.get("totalQuestions");
-                    int finishedB = (Integer) b.get("totalQuestions");
+                    int finishedA = (Integer) a.get("total_finished");
+                    int finishedB = (Integer) b.get("total_finished");
                     // 先按完成数排序
                     return Integer.compare(finishedB, finishedA);
                 })

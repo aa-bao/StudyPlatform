@@ -162,9 +162,10 @@ public class ExamRecordServiceImpl extends ServiceImpl<ExamRecordMapper, ExamRec
             .filter(Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 主观题统计（有用户自评数据）
+        // 主观题统计（有用户自评数据或AI已批改）
         List<ExamRecord> subjectiveRecords = records.stream()
-            .filter(r -> r.getUserProcessGrading() != null || r.getUserResultGrading() != null)
+            .filter(r -> (r.getUserProcessGrading() != null || r.getUserResultGrading() != null)
+                    || (r.getIsCorrect() != null && r.getIsCorrect() == 2)) // AI已批改
             .collect(Collectors.toList());
 
         BigDecimal subjectiveScore = subjectiveRecords.stream()
@@ -218,6 +219,7 @@ public class ExamRecordServiceImpl extends ServiceImpl<ExamRecordMapper, ExamRec
             dto.setSessionId(record.getSessionId());
             dto.setQuestionId(record.getQuestionId());
             dto.setUserAnswer(record.getUserAnswer());
+            dto.setUserAnswerImages(record.getUserAnswerImages());
             dto.setIsCorrect(record.getIsCorrect());
             dto.setScoreEarned(record.getScoreEarned());
             dto.setDurationSeconds(record.getDurationSeconds());

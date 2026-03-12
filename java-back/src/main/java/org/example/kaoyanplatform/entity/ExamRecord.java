@@ -14,6 +14,7 @@ public class ExamRecord {
     private Long sessionId;
     private Long questionId;
     private String userAnswer;
+    private String userAnswerImages;  // 用户手写答案图片（JSON格式存储Base64列表）
     private Integer isCorrect;
     private BigDecimal scoreEarned;
     private Integer durationSeconds;

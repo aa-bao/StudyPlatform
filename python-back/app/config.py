@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     GLM_TIMEOUT: int = 60
     GLM_BASE_URL: str = "https://open.bigmodel.cn/api/paas/v4/"
 
+    # ========== LongCat API 配置（用于图片答案批改） ==========
+    LONGCAT_API_KEY: str
+    LONGCAT_BASE_URL: str = "https://api.longcat.chat/openai"
+    LONGCAT_MODEL: str = "LongCat-Flash-Lite"
+    LONGCAT_TEMPERATURE: float = 0.3
+    LONGCAT_MAX_TOKENS: int = 2000
+    LONGCAT_TIMEOUT: int = 120
+
     # ========== CORS 配置 ==========
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:8081"
 

@@ -17,7 +17,7 @@ public interface ExamSessionService extends IService<ExamSession> {
 
     boolean recordSwitch(String sessionId);
 
-    void submitExam(String sessionId);
+    void submitExam(String sessionId, String imagesJson);
 
     /**
      * 异步批改主观题

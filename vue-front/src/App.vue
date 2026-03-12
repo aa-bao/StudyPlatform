@@ -12,7 +12,7 @@ body,
   width: 100%;
 }
 
-/* 隐藏滚动条但保留滚动功能 */
+/* 隐藏滚动条 */
 ::-webkit-scrollbar {
   width: 0px;
   background: transparent;

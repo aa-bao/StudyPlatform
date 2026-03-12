@@ -36,12 +36,13 @@ export function recordSwitch(sessionId) {
 }
 
 // 提交考试
-export function submitExam(sessionId) {
+export function submitExam(sessionId, imagesJson = '{}') {
     return request({
         url: '/exam-session/submit',
         method: 'post',
-        params: {
-            sessionId
+        data: {
+            sessionId,
+            imagesJson
         }
     })
 }
@@ -94,5 +95,13 @@ export function getExamStats() {
     return request({
         url: '/exam-session/admin/stats',
         method: 'get'
+    })
+}
+
+// 放弃考试
+export function abandonExamApi(sessionId) {
+    return request({
+        url: `/exam-session/${sessionId}`,
+        method: 'delete'
     })
 }

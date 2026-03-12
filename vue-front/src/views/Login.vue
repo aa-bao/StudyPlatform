@@ -105,7 +105,6 @@
                     <div class="input-group">
                         <div class="flex-between">
                             <label>密码</label>
-                            <a href="#" class="link" @click.prevent="handleForgetPassword">忘记密码?</a>
                         </div>
                         <div class="input-wrapper">
                             <img :src="lockIcon" class="field-icon" alt="lock">
@@ -379,10 +378,6 @@ const handleGetCode = async () => {
     }
 };
 
-// 忘记密码
-const handleForgetPassword = () => {
-    ElMessage.info('忘记密码功能开发中，请联系管理员重置密码');
-};
 </script>
 
 <style scoped>

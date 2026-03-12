@@ -118,7 +118,6 @@
                     <textarea
                       v-model="answers[q.id]"
                       @input="markDone(q.id)"
-                      @focus="activeLatexPanel = q.id"
                       :data-question-id="q.id"
                       class="answer-area"
                       :disabled="isSubmitted"
@@ -126,19 +125,45 @@
                       placeholder="请输入你的答案..."
                     ></textarea>
 
-                    <!-- LaTeX 预览区 -->
+                    <!-- 主观题图片上传区域 -->
+                    <div v-if="q.type === 'subjective' && !isSubmitted" class="image-upload-section">
+                      <div class="upload-header">
+                        <span class="upload-label">上传手写答案图片：</span>
+                        <el-button size="small" type="primary" @click="triggerImageUpload(q.id)">
+                          选择图片
+                        </el-button>
+                        <input
+                          type="file"
+                          :ref="el => setImageUploadRef(el, q.id)"
+                          accept="image/*"
+                          style="display: none"
+                          @change="handleImageUpload($event, q.id)"
+                        />
+                      </div>
+                      <!-- 已上传的图片列表 -->
+                      <div v-if="answerImages[q.id] && answerImages[q.id].length > 0" class="image-preview-list">
+                        <div v-for="(img, index) in answerImages[q.id]" :key="index" class="image-preview-item">
+                          <img :src="getSafeImageSrc(img.preview)" class="preview-thumb" @error="handleImageError" />
+                          <button class="remove-btn" @click="removeImage(q.id, index)">×</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 已提交的图片显示 -->
+                    <div v-if="q.type === 'subjective' && isSubmitted && answerImages[q.id] && answerImages[q.id].length > 0" class="submitted-images">
+                      <span class="upload-label">手写答案：</span>
+                      <div class="image-preview-list">
+                        <div v-for="(img, index) in answerImages[q.id]" :key="index" class="image-preview-item">
+                          <img :src="getSafeImageSrc(img.preview)" class="preview-thumb" @click="previewImage(img.preview)" @error="handleImageError" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 公式预览区（保留用于查看用户输入的公式） -->
                     <div v-if="!isSubmitted && answers[q.id] && hasLatex(answers[q.id])" class="latex-preview">
                       <div class="preview-label">公式预览：</div>
                       <div class="preview-content" v-html="renderLatex(answers[q.id])"></div>
                     </div>
-
-                    <!-- LaTeX 快捷输入面板 -->
-                    <LatexShortcuts
-                      v-if="!isSubmitted && activeLatexPanel === q.id && (q.type === 'fill-blank' || q.type === 'subjective')"
-                      @insert="(latex) => insertLatex(q.id, latex)"
-                      @clear="() => clearLatexInput(q.id)"
-                      @wrap="(wrapper) => wrapLatex(q.id, wrapper)"
-                    />
                   </div>
                 </template>
               </div>
@@ -248,11 +273,12 @@
                 <div class="score-box">
                   <span class="score-label">总得分</span>
                   <span class="score-value">{{ examResult.totalScore || 0 }}</span>
-                  <span class="score-total">/ {{ examResult.objectiveTotalScore || 75 }}</span>
+                  <!-- <span class="score-total">/ {{ examResult.objectiveTotalScore || 75 }}</span> -->
+                  <span class="score-total"></span>
                 </div>
-                <div class="analysis-box">
+                <div class="analysis-box markdown-content">
                   <h4>总结</h4>
-                  <p style="white-space: pre-line;">{{ examResult.aiSummary || '暂无总结' }}</p>
+                  <div v-html="renderMarkdown(examResult.aiSummary || '暂无总结')"></div>
                 </div>
               </div>
             </div>
@@ -283,6 +309,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import MarkdownIt from 'markdown-it';
 import { startExam, saveSnapshot, recordSwitch, submitExam as submitExamApi, getSessionDetail } from '@/api/examSession';
 import { getPaperDetail } from '@/api/paper';
 import { getSessionExamRecords } from '@/api/examRecord';
@@ -290,10 +317,44 @@ import draftIcon from '@/assets/icons/draft.svg?url';
 import eyesIcon from '@/assets/icons/eyes.svg?url';
 import fullScreenIcon from '@/assets/icons/full-screen.svg?url';
 import UserGradingDialog from '@/components/UserGradingDialog.vue';
-import LatexShortcuts from '@/components/LatexShortcuts.vue';
 
 const router = useRouter();
 const route = useRoute();
+
+// 初始化 markdown-it
+const md = new MarkdownIt({
+  breaks: true,
+  linkify: true,
+  typographer: true
+})
+
+// 渲染 markdown 内容
+const renderMarkdown = (content) => {
+  if (!content) return ''
+  return md.render(content)
+}
+
+// 检查URL是否包含Base64数据（通常是localStorage数据被错误编码）
+const cleanupUrlEncodedData = () => {
+  const url = window.location.href;
+  if (url.includes('iVBORw') || url.includes('base64,')) {
+    console.warn('检测到URL中包含Base64数据，正在清理localStorage');
+
+    // 直接清理localStorage，不重新加载页面
+    localStorage.removeItem('mock_exam_state');
+    localStorage.removeItem(`exam_end_time_${Date.now()}`);
+
+    // 使用replaceState而不是href来避免重新加载
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+};
+
+// 页面加载时检查
+onMounted(() => {
+  cleanupUrlEncodedData();
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  addHistoryProtection();
+});
 
 // --- 状态数据 ---
 const examAppRef = ref(null);
@@ -301,16 +362,17 @@ const isFullScreen = ref(false);
 const isSubmitted = ref(false);
 const showResultModal = ref(false);
 const showUserGradingDialog = ref(false); // 主观题自评对话框
-const activeLatexPanel = ref(null); // 当前激活LaTeX面板的题目ID
 const loading = ref(true);
 const loadingText = ref('正在加载试卷...');
 const error = ref(null);
 const submitting = ref(false);
+const isTimeoutSubmitting = ref(false); // 标记是否正在超时自动提交
 
 // 试卷信息
 const paperInfo = ref({});
 const allQuestions = ref([]); // 所有题目
-const answers = reactive({}); // 用户答案
+const answers = reactive({}); // 用户答案（文本）
+const answerImages = reactive({}); // 用户答案（图片）-- 主观题手写答案
 const doneSet = reactive(new Set()); // 已答题目集合
 
 // 考试会话
@@ -487,18 +549,79 @@ const initExam = async () => {
     // 保存到 examResult 中，用于报告显示
     examResult.value.objectiveTotalScore = objectiveTotalScore;
 
-    // 恢复后端保存的答题快照（如果有）
+    // 恢复后端保存的答题快照（只有文本答案）
     if (data.session.snapshotAnswers && data.session.snapshotAnswers !== '{}') {
       try {
-        const snapshot = JSON.parse(data.session.snapshotAnswers);
+        const snapshotAnswers = JSON.parse(data.session.snapshotAnswers);
+
         // 将快照答案应用到题目
         allQuestions.value.forEach(q => {
-          if (snapshot[q.id]) {
-            q.userAnswer = snapshot[q.id];
+          if (snapshotAnswers[q.id]) {
+            q.userAnswer = snapshotAnswers[q.id];
           }
         });
       } catch (err) {
         console.error('恢复答题快照失败:', err);
+      }
+    }
+
+    // 从本地存储恢复图片答案（仅在考试进行中且数据非常小时）
+    if (!isSubmitted.value) {
+      const savedState = localStorage.getItem('mock_exam_state');
+      if (savedState && savedState.length < 1024) { // 限制大小为1KB
+        try {
+          const parsed = JSON.parse(savedState);
+          if (parsed.answerImages &&
+              typeof parsed.answerImages === 'object' &&
+              Object.keys(parsed.answerImages).length > 0) {
+
+            // 检查每个题目的图片数量是否合理（最多3张）
+            let validImages = true;
+            let totalImages = 0;
+            for (const qid in parsed.answerImages) {
+              const images = parsed.answerImages[qid];
+              if (images.length > 3) {
+                validImages = false;
+                break;
+              }
+              totalImages += images.length;
+
+              // 检查每张图片的base64数据长度（限制在1KB内）
+              for (let i = 0; i < images.length; i++) {
+                if (images[i].base64 && images[i].base64.length > 1024) {
+                  validImages = false;
+                  break;
+                }
+              }
+              if (!validImages) break;
+            }
+
+            // 最多允许恢复6张图片
+            if (validImages && totalImages <= 6) {
+              // 恢复图片 - 确保预览URL有正确的data URL前缀
+              Object.keys(parsed.answerImages).forEach(qid => {
+                answerImages[qid] = parsed.answerImages[qid].map(img => {
+                  // 检查base64和preview是否包含正确的前缀
+                  let { base64, preview } = img;
+
+                  // 确保base64有正确的前缀
+                  if (base64 && !base64.startsWith('data:image/')) {
+                    base64 = `data:image/png;base64,${base64}`;
+                  }
+
+                  // 确保preview有正确的前缀
+                  if (preview && !preview.startsWith('data:image/')) {
+                    preview = `data:image/png;base64,${preview}`;
+                  }
+
+                  return { base64, preview };
+                });
+              });
+            }
+          }
+        } catch (err) {
+          console.error('恢复本地图片失败:', err);
+        }
       }
     }
 
@@ -629,7 +752,11 @@ const handleOptionChange = (questionId, option, questionType) => {
 // 标记已答
 const markDone = (id) => {
   const answer = answers[id];
-  if (answer && (typeof answer === 'string' ? answer.trim() : true)) {
+  const images = answerImages[id] || [];
+  const hasAnswer = answer && (typeof answer === 'string' ? answer.trim() : true);
+  const hasImages = images.length > 0;
+
+  if (hasAnswer || hasImages) {
     doneSet.add(id);
   } else {
     doneSet.delete(id);
@@ -677,8 +804,14 @@ const hasLatex = (text) => {
 
 // 计时器
 const initTimer = () => {
+  // 先清除可能存在的旧计时器
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
   const updateTimer = () => {
-    if (!examEndTime.value) return;
+    if (!examEndTime.value || isSubmitted.value) return;
 
     const now = Date.now();
     const remaining = Math.max(0, Math.floor((examEndTime.value - now) / 1000));
@@ -686,6 +819,8 @@ const initTimer = () => {
 
     if (remaining === 0) {
       clearInterval(timerInterval);
+      // 超时自动提交 - 设置标记防止违规检测触发
+      isTimeoutSubmitting.value = true;
       handleSubmit(true);
     }
   };
@@ -722,19 +857,151 @@ const saveSnapshotToLocal = async () => {
       }
     });
 
+    // 只保存文本答案到后端（图片太大，不实时传输）
+    // 图片保存在前端本地存储，提交试卷时一起发送
     await saveSnapshot(sessionId.value, JSON.stringify(answersToSave));
   } catch (err) {
     console.error('保存快照失败:', err);
   }
 };
 
+// 图片上传相关
+const imageUploadRefs = reactive({});
+
+const setImageUploadRef = (el, questionId) => {
+  if (el) {
+    imageUploadRefs[questionId] = el;
+  }
+};
+
+const triggerImageUpload = (questionId) => {
+  const input = imageUploadRefs[questionId];
+  if (input) {
+    input.click();
+  }
+};
+
+const handleImageUpload = async (event, questionId) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // 验证文件大小（最大5MB）
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('图片大小不能超过5MB');
+    return;
+  }
+
+  // 转换为Base64
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const base64 = e.target.result;
+
+    // 初始化题目图片数组
+    if (!answerImages[questionId]) {
+      answerImages[questionId] = [];
+    }
+
+    // 添加图片（最多3张）
+    if (answerImages[questionId].length >= 3) {
+      ElMessage.warning('最多只能上传3张图片');
+      return;
+    }
+
+    answerImages[questionId].push({
+      base64: base64,
+      preview: base64
+    });
+
+    // 标记完成
+    markDone(questionId);
+    ElMessage.success('图片上传成功');
+  };
+  reader.readAsDataURL(file);
+
+  // 清空input，允许重复选择同一张图片
+  event.target.value = '';
+};
+
+const removeImage = (questionId, index) => {
+  if (answerImages[questionId] && answerImages[questionId].length > index) {
+    answerImages[questionId].splice(index, 1);
+    // 删除图片后更新答题卡状态
+    markDone(questionId);
+  }
+};
+
+// 安全的图片URL处理
+const getSafeImageSrc = (src) => {
+  if (!src) return '';
+
+  // 确保图片URL有正确的数据前缀
+  if (src.startsWith('data:image/')) {
+    return src;
+  } else if (src.startsWith('iVBORw0KGgo') || src.includes('/') || src.includes('+')) {
+    // 如果是base64数据但没有前缀，添加默认前缀
+    return `data:image/png;base64,${src}`;
+  }
+
+  return '';
+};
+
+// 图片加载失败处理
+const handleImageError = (event) => {
+  console.warn('图片加载失败:', event.target.src);
+  // 隐藏失败的图片
+  event.target.style.display = 'none';
+  // 或者替换为默认图片
+  // event.target.src = '/default-image.png';
+};
+
+// 图片预览
+const previewImage = (url) => {
+  // 确保预览URL有正确的前缀
+  const safeUrl = getSafeImageSrc(url);
+  if (safeUrl) {
+    window.open(safeUrl, '_blank');
+  }
+};
+
 // 保存本地状态
 const saveLocalState = () => {
-  localStorage.setItem('mock_exam_state', JSON.stringify({
-    sessionId: sessionId.value,
-    answers,
-    strokes: strokes.value
-  }));
+  try {
+    const state = {
+      sessionId: sessionId.value,
+      answers,
+      strokes: strokes.value
+    };
+
+    // 只保存图片数据，但限制大小
+    if (Object.keys(answerImages).length > 0) {
+      state.answerImages = {};
+      Object.keys(answerImages).forEach(qid => {
+        state.answerImages[qid] = answerImages[qid].map(img => {
+          // 保存时，确保只保存有用的信息，并且格式化正确
+          let pureBase64 = img.base64;
+          if (pureBase64 && pureBase64.includes(',')) {
+            pureBase64 = pureBase64.split(',')[1];
+          }
+
+          return {
+            base64: pureBase64,
+            preview: pureBase64 // 预览也使用纯base64，恢复时会添加前缀
+          };
+        });
+      });
+    }
+
+    const serialized = JSON.stringify(state);
+    // 限制localStorage大小为1KB，防止URL过长
+    if (serialized.length < 1024) {
+      localStorage.setItem('mock_exam_state', serialized);
+    } else {
+      // 如果太大，只保存空对象
+      localStorage.setItem('mock_exam_state', JSON.stringify({}));
+    }
+  } catch (err) {
+    console.error('保存本地状态失败:', err);
+  }
 };
 
 // 滚动到题目
@@ -866,18 +1133,34 @@ const confirmSubmit = async () => {
   isSubmitted.value = true;
   submitting.value = true;
 
-  // 停止计时器
+  // 停止计时器 - 多重保险确保完全停止
   if (timerInterval) {
     clearInterval(timerInterval);
     timerInterval = null;
   }
+  // 清空结束时间，确保即使有遗漏的计时器也不会继续更新
+  examEndTime.value = null;
 
   try {
-    // 先保存快照
+    // 准备图片答案（转换为后端需要的格式）
+    const imagesToSubmit = {};
+    Object.keys(answerImages).forEach(qid => {
+      if (answerImages[qid] && answerImages[qid].length > 0) {
+        // 提取base64数据（去掉data:image/xxx;base64,前缀）
+        imagesToSubmit[qid] = answerImages[qid].map(img => {
+          if (img.base64 && img.base64.includes(',')) {
+            return img.base64.split(',')[1];
+          }
+          return img.base64;
+        });
+      }
+    });
+
+    // 保存文本快照到后端
     await saveSnapshotToLocal();
 
-    // 提交考试（后端会立即返回客观题分数，并触发异步批改主观题）
-    const submitRes = await submitExamApi(sessionId.value);
+    // 提交考试（同时传递图片答案）
+    const submitRes = await submitExamApi(sessionId.value, JSON.stringify(imagesToSubmit));
     if (submitRes.code !== 200) {
       throw new Error('提交失败');
     }
@@ -914,7 +1197,29 @@ const confirmSubmit = async () => {
   } catch (err) {
     console.error('提交考试失败:', err);
     ElMessage.error(err.message || '提交失败');
-    isSubmitted.value = false;
+
+    // 无论提交成功或失败，都清理本地状态
+    isSubmitted.value = true; // 标记为已提交，防止违规检测
+    submitting.value = false;
+
+    // 清理本地存储
+    const { paperId, userId } = route.query;
+    if (paperId && userId) {
+      const storageKey = `exam_session_${paperId}_${userId}`;
+      localStorage.removeItem(storageKey);
+    }
+    localStorage.removeItem('mock_exam_state');
+    localStorage.removeItem(`exam_end_time_${sessionId.value}`);
+
+    // 移除历史记录保护
+    removeHistoryProtection();
+
+    // 提示用户并允许返回
+    ElMessage.warning('考试已结束，您现在可以退出');
+
+    // 直接显示结果（如果有）
+    showResultModal.value = true;
+    return;
   } finally {
     submitting.value = false;
   }
@@ -971,7 +1276,8 @@ const startPollingForResult = () => {
 
 // 切屏检测
 const handleVisibilityChange = () => {
-  if (document.hidden && sessionId.value && !isSubmitted.value) {
+  // 超时自动提交时不触发切屏检测
+  if (document.hidden && sessionId.value && !isSubmitted.value && !isTimeoutSubmitting.value) {
     switchCount.value++;
     recordSwitch(sessionId.value).catch(err => console.error('记录切屏失败:', err));
   }
@@ -987,8 +1293,8 @@ const addHistoryProtection = () => {
 
 // 处理返回按钮点击
 const handlePopState = (event) => {
-  // 如果考试已提交，不再阻止返回
-  if (isSubmitted.value) {
+  // 如果考试已提交或正在超时自动提交，不再阻止返回
+  if (isSubmitted.value || isTimeoutSubmitting.value) {
     return;
   }
 
@@ -1072,52 +1378,6 @@ const handleGradingSubmitted = async () => {
   }
 };
 
-// LaTeX 快捷输入处理函数
-const insertLatex = (questionId, latex) => {
-  const textarea = document.querySelector(`textarea[data-question-id="${questionId}"]`);
-  if (!textarea) return;
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const text = textarea.value;
-
-  // 在光标位置插入 LaTeX 代码
-  answers[questionId] = text.substring(0, start) + latex + text.substring(end);
-
-  // 恢复焦点和光标位置
-  nextTick(() => {
-    textarea.focus();
-    textarea.selectionStart = textarea.selectionEnd = start + latex.length;
-  });
-};
-
-const clearLatexInput = (questionId) => {
-  answers[questionId] = '';
-  nextTick(() => {
-    const textarea = document.querySelector(`textarea[data-question-id="${questionId}"]`);
-    if (textarea) textarea.focus();
-  });
-};
-
-const wrapLatex = (questionId, wrapper) => {
-  const textarea = document.querySelector(`textarea[data-question-id="${questionId}"]`);
-  if (!textarea) return;
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const selectedText = textarea.value.substring(start, end);
-
-  answers[questionId] =
-    textarea.value.substring(0, start) +
-    `${wrapper}${selectedText}${wrapper}` +
-    textarea.value.substring(end);
-
-  nextTick(() => {
-    textarea.focus();
-    textarea.selectionStart = start + wrapper.length;
-    textarea.selectionEnd = end + wrapper.length;
-  });
-};
 
 // 获取答题详情
 const fetchExamDetails = async () => {
@@ -1125,6 +1385,23 @@ const fetchExamDetails = async () => {
     const res = await getSessionExamRecords(sessionId.value);
     if (res.code === 200) {
       examDetails.value = res.data || [];
+
+      // 恢复图片答案到前端状态
+      res.data.forEach(detail => {
+        if (detail.userAnswerImages) {
+          try {
+            const images = JSON.parse(detail.userAnswerImages);
+            if (Array.isArray(images) && images.length > 0) {
+              answerImages[detail.questionId] = images.map(img => ({
+                base64: img,
+                preview: img
+              }));
+            }
+          } catch (e) {
+            console.error('解析图片答案失败:', e);
+          }
+        }
+      });
     }
   } catch (err) {
     console.error('获取答题详情失败:', err);
@@ -1133,15 +1410,24 @@ const fetchExamDetails = async () => {
 
 // 返回
 const goBack = () => {
+  // 先移除历史记录保护，允许返回
+  removeHistoryProtection();
+  // 标记为已提交状态，防止任何拦截
+  isSubmitted.value = true;
   router.back();
 };
 
 const goBackToHome = () => {
+  // 先移除历史记录保护，允许跳转
+  removeHistoryProtection();
+  // 标记为已提交状态，防止任何拦截
+  isSubmitted.value = true;
   router.push('/user/paper-list');
 };
 
 // 监听状态变化
 watch(answers, () => saveLocalState(), { deep: true });
+watch(answerImages, () => saveLocalState(), { deep: true });
 watch(strokes, () => saveLocalState(), { deep: true });
 
 // 生命周期
@@ -1610,6 +1896,78 @@ button {
   width: 100%;
 }
 
+/* 图片上传区域 */
+.image-upload-section {
+  margin-top: 12px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px dashed #dcdfe6;
+}
+
+.upload-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-label {
+  font-size: 13px;
+  color: #606266;
+}
+
+.image-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.image-preview-item {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #ebeef5;
+}
+
+.preview-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-btn:hover {
+  background: rgba(255, 0, 0, 0.8);
+}
+
+.submitted-images {
+  margin-top: 12px;
+  padding: 10px;
+  background: #f0f9eb;
+  border-radius: 6px;
+}
+
 .latex-preview {
   margin-top: 10px;
   padding: 10px;
@@ -1961,6 +2319,133 @@ button {
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
+}
+
+/* Markdown 内容样式 */
+.markdown-content {
+  color: #303133;
+  line-height: 1.8;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.markdown-content h1 {
+  font-size: 22px;
+  border-bottom: 2px solid #e4e7ed;
+  padding-bottom: 8px;
+}
+
+.markdown-content h2 {
+  font-size: 18px;
+  border-bottom: 1px solid #e4e7ed;
+  padding-bottom: 6px;
+}
+
+.markdown-content h3 {
+  font-size: 16px;
+}
+
+.markdown-content h4 {
+  font-size: 15px;
+}
+
+.markdown-content p {
+  margin: 8px 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-content li {
+  margin: 4px 0;
+}
+
+.markdown-content code {
+  background-color: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  color: #c7254e;
+}
+
+.markdown-content pre {
+  background-color: #f5f7fa;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  color: #303133;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #409eff;
+  padding-left: 12px;
+  margin: 12px 0;
+  color: #606266;
+  background-color: #ecf5ff;
+  padding: 8px 12px;
+  border-radius: 0 4px 4px 0;
+}
+
+.markdown-content strong {
+  color: #303133;
+  font-weight: 600;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content a {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #dcdfe6;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: #f5f7fa;
+  font-weight: 600;
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid #dcdfe6;
+  margin: 16px 0;
 }
 
 

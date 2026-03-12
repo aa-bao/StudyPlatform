@@ -177,6 +177,121 @@ public class PythonBackendClient {
     }
 
     /**
+     * 图片答案智能批改
+     * 调用 Python 服务的 /ai/grade-with-image 接口
+     *
+     * @param questionContent 题目内容
+     * @param referenceAnswer 参考答案
+     * @param imageBases 用户手写答案的图片Base64列表
+     * @param questionType 题目类型
+     * @param questionScore 题目满分
+     * @return 批改结果
+     */
+    public Map<String, Object> gradeWithImage(
+            String questionContent,
+            String referenceAnswer,
+            List<String> imageBases,
+            Integer questionType,
+            Float questionScore) {
+
+        try {
+            log.info("调用 Python 服务进行图片答案批改，题型: {}, 图片数量: {}", questionType, imageBases.size());
+
+            // 构造请求体
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("question_content", questionContent);
+            requestBody.put("reference_answer", referenceAnswer);
+            requestBody.put("image_bases", imageBases);
+            requestBody.put("question_type", questionType != null ? questionType : 4);
+            requestBody.put("question_score", questionScore != null ? questionScore : 100f);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+
+            // 发送请求
+            ResponseEntity<String> response = restTemplate.exchange(
+                    pythonBackendUrl + "/ai/grade-with-image",
+                    HttpMethod.POST,
+                    requestEntity,
+                    String.class
+            );
+
+            // 解析响应
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                Map<String, Object> result = objectMapper.readValue(
+                        response.getBody(),
+                        new TypeReference<Map<String, Object>>() {}
+                );
+
+                Integer code = (Integer) result.get("code");
+                if (code != null && code == 200) {
+                    return (Map<String, Object>) result.get("data");
+                } else {
+                    String message = (String) result.get("message");
+                    throw new RuntimeException("Python 服务返回错误: " + message);
+                }
+            } else {
+                throw new RuntimeException("Python 服务响应异常: " + response.getStatusCode());
+            }
+
+        } catch (Exception e) {
+            log.error("图片答案批改失败", e);
+            throw new RuntimeException("图片答案批改失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 整卷分析
+     * 调用 Python 服务的 /ai/analyze-exam 接口
+     *
+     * @param examData 整卷数据（题目、答案、用户答案等）
+     * @return 分析结果
+     */
+    public Map<String, Object> analyzeExam(Map<String, Object> examData) {
+        try {
+            log.info("调用 Python 服务进行整卷分析，题目数量: {}",
+                    examData.get("questions") instanceof List ? ((List<?>) examData.get("questions")).size() : 0);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(examData, headers);
+
+            // 发送请求
+            ResponseEntity<String> response = restTemplate.exchange(
+                    pythonBackendUrl + "/ai/analyze-exam",
+                    HttpMethod.POST,
+                    requestEntity,
+                    String.class
+            );
+
+            // 解析响应
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                Map<String, Object> result = objectMapper.readValue(
+                        response.getBody(),
+                        new TypeReference<Map<String, Object>>() {}
+                );
+
+                Integer code = (Integer) result.get("code");
+                if (code != null && code == 200) {
+                    return (Map<String, Object>) result.get("data");
+                } else {
+                    String message = (String) result.get("message");
+                    throw new RuntimeException("Python 服务返回错误: " + message);
+                }
+            } else {
+                throw new RuntimeException("Python 服务响应异常: " + response.getStatusCode());
+            }
+
+        } catch (Exception e) {
+            log.error("整卷分析失败", e);
+            throw new RuntimeException("整卷分析失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * 健康检查
      *
      * @return Python 服务的健康状态

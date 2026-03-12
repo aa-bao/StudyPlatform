@@ -158,8 +158,8 @@
         <div class="options-grid" th:if="${(question.type == 1 || question.type == 2) && question.options != null}">
             <div class="option-item" th:each="option, optStat : ${question.options}">
                 <span class="option-circle"></span>
-                <span class="option-label" th:text="'(' + ${T(java.lang.String).valueOf((char)(65 + optStat.index))} + ')'"> (A) </span>
-                <span th:utext="${option}"></span>
+                <span class="option-label" th:text="'(' + ${option.label} + ')'"> (A) </span>
+                <span th:utext="${option.text}"></span>
             </div>
         </div>
 
