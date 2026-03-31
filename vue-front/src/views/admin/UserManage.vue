@@ -138,7 +138,7 @@
                                 <el-input v-model="editForm.nickname" placeholder="请输入昵称" />
                             </el-form-item>
                             <el-form-item label="手机号">
-                                <el-input v-model="editForm.phone" placeholder="请输入手机号" />
+                                <el-input v-model="editForm.phone" placeholder="请输入手机号" maxlength="11" show-word-limit @input="editForm.phone = editForm.phone.replace(/\D/g, '')" />
                             </el-form-item>
                             <el-form-item label="邮箱">
                                 <el-input v-model="editForm.email" placeholder="请输入邮箱" />
@@ -322,7 +322,7 @@ const submitEdit = async () => {
     try {
         if (isAddMode.value) {
             // 新增用户
-            await request.post('/user/register', editForm.value)
+            await request.post('/user/adminAdd', editForm.value)
             ElMessage.success('添加成功')
         } else {
             // 更新用户

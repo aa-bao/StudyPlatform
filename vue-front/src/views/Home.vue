@@ -1079,7 +1079,7 @@ onUnmounted(() => {
 .dashboard-container {
     display: flex;
     min-height: 100vh;
-    background: linear-gradient(135deg, #cfecff 0%, #00aeff 100%);
+    background: linear-gradient(135deg, #faf8f5 0%, #f0e8df 100%);
     color: #1f2937;
     font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
     padding: 20px;

@@ -152,31 +152,49 @@ public class AdminServiceImpl implements org.example.kaoyanplatform.service.Admi
         List<String> dates = new ArrayList<>();
         List<Integer> activeUsers = new ArrayList<>();
 
-        int days = period.equals("month") ? 30 : (period.equals("year") ? 30 : 7); // year暂用30天示例
+        if (period.equals("year")) {
+            // 按月聚合：遍历过去12个月
+            for (int i = 11; i >= 0; i--) {
+                LocalDate monthStart = LocalDate.now().minusMonths(i).withDayOfMonth(1);
+                LocalDate monthEnd = monthStart.plusMonths(1);
+                LocalDateTime start = monthStart.atStartOfDay();
+                LocalDateTime end = monthEnd.atStartOfDay();
 
-        for (int i = days - 1; i >= 0; i--) {
-            LocalDateTime dayStart = LocalDate.now().minusDays(i).atStartOfDay();
-            LocalDateTime dayEnd = LocalDate.now().minusDays(i - 1).atStartOfDay();
+                List<AnswerRecord> monthRecords = recordService.list(
+                    new QueryWrapper<AnswerRecord>()
+                        .ge("create_time", start)
+                        .lt("create_time", end)
+                );
 
-            // 查询当天的活跃用户
-            List<AnswerRecord> dayRecords = recordService.list(
-                new QueryWrapper<AnswerRecord>()
-                    .ge("create_time", dayStart)
-                    .lt("create_time", dayEnd)
-            );
+                Set<Long> uniqueUsers = new HashSet<>();
+                for (AnswerRecord record : monthRecords) {
+                    uniqueUsers.add(record.getUserId());
+                }
 
-            Set<Long> uniqueUsers = new HashSet<>();
-            for (AnswerRecord record : dayRecords) {
-                uniqueUsers.add(record.getUserId());
+                dates.add(monthStart.getMonthValue() + "月");
+                activeUsers.add(uniqueUsers.size());
             }
+        } else {
+            int days = period.equals("month") ? 30 : 7;
 
-            // 格式化日期
-            String dateStr = period.equals("year")
-                ? (LocalDate.now().minusDays(i).getMonthValue() + "月")
-                : (LocalDate.now().minusDays(i).getMonthValue() + "/" + LocalDate.now().minusDays(i).getDayOfMonth());
+            for (int i = days - 1; i >= 0; i--) {
+                LocalDateTime dayStart = LocalDate.now().minusDays(i).atStartOfDay();
+                LocalDateTime dayEnd = LocalDate.now().minusDays(i - 1).atStartOfDay();
 
-            dates.add(dateStr);
-            activeUsers.add(uniqueUsers.size());
+                List<AnswerRecord> dayRecords = recordService.list(
+                    new QueryWrapper<AnswerRecord>()
+                        .ge("create_time", dayStart)
+                        .lt("create_time", dayEnd)
+                );
+
+                Set<Long> uniqueUsers = new HashSet<>();
+                for (AnswerRecord record : dayRecords) {
+                    uniqueUsers.add(record.getUserId());
+                }
+
+                dates.add(LocalDate.now().minusDays(i).getMonthValue() + "/" + LocalDate.now().minusDays(i).getDayOfMonth());
+                activeUsers.add(uniqueUsers.size());
+            }
         }
 
         result.put("dates", dates);

@@ -77,6 +77,23 @@ public class UserController {
         }
     }
 
+    @PostMapping("/adminAdd")
+    @Operation(summary = "管理员新增用户", description = "管理员直接创建用户，无需验证码。")
+    public Result adminAdd(@RequestBody User user) {
+        if (StrUtil.isBlank(user.getUsername()) || StrUtil.isBlank(user.getPassword())) {
+            return Result.error("用户名或密码不能为空");
+        }
+
+        User existUser = userService.getOne(new LambdaQueryWrapper<User>()
+                .eq(User::getUsername, user.getUsername()));
+        if (existUser != null) {
+            return Result.error("用户名已存在");
+        }
+
+        boolean success = userService.register(user);
+        return success ? Result.success("添加成功") : Result.error("添加失败");
+    }
+
     @PostMapping("/register")
     @Operation(summary = "用户注册", description = "创建新用户。用户名具有唯一性限制。")
     public Result register(

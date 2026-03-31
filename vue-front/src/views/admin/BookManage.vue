@@ -61,16 +61,18 @@
                     <el-table-column label="习题册信息" min-width="250">
                         <template #default="scope">
                             <div class="book-info-cell">
-                                <div v-if="scope.row.image" class="book-image">
-                                    <el-image :src="scope.row.image" :preview-src-list="[scope.row.image]" style="width: 60px; height: 80px; object-fit: cover; border-radius: 4px" fit="cover" />
+                                <div v-if="scope.row.image" class="book-cover">
+                                    <el-image :src="scope.row.image" :preview-src-list="[scope.row.image]" fit="cover" />
                                 </div>
-                                <div class="nickname">
-                                    <el-icon class="book-icon">
-                                        <Notebook />
-                                    </el-icon>
-                                    <span>{{ scope.row.name }}</span>
+                                <div class="book-text">
+                                    <div class="nickname">
+                                        <el-icon class="book-icon">
+                                            <Notebook />
+                                        </el-icon>
+                                        <span>{{ scope.row.name }}</span>
+                                    </div>
+                                    <div class="book-description">{{ scope.row.description || '暂无描述' }}</div>
                                 </div>
-                                <div class="book-description">{{ scope.row.description || '暂无描述' }}</div>
                             </div>
                         </template>
                     </el-table-column>
@@ -702,10 +704,6 @@ onMounted(() => {
     text-align: center;
 }
 
-.book-image {
-    margin-bottom: 8px;
-}
-
 /* 表格内部样式 */
 .modern-table {
     margin-bottom: 20px;
@@ -713,8 +711,29 @@ onMounted(() => {
 
 .book-info-cell {
     display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.book-cover {
+    flex-shrink: 0;
+    width: 48px;
+    height: 64px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #f1f3f5;
+}
+
+.book-cover .el-image {
+    width: 100%;
+    height: 100%;
+}
+
+.book-text {
+    display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 0;
 }
 
 .nickname {

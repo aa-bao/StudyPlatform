@@ -206,7 +206,7 @@
                             <el-upload ref="uploadRef" action="#" :auto-upload="false" :show-file-list="false"
                                 :on-change="handleAiRecognize" accept="image/*" class="ai-uploader">
                                 <el-button type="primary" size="small" :loading="recognizing" plain icon="Picture">
-                                    GLM AI 识别
+                                    智能识题
                                 </el-button>
                             </el-upload>
                         </div>

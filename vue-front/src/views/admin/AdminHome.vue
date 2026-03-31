@@ -441,77 +441,16 @@ const loadHourlyActivityHeatmap = async () => {
         const res = await request.get('/admin/hourly-activity-heatmap')
         const data = res.data || {}
 
-        // 更新答题时段热力图
         if (charts.heat) {
             charts.heat.setOption({
-                tooltip: {
-                    position: 'top',
-                    formatter: function(params) {
-                        return `${data.days[params.value[1]]} ${data.hours[params.value[0]]}<br/>答题: ${params.value[2]}次`
-                    }
-                },
-                grid: {
-                    height: '70%',
-                    top: '15%',
-                    left: '10%',
-                    right: '15%'
-                },
                 xAxis: {
-                    type: 'category',
-                    data: data.hours || [],
-                    splitArea: {
-                        show: true
-                    },
-                    axisLabel: {
-                        fontSize: 10
-                    }
+                    data: data.hours || []
                 },
                 yAxis: {
-                    type: 'category',
-                    data: data.days || [],
-                    splitArea: {
-                        show: true
-                    },
-                    axisLabel: {
-                        fontSize: 11
-                    }
-                },
-                visualMap: {
-                    min: 0,
-                    max: 20,
-                    calculable: true,
-                    orient: 'horizontal',
-                    left: 'center',
-                    bottom: '5%',
-                    text: ['低', '', '', '', '', '中', '', '', '', '', '高'],
-                    inRange: {
-                        color: ['#e0f3f8', '#b3e0ff', '#80b5ff', '#4d94ff', '#1a73e8', '#0078d4', '#0050a3', '#003366']
-                    },
-                    textStyle: {
-                        color: '#666'
-                    },
-                    controller: {
-                        inRange: {
-                            color: '#409EFF'
-                        }
-                    }
+                    data: data.days || []
                 },
                 series: [{
-                    type: 'heatmap',
-                    data: data.data || [],
-                    label: {
-                        show: true,
-                        fontSize: 10,
-                        formatter: function(params) {
-                            return params.value[2] > 0 ? params.value[2] : ''
-                        }
-                    },
-                    emphasis: {
-                        itemStyle: {
-                            shadowBlur: 10,
-                            shadowColor: 'rgba(0, 0, 0, 0.5)'
-                        }
-                    }
+                    data: data.data || []
                 }]
             })
         }
@@ -624,10 +563,11 @@ const initCharts = () => {
             }
         },
         grid: {
-            height: '70%',
-            top: '15%',
-            left: '10%',
-            right: '15%'
+            height: '60%',
+            top: '8%',
+            left: '12%',
+            right: '10%',
+            bottom: '25%'
         },
         xAxis: {
             type: 'category',
@@ -655,18 +595,13 @@ const initCharts = () => {
             calculable: true,
             orient: 'horizontal',
             left: 'center',
-            bottom: '5%',
-            text: ['低', '', '', '', '', '中', '', '', '', '', '高'],
+            bottom: '2%',
+            text: ['高', '低'],
             inRange: {
-                color: ['#e0f3f8', '#b3e0ff', '#80b5ff', '#4d94ff', '#1a73e8', '#0078d4', '#0050a3', '#003366']
+                color: ['#f0f9ff', '#bae0ff', '#74c0fc', '#339af0', '#1c7ed6', '#1864ab']
             },
             textStyle: {
                 color: '#666'
-            },
-            controller: {
-                inRange: {
-                    color: '#409EFF'
-                }
             }
         },
         series: [{
